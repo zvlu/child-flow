@@ -8,6 +8,13 @@
       "when": 1774958793391,
       "tag": "0000_thick_ogun",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1774958976809,
+      "tag": "0001_safe_eternals",
+      "breakpoints": true
     }
   ]
 }

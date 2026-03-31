@@ -3,18 +3,20 @@
 ## Core Features
 
 ### Phase 1: Foundation & Authentication
-- [ ] Set up GitHub repository (zvlu/childflow)
-- [ ] Configure environment variables and secrets
+- [x] Set up GitHub repository (zvlu/childflow)
+- [x] Configure environment variables and secrets
 - [ ] Implement agency/organization login flow
-- [ ] Create user roles system (admin, staff, parent)
+- [x] Create user roles system (admin, staff, parent)
 
 ### Phase 2: Dashboard & Navigation
-- [ ] Design and implement main dashboard layout
+- [x] Design and implement main dashboard layout
 - [ ] Build sidebar navigation with role-based menu items
-- [ ] Create responsive header with user profile and logout
+- [x] Create responsive header with user profile and logout
 - [ ] Implement breadcrumb navigation
 
 ### Phase 3: Child Management
+- [x] Create database schema for children and families
+- [x] Implement tRPC procedures for child CRUD operations
 - [ ] Create child enrollment module (add, edit, view)
 - [ ] Build child profile pages with basic info
 - [ ] Implement child search and filtering

@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, and, gte, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, organizations, children, staff, families, attendance, InsertChild, InsertOrganization } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,62 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function getOrganizationByAgencyId(agencyId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(organizations).where(eq(organizations.agencyId, agencyId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getUserOrganizations(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(organizations).where(eq(organizations.ownerId, userId));
+}
+
+export async function getOrganizationChildren(organizationId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(children).where(eq(children.organizationId, organizationId));
+}
+
+export async function getChildById(childId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(children).where(eq(children.id, childId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createChild(data: InsertChild) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(children).values(data);
+  return result;
+}
+
+export async function getOrganizationStaff(organizationId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(staff).where(eq(staff.organizationId, organizationId));
+}
+
+export async function getAttendanceByDate(organizationId: number, date: Date) {
+  const db = await getDb();
+  if (!db) return [];
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+  return await db
+    .select()
+    .from(attendance)
+    .where(
+      and(
+        eq(attendance.organizationId, organizationId),
+        gte(attendance.date, startOfDay),
+        lte(attendance.date, endOfDay)
+      )
+    );
+}
+
+// TODO: add more feature queries here as your schema grows.
