@@ -1,5 +1,13 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1774958793391,
+      "tag": "0000_thick_ogun",
+      "breakpoints": true
+    }
+  ]
 }
