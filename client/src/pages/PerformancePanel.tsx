@@ -14,7 +14,7 @@ const chronicAbsenceData = [
 
 const donutData = (completed: number, total: number, color: string) => [
   { name: "Completed", value: completed, color: color },
-  { name: "Incomplete", value: total - completed, color: "#e5e7eb" },
+  { name: "Incomplete", value: total - completed, color: "#f1f5f9" },
 ];
 
 interface PanelCardProps {
@@ -25,12 +25,12 @@ interface PanelCardProps {
 }
 
 const PanelCard = ({ title, children, isEmpty, isLoading }: PanelCardProps) => (
-  <Card className="rounded-none border-none shadow-none bg-white h-[220px] flex flex-col overflow-hidden">
-    <CardHeader className="p-3 pb-0 flex flex-row items-center justify-between space-y-0 flex-shrink-0">
-      <CardTitle className="text-[12px] font-semibold text-slate-700 tracking-tight truncate pr-2">{title}</CardTitle>
-      <Info className="h-3.5 w-3.5 text-slate-300 cursor-help flex-shrink-0" />
+  <Card className="rounded-2xl border-none shadow-sm bg-white h-[240px] flex flex-col overflow-hidden transition-all hover:shadow-md">
+    <CardHeader className="p-4 pb-0 flex flex-row items-center justify-between space-y-0 flex-shrink-0">
+      <CardTitle className="text-[13px] font-bold text-slate-800 tracking-tight truncate pr-2">{title}</CardTitle>
+      <Info className="h-4 w-4 text-slate-300 cursor-help flex-shrink-0" />
     </CardHeader>
-    <CardContent className="flex-1 flex flex-col items-center justify-center p-2 overflow-hidden">
+    <CardContent className="flex-1 flex flex-col items-center justify-center p-3 overflow-hidden">
       {isLoading ? (
         <RefreshCw className="h-6 w-6 text-slate-200 animate-spin" />
       ) : isEmpty ? (
@@ -46,13 +46,13 @@ const DonutChart = ({ completed, total, color, label, subLabel }: { completed: n
   const percentage = Math.round((completed / total) * 100);
   return (
     <div className="flex flex-col items-center w-full h-full justify-center">
-      <div className="relative h-24 w-24 flex-shrink-0">
+      <div className="relative h-28 w-28 flex-shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie 
               data={donutData(completed, total, color)} 
-              innerRadius={28} 
-              outerRadius={38} 
+              innerRadius={32} 
+              outerRadius={44} 
               paddingAngle={0} 
               dataKey="value"
               startAngle={90}
@@ -60,20 +60,20 @@ const DonutChart = ({ completed, total, color, label, subLabel }: { completed: n
               isAnimationActive={false}
             >
               <Cell fill={color} />
-              <Cell fill="#e2e8f0" />
+              <Cell fill="#f1f5f9" />
             </Pie>
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-lg font-bold text-slate-700 leading-none">{completed}</span>
-          <span className="text-[8px] text-slate-400 text-center leading-tight mt-0.5">
+          <span className="text-xl font-bold text-slate-800 leading-none">{completed}</span>
+          <span className="text-[9px] text-slate-400 text-center leading-tight mt-1 font-medium">
             of {total}<br/>({percentage}%)
           </span>
         </div>
       </div>
-      <div className="flex gap-2 mt-2 text-[9px] text-slate-500 flex-wrap justify-center">
-        <div className="flex items-center gap-1"><div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} /> {label}: {completed}</div>
-        <div className="flex items-center gap-1"><div className="h-1.5 w-1.5 rounded-full bg-slate-200" /> {subLabel}: {total - completed}</div>
+      <div className="flex gap-3 mt-3 text-[10px] text-slate-500 flex-wrap justify-center font-medium">
+        <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} /> {label}: {completed}</div>
+        <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-slate-100" /> {subLabel}: {total - completed}</div>
       </div>
     </div>
   );
@@ -81,41 +81,46 @@ const DonutChart = ({ completed, total, color, label, subLabel }: { completed: n
 
 export default function PerformancePanel() {
   return (
-    <div className="h-full flex flex-col bg-[#f1f5f9] overflow-hidden">
+    <div className="h-full flex flex-col bg-[#f8fafc] overflow-hidden">
       {/* Header - Fixed Height */}
-      <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-slate-200 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <h1 className="text-base font-bold text-slate-800 flex items-center gap-1">
-            My Performance Panel (Current) <ChevronDown className="h-4 w-4 text-slate-400" />
-          </h1>
-          <Info className="h-4 w-4 text-slate-400 cursor-help" />
-        </div>
-        <div className="flex items-center gap-4 text-[10px] text-slate-500">
-          <div className="text-right">
-            <p className="font-bold text-slate-400">2025 - 2026</p>
-            <p>Refreshed Today • 12:30 AM</p>
+      <div className="flex items-center justify-between px-8 py-4 bg-white border-b border-slate-100 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <RefreshCw className="h-5 w-5 text-primary" />
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 border border-slate-200 bg-white shadow-sm rounded-md">
-            <MoreHorizontal className="h-4 w-4 text-slate-600" />
+          <div>
+            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-1.5">
+              My Performance Panel (Current) <ChevronDown className="h-4 w-4 text-slate-400" />
+            </h1>
+            <p className="text-[11px] text-slate-400 font-medium">Program-wide performance metrics and tracking</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-6 text-[11px] text-slate-500">
+          <div className="text-right">
+            <p className="font-bold text-slate-900">2025 - 2026</p>
+            <p className="font-medium text-slate-400">Refreshed Today • 12:30 AM</p>
+          </div>
+          <Button variant="outline" size="icon" className="h-10 w-10 border-slate-200 bg-white shadow-sm rounded-xl hover:bg-slate-50">
+            <MoreHorizontal className="h-5 w-5 text-slate-600" />
           </Button>
         </div>
       </div>
 
       {/* Main Grid - Scrollable if needed, but constrained */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[1px] bg-slate-200 border border-slate-200 rounded-sm overflow-hidden shadow-sm max-w-[1600px] mx-auto">
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-[1600px] mx-auto">
           
           {/* Row 1 */}
           <PanelCard title="Attendance on Mon 4/20" isEmpty />
           
           <PanelCard title="Chronic Absence">
-            <div className="w-full h-full px-1 flex flex-col justify-center">
-              <div className="h-32 w-full">
+            <div className="w-full h-full px-2 flex flex-col justify-center">
+              <div className="h-36 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chronicAbsenceData} layout="vertical" margin={{ left: -25, right: 10, top: 5, bottom: 5 }}>
+                  <BarChart data={chronicAbsenceData} layout="vertical" margin={{ left: -20, right: 15, top: 10, bottom: 10 }}>
                     <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#64748b" }} width={85} />
-                    <Bar dataKey="value" radius={[0, 2, 2, 0]} barSize={14} isAnimationActive={false}>
+                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#64748b", fontWeight: 500 }} width={90} />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20} isAnimationActive={false}>
                       {chronicAbsenceData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
@@ -123,7 +128,7 @@ export default function PerformancePanel() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex justify-between text-[8px] text-slate-400 px-10 mt-[-5px]">
+              <div className="flex justify-between text-[9px] text-slate-400 px-12 mt-[-5px] font-bold">
                 <span>0</span><span>100</span><span>200</span>
               </div>
             </div>
@@ -134,7 +139,7 @@ export default function PerformancePanel() {
           </PanelCard>
 
           <PanelCard title="Disability Concerns">
-            <DonutChart completed={33} total={335} color="#6d28d9" label="Open Concern" subLabel="No Concern" />
+            <DonutChart completed={33} total={335} color="#7c3aed" label="Open Concern" subLabel="No Concern" />
           </PanelCard>
 
           {/* Row 2 */}
