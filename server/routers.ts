@@ -11,6 +11,10 @@ import {
   createChild,
   getOrganizationStaff,
   getAttendanceByDate,
+  getHealthRecords,
+  createHealthRecord,
+  getFamilyServices,
+  createFamilyService,
 } from "./db";
 
 export const appRouter = router({
@@ -83,6 +87,32 @@ export const appRouter = router({
       )
       .query(async ({ input }) => {
         return getAttendanceByDate(input.organizationId, input.date);
+      }),
+  }),
+
+  health: router({
+    list: protectedProcedure
+      .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
+      .query(async ({ input }) => {
+        return getHealthRecords(input.organizationId, input.childId);
+      }),
+    create: protectedProcedure
+      .input(z.any()) // Using any for brevity in this step, ideally use Zod schema matching InsertHealthRecord
+      .mutation(async ({ input }) => {
+        return createHealthRecord(input);
+      }),
+  }),
+
+  familyServices: router({
+    list: protectedProcedure
+      .input(z.object({ organizationId: z.number(), familyId: z.number().optional() }))
+      .query(async ({ input }) => {
+        return getFamilyServices(input.organizationId, input.familyId);
+      }),
+    create: protectedProcedure
+      .input(z.any())
+      .mutation(async ({ input }) => {
+        return createFamilyService(input);
       }),
   }),
 });

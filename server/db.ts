@@ -1,6 +1,10 @@
 import { eq, and, gte, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, organizations, children, staff, families, attendance, InsertChild, InsertOrganization } from "../drizzle/schema";
+import { 
+  InsertUser, users, organizations, children, staff, families, attendance, 
+  healthRecords, familyServices,
+  InsertChild, InsertOrganization, InsertHealthRecord, InsertFamilyService 
+} from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -147,4 +151,42 @@ export async function getAttendanceByDate(organizationId: number, date: Date) {
     );
 }
 
-// TODO: add more feature queries here as your schema grows.
+export async function getHealthRecords(organizationId: number, childId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  if (childId) {
+    return await db.select().from(healthRecords).where(
+      and(
+        eq(healthRecords.organizationId, organizationId),
+        eq(healthRecords.childId, childId)
+      )
+    );
+  }
+  return await db.select().from(healthRecords).where(eq(healthRecords.organizationId, organizationId));
+}
+
+export async function createHealthRecord(data: InsertHealthRecord) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.insert(healthRecords).values(data);
+}
+
+export async function getFamilyServices(organizationId: number, familyId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  if (familyId) {
+    return await db.select().from(familyServices).where(
+      and(
+        eq(familyServices.organizationId, organizationId),
+        eq(familyServices.familyId, familyId)
+      )
+    );
+  }
+  return await db.select().from(familyServices).where(eq(familyServices.organizationId, organizationId));
+}
+
+export async function createFamilyService(data: InsertFamilyService) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.insert(familyServices).values(data);
+}
