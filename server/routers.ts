@@ -15,6 +15,7 @@ import {
   createHealthRecord,
   getFamilyServices,
   createFamilyService,
+  getCommunicationLogs,
 } from "./db";
 import { CommunicationService } from "./services/communication";export const appRouter = router({
   system: systemRouter,
@@ -138,6 +139,11 @@ import { CommunicationService } from "./services/communication";export const app
         // In production, fetch all families in organization and loop sendMessage
         console.log(`[Broadcast] Sending to organization ${input.organizationId} via ${input.channels.join(', ')}`);
         return { success: true, count: 150 }; // Mock count
+      }),
+    list: protectedProcedure
+      .input(z.object({ organizationId: z.number(), recipientId: z.number().optional() }))
+      .query(async ({ input }) => {
+        return await getCommunicationLogs(input.organizationId, input.recipientId);
       }),
   }),
 });

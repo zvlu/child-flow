@@ -8,7 +8,8 @@ import {
   Search, MessageSquare, Phone, Mail, Plus, 
   MoreHorizontal, Filter, Send, User, Clock,
   CheckCircle2, AlertCircle, Trash2, Archive,
-  Reply, Forward, FileText, Users, Megaphone
+  Reply, Forward, FileText, Users, Megaphone,
+  History as HistoryIcon, Smartphone
 } from "lucide-react";
 import {
   Dialog,
@@ -54,7 +55,9 @@ export default function Communication() {
   const [isNewLogOpen, setIsNewLogOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState("messages");
 
-  // API Mutations
+  // API Queries & Mutations
+  const { data: historyLogs, isLoading: isHistoryLoading } = trpc.messaging.list.useQuery({ organizationId: 1 });
+
   const sendMessageMutation = trpc.messaging.send.useMutation({
     onSuccess: () => {
       toast.success("Message sent successfully to the family!");
@@ -99,15 +102,23 @@ export default function Communication() {
     );
   }, [logs, searchQuery]);
 
+  const filteredHistory = useMemo(() => {
+    if (!historyLogs) return [];
+    return historyLogs.filter(h => 
+      h.content.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (h.subject && h.subject.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [historyLogs, searchQuery]);
+
   // Handlers
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
     
     sendMessageMutation.mutate({
-      organizationId: 1, // Mock org ID
-      recipientId: 1,    // Mock recipient ID
-      to: "parent@example.com", // Mock destination
+      organizationId: 1,
+      recipientId: 1,
+      to: "parent@example.com",
       subject: formData.get("subject") as string,
       content: formData.get("content") as string,
       type: "email"
@@ -216,6 +227,7 @@ export default function Communication() {
               Inbox <Badge className="ml-2 bg-white/20 text-white border-none h-4 px-1.5">{messages.filter(m => m.unread).length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="logs" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Contact Logs</TabsTrigger>
+            <TabsTrigger value="history" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">History</TabsTrigger>
             <TabsTrigger value="broadcast" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Broadcasts</TabsTrigger>
           </TabsList>
 
@@ -405,6 +417,59 @@ export default function Communication() {
               </DialogContent>
             </Dialog>
           </div>
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-0">
+          <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
+            <CardContent className="p-0">
+              {isHistoryLoading ? (
+                <div className="py-20 flex flex-col items-center justify-center">
+                  <Clock className="h-8 w-8 text-primary animate-spin mb-2" />
+                  <p className="text-sm text-slate-500 font-bold">Loading communication history...</p>
+                </div>
+              ) : filteredHistory.length > 0 ? (
+                <div className="divide-y divide-slate-50">
+                  {filteredHistory.map((h: any) => (
+                    <div key={h.id} className="p-5 hover:bg-slate-50/80 transition-all flex items-start gap-4">
+                      <div className={cn(
+                        "h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm",
+                        h.type === 'sms' ? "bg-blue-50 text-blue-500" : "bg-purple-50 text-purple-500"
+                      )}>
+                        {h.type === 'sms' ? <Smartphone className="h-5 w-5" /> : <Mail className="h-5 w-5" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-slate-900">
+                              {h.type === 'sms' ? 'SMS Message' : h.subject || 'Email Notification'}
+                            </h3>
+                            <Badge className={cn(
+                              "text-[9px] font-bold uppercase tracking-tighter h-4 px-1.5",
+                              h.status === 'sent' ? "bg-green-500" : h.status === 'failed' ? "bg-red-500" : "bg-amber-500"
+                            )}>
+                              {h.status}
+                            </Badge>
+                          </div>
+                          <span className="text-[11px] text-slate-400 font-bold">
+                            {new Date(h.sentAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed">{h.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-20 flex flex-col items-center justify-center text-center">
+                  <div className="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center mb-4">
+                    <HistoryIcon className="h-8 w-8 text-slate-200" />
+                  </div>
+                  <h3 className="text-slate-900 font-bold">No communication history</h3>
+                  <p className="text-slate-400 text-sm font-medium">Past SMS and Email logs will appear here.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="broadcast" className="mt-0">

@@ -190,3 +190,17 @@ export async function createFamilyService(data: InsertFamilyService) {
   if (!db) throw new Error("Database not available");
   return await db.insert(familyServices).values(data);
 }
+
+export async function getCommunicationLogs(organizationId: number, recipientId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  if (recipientId) {
+    return await db.select().from(communicationLogs).where(
+      and(
+        eq(communicationLogs.organizationId, organizationId),
+        eq(communicationLogs.recipientId, recipientId)
+      )
+    );
+  }
+  return await db.select().from(communicationLogs).where(eq(communicationLogs.organizationId, organizationId));
+}
