@@ -98,8 +98,8 @@
   --accent-foreground:  oklch(0.92 0.005 65);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: oklch(1 0 0 / 15%);
+  --input: oklch(1 0 0 / 20%);
   --ring: oklch(0.488 0.243 264.376);
   --chart-1: oklch(0.62 0.16 175);
   --chart-2: oklch(0.68 0.16 200);
@@ -125,8 +125,9 @@
   /* Global rounded overrides for sleek look - Using standard CSS for !important */
   .card, [class*="Card"] {
     border-radius: 1rem !important;
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
     border: none !important;
+    @apply bg-card text-card-foreground;
   }
   
   button, .btn, [class*="Button"] {
@@ -137,6 +138,7 @@
   
   input, select, textarea, [class*="Input"] {
     border-radius: 0.75rem !important;
+    @apply bg-background text-foreground border-border;
   }
   
   .badge, [class*="Badge"] {
