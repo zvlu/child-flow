@@ -1,10 +1,11 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowRight } from "lucide-react";
 import { getLoginUrl } from "@/const";
+import { Link } from "wouter";
 
 export default function Home() {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { loading, isAuthenticated } = useAuth();
   const loginUrl = getLoginUrl();
 
   if (loading) {
@@ -15,87 +16,50 @@ export default function Home() {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">ChildFlow</h1>
-          <p className="text-lg text-gray-600 mb-8">Modern Head Start Management System</p>
-          <p className="text-gray-600 mb-8">Streamlined attendance, health records, family services, and compliance tracking in one intuitive platform.</p>
-          <a href={loginUrl}>
-            <Button size="lg" className="w-full">
-              Sign In with Your Agency ID
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-green-100 flex flex-col items-center justify-center px-4">
+      <div className="text-center max-w-2xl">
+        <div className="mb-6 inline-flex items-center justify-center h-20 w-20 rounded-2xl bg-primary text-white text-4xl font-bold shadow-lg">
+          CF
+        </div>
+        <h1 className="text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">ChildFlow</h1>
+        <p className="text-xl text-gray-600 mb-8 font-medium">Modern Head Start Management System</p>
+        <p className="text-gray-600 mb-10 text-lg leading-relaxed">
+          The superior alternative to ChildPlus. Streamlined attendance, health records, 
+          family services, and compliance tracking in one intuitive, high-performance platform.
+        </p>
+        
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <Link href="/dashboard">
+            <Button size="lg" className="px-8 py-6 text-lg rounded-xl shadow-md hover:shadow-lg transition-all gap-2">
+              Enter Dashboard <ArrowRight className="h-5 w-5" />
             </Button>
-          </a>
+          </Link>
+          
+          {!isAuthenticated && loginUrl !== "/dashboard" && (
+            <a href={loginUrl}>
+              <Button size="lg" variant="outline" className="px-8 py-6 text-lg rounded-xl bg-white/50 backdrop-blur-sm">
+                Sign In with Agency ID
+              </Button>
+            </a>
+          )}
+        </div>
+        
+        <div className="mt-16 grid grid-cols-3 gap-8 text-sm text-gray-500 font-medium">
+          <div>
+            <p className="text-primary text-xl font-bold mb-1">100%</p>
+            <p>PIR Compliant</p>
+          </div>
+          <div>
+            <p className="text-primary text-xl font-bold mb-1">Real-time</p>
+            <p>Analytics</p>
+          </div>
+          <div>
+            <p className="text-primary text-xl font-bold mb-1">Secure</p>
+            <p>Data Storage</p>
+          </div>
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-foreground">ChildFlow</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{user?.name}</span>
-            <Button variant="outline" onClick={() => window.location.href = loginUrl}>
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-card border border-border rounded-lg p-6">
-            <div className="text-sm font-medium text-muted-foreground">Total Children</div>
-            <div className="text-3xl font-bold text-foreground mt-2">--</div>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-6">
-            <div className="text-sm font-medium text-muted-foreground">Present Today</div>
-            <div className="text-3xl font-bold text-foreground mt-2">--</div>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-6">
-            <div className="text-sm font-medium text-muted-foreground">Staff Members</div>
-            <div className="text-3xl font-bold text-foreground mt-2">--</div>
-          </div>
-          <div className="bg-card border border-border rounded-lg p-6">
-            <div className="text-sm font-medium text-muted-foreground">Pending Actions</div>
-            <div className="text-3xl font-bold text-foreground mt-2">0</div>
-          </div>
-        </div>
-
-        <div className="bg-card border border-border rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-              <span className="text-2xl mb-2">📋</span>
-              <span>Attendance</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-              <span className="text-2xl mb-2">👶</span>
-              <span>Children</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-              <span className="text-2xl mb-2">❤️</span>
-              <span>Health Records</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-              <span className="text-2xl mb-2">👨‍👩‍👧</span>
-              <span>Family Services</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-              <span className="text-2xl mb-2">📊</span>
-              <span>Reports</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-              <span className="text-2xl mb-2">⚙️</span>
-              <span>Settings</span>
-            </Button>
-          </div>
-        </div>
-      </main>
     </div>
   );
 }
