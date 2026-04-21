@@ -44,6 +44,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { CommandPalette } from "./CommandPalette";
 
 const topNavItems = [
   { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
@@ -143,6 +144,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </nav>
 
         <div className="flex items-center gap-3 ml-4">
+          <div className="hidden md:block">
+            <CommandPalette />
+          </div>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10" onClick={() => handleTopNavAction("Print")}>
             <Printer className="h-4 w-4" />
           </Button>
@@ -245,7 +249,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
-                <Calendar className="h-3 w-3" />
+                <CalendarIcon className="h-3 w-3" />
                 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
               <Button variant="ghost" size="icon" className="h-7 w-7 relative">
@@ -265,7 +269,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   );
 }
 
-function Calendar(props: any) {
+function CalendarIcon(props: any) {
   return (
     <svg
       {...props}
