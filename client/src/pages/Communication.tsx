@@ -31,6 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/_core/trpc";
 
 const initialMessages = [
   { id: 1, sender: "Maria Rodriguez", subject: "Absence Note - Marcus", preview: "Marcus will be out today due to a doctor's appointment...", time: "10:30 AM", unread: true, type: "Message", category: "Attendance" },
@@ -53,6 +54,36 @@ export default function Communication() {
   const [isNewLogOpen, setIsNewLogOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState("messages");
 
+  // API Mutations
+  const sendMessageMutation = trpc.messaging.send.useMutation({
+    onSuccess: () => {
+      toast.success("Message sent successfully to the family!");
+      setIsNewMessageOpen(false);
+    },
+    onError: (error) => {
+      toast.error(`Failed to send message: ${error.message}`);
+    }
+  });
+
+  const broadcastMutation = trpc.messaging.broadcast.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Broadcast sent to ${data.count} families!`);
+    },
+    onError: (error) => {
+      toast.error(`Broadcast failed: ${error.message}`);
+    }
+  });
+
+  const createLogMutation = trpc.familyServices.create.useMutation({
+    onSuccess: () => {
+      toast.success("Contact log entry saved.");
+      setIsNewLogOpen(false);
+    },
+    onError: (error) => {
+      toast.error(`Failed to save log: ${error.message}`);
+    }
+  });
+
   // Filtered Data
   const filteredMessages = useMemo(() => {
     return messages.filter(m => 
@@ -71,14 +102,39 @@ export default function Communication() {
   // Handlers
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Message sent successfully to the family!");
-    setIsNewMessageOpen(false);
+    const formData = new FormData(e.target as HTMLFormElement);
+    
+    sendMessageMutation.mutate({
+      organizationId: 1, // Mock org ID
+      recipientId: 1,    // Mock recipient ID
+      to: "parent@example.com", // Mock destination
+      subject: formData.get("subject") as string,
+      content: formData.get("content") as string,
+      type: "email"
+    });
   };
 
   const handleAddLog = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Contact log entry saved.");
-    setIsNewLogOpen(false);
+    const formData = new FormData(e.target as HTMLFormElement);
+    
+    createLogMutation.mutate({
+      organizationId: 1,
+      familyId: 1,
+      type: formData.get("type") as any,
+      serviceDate: new Date(),
+      description: formData.get("outcome") as string,
+      outcome: "Logged via Communication Center",
+      recordedBy: 1
+    });
+  };
+
+  const handleBroadcast = () => {
+    broadcastMutation.mutate({
+      organizationId: 1,
+      content: "Important Program Update: Please check your email for details.",
+      channels: ["sms", "email"]
+    });
   };
 
   const markAsRead = (id: number) => {
@@ -120,7 +176,7 @@ export default function Communication() {
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
                     <label className="text-xs font-bold uppercase text-slate-400">Recipient Family</label>
-                    <Select required>
+                    <Select name="family" required>
                       <SelectTrigger className="rounded-xl">
                         <SelectValue placeholder="Select a family..." />
                       </SelectTrigger>
@@ -133,23 +189,18 @@ export default function Communication() {
                   </div>
                   <div className="grid gap-2">
                     <label className="text-xs font-bold uppercase text-slate-400">Subject</label>
-                    <Input placeholder="e.g., Upcoming Field Trip" className="rounded-xl" required />
+                    <Input name="subject" placeholder="e.g., Upcoming Field Trip" className="rounded-xl" required />
                   </div>
                   <div className="grid gap-2">
                     <label className="text-xs font-bold uppercase text-slate-400">Message Content</label>
-                    <Textarea placeholder="Type your message here..." className="rounded-xl min-h-[120px]" required />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs font-bold text-slate-500 flex items-center gap-2">
-                      <input type="checkbox" className="rounded border-slate-300" />
-                      Also send as Email notification
-                    </label>
+                    <Textarea name="content" placeholder="Type your message here..." className="rounded-xl min-h-[120px]" required />
                   </div>
                 </div>
                 <DialogFooter>
                   <Button type="button" variant="ghost" onClick={() => setIsNewMessageOpen(false)} className="rounded-xl font-bold">Cancel</Button>
-                  <Button type="submit" className="rounded-xl gap-2 font-bold px-6">
-                    <Send className="h-4 w-4" /> Send Message
+                  <Button type="submit" className="rounded-xl gap-2 font-bold px-6" disabled={sendMessageMutation.isLoading}>
+                    {sendMessageMutation.isLoading ? <Clock className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    Send Message
                   </Button>
                 </DialogFooter>
               </form>
@@ -314,7 +365,7 @@ export default function Communication() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-2">
                         <label className="text-xs font-bold uppercase text-slate-400">Family</label>
-                        <Select required>
+                        <Select name="family" required>
                           <SelectTrigger className="rounded-xl">
                             <SelectValue placeholder="Select family..." />
                           </SelectTrigger>
@@ -326,14 +377,14 @@ export default function Communication() {
                       </div>
                       <div className="grid gap-2">
                         <label className="text-xs font-bold uppercase text-slate-400">Contact Type</label>
-                        <Select required>
+                        <Select name="type" required>
                           <SelectTrigger className="rounded-xl">
                             <SelectValue placeholder="Select type..." />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
-                            <SelectItem value="phone">Phone Call</SelectItem>
-                            <SelectItem value="home">Home Visit</SelectItem>
-                            <SelectItem value="office">Office Visit</SelectItem>
+                            <SelectItem value="phone_call">Phone Call</SelectItem>
+                            <SelectItem value="home_visit">Home Visit</SelectItem>
+                            <SelectItem value="office_visit">Office Visit</SelectItem>
                             <SelectItem value="email">Email</SelectItem>
                           </SelectContent>
                         </Select>
@@ -341,24 +392,14 @@ export default function Communication() {
                     </div>
                     <div className="grid gap-2">
                       <label className="text-xs font-bold uppercase text-slate-400">Outcome / Notes</label>
-                      <Textarea placeholder="What was discussed? Any follow-up needed?" className="rounded-xl min-h-[100px]" required />
-                    </div>
-                    <div className="grid gap-2">
-                      <label className="text-xs font-bold uppercase text-slate-400">Status</label>
-                      <Select defaultValue="completed">
-                        <SelectTrigger className="rounded-xl">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                          <SelectItem value="completed">Completed</SelectItem>
-                          <SelectItem value="followup">Follow-up Required</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Textarea name="outcome" placeholder="What was discussed? Any follow-up needed?" className="rounded-xl min-h-[100px]" required />
                     </div>
                   </div>
                   <DialogFooter>
                     <Button type="button" variant="ghost" onClick={() => setIsNewLogOpen(false)} className="rounded-xl font-bold">Cancel</Button>
-                    <Button type="submit" className="rounded-xl font-bold px-6">Save Log Entry</Button>
+                    <Button type="submit" className="rounded-xl font-bold px-6" disabled={createLogMutation.isLoading}>
+                      {createLogMutation.isLoading ? <Clock className="h-4 w-4 animate-spin" /> : "Save Log Entry"}
+                    </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -376,8 +417,13 @@ export default function Communication() {
               <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">
                 Send urgent alerts, weather closures, or program updates to all families simultaneously via SMS and Email.
               </p>
-              <Button className="rounded-full px-8 py-6 h-auto text-base font-bold gap-3 shadow-lg shadow-primary/20" onClick={() => handleAction("New Broadcast")}>
-                <Plus className="h-5 w-5" /> Create New Broadcast
+              <Button 
+                className="rounded-full px-8 py-6 h-auto text-base font-bold gap-3 shadow-lg shadow-primary/20" 
+                onClick={handleBroadcast}
+                disabled={broadcastMutation.isLoading}
+              >
+                {broadcastMutation.isLoading ? <Clock className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
+                Create New Broadcast
               </Button>
               
               <div className="mt-12 w-full text-left">
