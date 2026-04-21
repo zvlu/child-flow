@@ -39,6 +39,7 @@ import { Loader2 } from "lucide-react";
 
 const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/performance", label: "Performance Panel", icon: BarChart3 },
   { path: "/enrollment", label: "Enrollment", icon: BookOpen },
   { path: "/children", label: "Children", icon: Baby },
   { path: "/attendance", label: "Attendance", icon: ClipboardCheck },

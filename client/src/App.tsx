@@ -15,6 +15,7 @@ import Staff from "./pages/Staff";
 import Reports from "./pages/Reports";
 import Enrollment from "./pages/Enrollment";
 import Compliance from "./pages/Compliance";
+import PerformancePanel from "./pages/PerformancePanel";
 import Settings from "./pages/Settings";
 import AppLayout from "./components/AppLayout";
 
@@ -26,6 +27,13 @@ function Router() {
         {() => (
           <AppLayout>
             <Dashboard />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/performance">
+        {() => (
+          <AppLayout>
+            <PerformancePanel />
           </AppLayout>
         )}
       </Route>
