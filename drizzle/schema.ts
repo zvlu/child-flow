@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, date } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -129,3 +129,45 @@ export const attendance = mysqlTable("attendance", {
 
 export type Attendance = typeof attendance.$inferSelect;
 export type InsertAttendance = typeof attendance.$inferInsert;
+
+/**
+ * Health Records table for tracking screenings, immunizations, and exams.
+ */
+export const healthRecords = mysqlTable("health_records", {
+  id: int("id").autoincrement().primaryKey(),
+  childId: int("childId").notNull().references(() => children.id),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  type: mysqlEnum("type", ["immunization", "dental", "physical", "vision", "hearing", "lead", "hemoglobin", "other"]).notNull(),
+  status: mysqlEnum("status", ["up_to_date", "due_soon", "overdue", "exempt", "not_required"]).default("up_to_date"),
+  recordDate: timestamp("recordDate").notNull(),
+  expiryDate: timestamp("expiryDate"),
+  provider: varchar("provider", { length: 255 }),
+  notes: text("notes"),
+  recordedBy: int("recordedBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type HealthRecord = typeof healthRecords.$inferSelect;
+export type InsertHealthRecord = typeof healthRecords.$inferInsert;
+
+/**
+ * Family Services table for tracking home visits, contacts, and resource referrals.
+ */
+export const familyServices = mysqlTable("family_services", {
+  id: int("id").autoincrement().primaryKey(),
+  familyId: int("familyId").notNull().references(() => families.id),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  type: mysqlEnum("type", ["home_visit", "office_visit", "phone_call", "email", "referral", "other"]).notNull(),
+  serviceDate: timestamp("serviceDate").notNull(),
+  description: text("description").notNull(),
+  outcome: text("outcome"),
+  followUpRequired: int("followUpRequired").default(0),
+  followUpDate: timestamp("followUpDate"),
+  recordedBy: int("recordedBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FamilyService = typeof familyServices.$inferSelect;
+export type InsertFamilyService = typeof familyServices.$inferInsert;
