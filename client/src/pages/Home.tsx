@@ -1,21 +1,8 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowRight } from "lucide-react";
-import { getLoginUrl } from "@/const";
+import { ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Home() {
-  const { loading, isAuthenticated } = useAuth();
-  const loginUrl = getLoginUrl();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-green-100 flex flex-col items-center justify-center px-4">
       <div className="text-center max-w-2xl">
@@ -31,18 +18,10 @@ export default function Home() {
         
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link href="/dashboard">
-            <Button size="lg" className="px-8 py-6 text-lg rounded-xl shadow-md hover:shadow-lg transition-all gap-2">
-              Enter Dashboard <ArrowRight className="h-5 w-5" />
+            <Button size="lg" className="px-12 py-7 text-xl rounded-xl shadow-md hover:shadow-lg transition-all gap-2 bg-primary hover:bg-primary/90">
+              Get Started <ArrowRight className="h-6 w-6" />
             </Button>
           </Link>
-          
-          {!isAuthenticated && loginUrl !== "/dashboard" && (
-            <a href={loginUrl}>
-              <Button size="lg" variant="outline" className="px-8 py-6 text-lg rounded-xl bg-white/50 backdrop-blur-sm">
-                Sign In with Agency ID
-              </Button>
-            </a>
-          )}
         </div>
         
         <div className="mt-16 grid grid-cols-3 gap-8 text-sm text-gray-500 font-medium">
