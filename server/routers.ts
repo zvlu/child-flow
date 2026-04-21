@@ -16,6 +16,8 @@ import {
   getFamilyServices,
   createFamilyService,
   getCommunicationLogs,
+  getEducationRecords,
+  getPirData,
 } from "./db";
 import { CommunicationService } from "./services/communication";export const appRouter = router({
   system: systemRouter,
@@ -144,6 +146,22 @@ import { CommunicationService } from "./services/communication";export const app
       .input(z.object({ organizationId: z.number(), recipientId: z.number().optional() }))
       .query(async ({ input }) => {
         return await getCommunicationLogs(input.organizationId, input.recipientId);
+      }),
+  }),
+
+  education: router({
+    list: protectedProcedure
+      .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
+      .query(async ({ input }) => {
+        return await getEducationRecords(input.organizationId, input.childId);
+      }),
+  }),
+
+  compliance: router({
+    getPir: protectedProcedure
+      .input(z.object({ organizationId: z.number(), year: z.string() }))
+      .query(async ({ input }) => {
+        return await getPirData(input.organizationId, input.year);
       }),
   }),
 });

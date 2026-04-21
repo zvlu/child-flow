@@ -204,3 +204,28 @@ export async function getCommunicationLogs(organizationId: number, recipientId?:
   }
   return await db.select().from(communicationLogs).where(eq(communicationLogs.organizationId, organizationId));
 }
+
+export async function getEducationRecords(organizationId: number, childId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  if (childId) {
+    return await db.select().from(educationRecords).where(
+      and(
+        eq(educationRecords.organizationId, organizationId),
+        eq(educationRecords.childId, childId)
+      )
+    );
+  }
+  return await db.select().from(educationRecords).where(eq(educationRecords.organizationId, organizationId));
+}
+
+export async function getPirData(organizationId: number, year: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(pirData).where(
+    and(
+      eq(pirData.organizationId, organizationId),
+      eq(pirData.year, year)
+    )
+  );
+}

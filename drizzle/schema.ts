@@ -190,3 +190,40 @@ export const communicationLogs = mysqlTable("communication_logs", {
 
 export type CommunicationLog = typeof communicationLogs.$inferSelect;
 export type InsertCommunicationLog = typeof communicationLogs.$inferInsert;
+
+/**
+ * Education table for tracking individualized curriculum and assessments.
+ */
+export const educationRecords = mysqlTable("education_records", {
+  id: int("id").autoincrement().primaryKey(),
+  childId: int("childId").notNull().references(() => children.id),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  type: mysqlEnum("type", ["assessment", "parent_conference", "home_visit", "individual_plan"]).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  assessmentDate: timestamp("assessmentDate").notNull(),
+  score: varchar("score", { length: 50 }),
+  recordedBy: int("recordedBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type EducationRecord = typeof educationRecords.$inferSelect;
+export type InsertEducationRecord = typeof educationRecords.$inferInsert;
+
+/**
+ * PIR (Program Information Report) table for federal reporting data.
+ */
+export const pirData = mysqlTable("pir_data", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  year: varchar("year", { length: 9 }).notNull(), // e.g., "2024-2025"
+  section: varchar("section", { length: 100 }).notNull(), // e.g., "Section A: Enrollment"
+  questionId: varchar("questionId", { length: 50 }).notNull(),
+  value: text("value").notNull(),
+  updatedBy: int("updatedBy").references(() => staff.id),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PirData = typeof pirData.$inferSelect;
+export type InsertPirData = typeof pirData.$inferInsert;
