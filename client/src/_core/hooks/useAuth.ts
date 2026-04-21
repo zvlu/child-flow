@@ -9,7 +9,16 @@ type UseAuthOptions = {
 };
 
 export function useAuth(options?: UseAuthOptions) {
-  const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
+  // Safely get redirectPath with a fallback to avoid Invalid URL errors
+  const defaultRedirectPath = useMemo(() => {
+    try {
+      return getLoginUrl();
+    } catch (e) {
+      return "/dashboard";
+    }
+  }, []);
+
+  const { redirectOnUnauthenticated = false, redirectPath = defaultRedirectPath } =
     options ?? {};
   const utils = trpc.useUtils();
 
