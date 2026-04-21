@@ -16,6 +16,7 @@ import Reports from "./pages/Reports";
 import Enrollment from "./pages/Enrollment";
 import Compliance from "./pages/Compliance";
 import PerformancePanel from "./pages/PerformancePanel";
+import Communication from "./pages/Communication";
 import Settings from "./pages/Settings";
 import AppLayout from "./components/AppLayout";
 
@@ -62,6 +63,13 @@ function Router() {
         {() => (
           <AppLayout>
             <Attendance />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/communication">
+        {() => (
+          <AppLayout>
+            <Communication />
           </AppLayout>
         )}
       </Route>
