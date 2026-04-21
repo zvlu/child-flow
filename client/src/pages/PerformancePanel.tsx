@@ -4,7 +4,20 @@ import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, 
   PieChart, Pie, Cell
 } from "recharts";
-import { Info, MoreHorizontal, RefreshCw, ChevronDown } from "lucide-react";
+import { 
+  Info, MoreHorizontal, RefreshCw, ChevronDown, 
+  Download, FileSpreadsheet, FileText, CalendarDays,
+  Settings2
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
 const chronicAbsenceData = [
   { name: "Severe (20+%)", value: 77, color: "#ef4444" },
@@ -80,6 +93,10 @@ const DonutChart = ({ completed, total, color, label, subLabel }: { completed: n
 };
 
 export default function PerformancePanel() {
+  const handleAction = (action: string) => {
+    toast.success(`${action} initiated`);
+  };
+
   return (
     <div className="h-full flex flex-col bg-[#f8fafc] overflow-hidden">
       {/* Header - Fixed Height */}
@@ -100,9 +117,36 @@ export default function PerformancePanel() {
             <p className="font-bold text-slate-900">2025 - 2026</p>
             <p className="font-medium text-slate-400">Refreshed Today • 12:30 AM</p>
           </div>
-          <Button variant="outline" size="icon" className="h-10 w-10 border-slate-200 bg-white shadow-sm rounded-xl hover:bg-slate-50">
-            <MoreHorizontal className="h-5 w-5 text-slate-600" />
-          </Button>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="h-10 w-10 border-slate-200 bg-white shadow-sm rounded-xl hover:bg-slate-50">
+                <MoreHorizontal className="h-5 w-5 text-slate-600" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-xl">
+              <DropdownMenuLabel>Panel Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleAction("Refresh Data")}>
+                <RefreshCw className="mr-2 h-4 w-4" /> Refresh Data
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleAction("Change Program Year")}>
+                <CalendarDays className="mr-2 h-4 w-4" /> Change Program Year
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => handleAction("Export to PDF")}>
+                <FileText className="mr-2 h-4 w-4" /> Export as PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleAction("Export to Excel")}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as Excel
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleAction("Panel Settings")}>
+                <Settings2 className="mr-2 h-4 w-4" /> Panel Settings
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
