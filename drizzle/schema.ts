@@ -171,3 +171,22 @@ export const familyServices = mysqlTable("family_services", {
 
 export type FamilyService = typeof familyServices.$inferSelect;
 export type InsertFamilyService = typeof familyServices.$inferInsert;
+
+/**
+ * Communication Logs table for tracking sent SMS and Emails.
+ */
+export const communicationLogs = mysqlTable("communication_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  recipientId: int("recipientId").notNull().references(() => families.id),
+  type: mysqlEnum("type", ["sms", "email", "broadcast"]).notNull(),
+  subject: varchar("subject", { length: 255 }),
+  content: text("content").notNull(),
+  status: mysqlEnum("status", ["pending", "sent", "failed"]).default("pending"),
+  providerMessageId: varchar("providerMessageId", { length: 255 }),
+  sentAt: timestamp("sentAt").defaultNow(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CommunicationLog = typeof communicationLogs.$inferSelect;
+export type InsertCommunicationLog = typeof communicationLogs.$inferInsert;

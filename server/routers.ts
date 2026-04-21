@@ -10,14 +10,13 @@ import {
   getChildById,
   createChild,
   getOrganizationStaff,
-  getAttendanceByDate,
+  getAttendanceimport { 
   getHealthRecords,
   createHealthRecord,
   getFamilyServices,
   createFamilyService,
 } from "./db";
-
-export const appRouter = router({
+import { CommunicationService } from "./services/communication";export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -113,6 +112,32 @@ export const appRouter = router({
       .input(z.any())
       .mutation(async ({ input }) => {
         return createFamilyService(input);
+      }),
+  }),
+
+  messaging: router({
+    send: protectedProcedure
+      .input(z.object({
+        organizationId: z.number(),
+        recipientId: z.number(),
+        to: z.string(),
+        subject: z.string().optional(),
+        content: z.string(),
+        type: z.enum(['sms', 'email'])
+      }))
+      .mutation(async ({ input }) => {
+        return await CommunicationService.sendMessage(input);
+      }),
+    broadcast: protectedProcedure
+      .input(z.object({
+        organizationId: z.number(),
+        content: z.string(),
+        channels: z.array(z.enum(['sms', 'email']))
+      }))
+      .mutation(async ({ input }) => {
+        // In production, fetch all families in organization and loop sendMessage
+        console.log(`[Broadcast] Sending to organization ${input.organizationId} via ${input.channels.join(', ')}`);
+        return { success: true, count: 150 }; // Mock count
       }),
   }),
 });
