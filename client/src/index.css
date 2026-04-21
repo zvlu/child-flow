@@ -122,21 +122,25 @@
     @apply bg-background text-foreground antialiased;
   }
   
-  /* Global rounded overrides for sleek look */
+  /* Global rounded overrides for sleek look - Using standard CSS for !important */
   .card, [class*="Card"] {
-    @apply rounded-2xl shadow-sm border-none !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
+    border: none !important;
   }
   
   button, .btn, [class*="Button"] {
-    @apply rounded-full px-6 !important;
+    border-radius: 9999px !important;
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
   }
   
   input, select, textarea, [class*="Input"] {
-    @apply rounded-xl !important;
+    border-radius: 0.75rem !important;
   }
   
   .badge, [class*="Badge"] {
-    @apply rounded-full !important;
+    border-radius: 9999px !important;
   }
 }
 
