@@ -7,7 +7,6 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-  CommandShortcut,
 } from "@/components/ui/command";
 import { 
   LayoutDashboard, 
@@ -15,20 +14,22 @@ import {
   Calendar, 
   Heart, 
   Home, 
-  UserCircle, 
   FileText, 
   ShieldCheck, 
   Settings,
   Search,
   Plus,
   MessageSquare,
-  BarChart3
+  BarChart3,
+  BookOpen,
+  UserCog,
+  Baby
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "wouter";
 
 export function CommandPalette() {
   const [open, setOpen] = React.useState(false);
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -41,20 +42,20 @@ export function CommandPalette() {
     return () => document.removeEventListener("keydown", down);
   }, []);
 
-  const runCommand = (command: () => void) => {
+  const runCommand = (path: string) => {
     setOpen(false);
-    command();
+    setLocation(path);
   };
 
   return (
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-full transition-all border border-slate-200 group"
+        className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-500 bg-white/10 hover:bg-white/20 rounded-full transition-all border border-white/20 group"
       >
-        <Search className="h-4 w-4" />
-        <span className="font-medium">Quick Search...</span>
-        <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-white px-1.5 font-mono text-[10px] font-medium text-slate-400 opacity-100 ml-2">
+        <Search className="h-3.5 w-3.5 text-white/70" />
+        <span className="font-medium text-white/80">Quick Search...</span>
+        <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-white/20 bg-white/10 px-1.5 font-mono text-[10px] font-medium text-white/60 opacity-100 ml-2">
           <span className="text-xs">⌘</span>K
         </kbd>
       </button>
@@ -63,49 +64,61 @@ export function CommandPalette() {
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
           <CommandGroup heading="Navigation">
-            <CommandItem onSelect={() => runCommand(() => navigate("/dashboard"))}>
+            <CommandItem onSelect={() => runCommand("/dashboard")}>
               <LayoutDashboard className="mr-2 h-4 w-4" />
               <span>Dashboard</span>
             </CommandItem>
-            <CommandItem onSelect={() => runCommand(() => navigate("/performance"))}>
+            <CommandItem onSelect={() => runCommand("/performance")}>
               <BarChart3 className="mr-2 h-4 w-4" />
               <span>Performance Panel</span>
             </CommandItem>
-            <CommandItem onSelect={() => runCommand(() => navigate("/children"))}>
-              <Users className="mr-2 h-4 w-4" />
+            <CommandItem onSelect={() => runCommand("/enrollment")}>
+              <BookOpen className="mr-2 h-4 w-4" />
+              <span>Enrollment</span>
+            </CommandItem>
+            <CommandItem onSelect={() => runCommand("/children")}>
+              <Baby className="mr-2 h-4 w-4" />
               <span>Children Management</span>
             </CommandItem>
-            <CommandItem onSelect={() => runCommand(() => navigate("/attendance"))}>
+            <CommandItem onSelect={() => runCommand("/attendance")}>
               <Calendar className="mr-2 h-4 w-4" />
               <span>Attendance</span>
             </CommandItem>
-            <CommandItem onSelect={() => runCommand(() => navigate("/health"))}>
+            <CommandItem onSelect={() => runCommand("/health")}>
               <Heart className="mr-2 h-4 w-4" />
               <span>Health Records</span>
             </CommandItem>
-            <CommandItem onSelect={() => runCommand(() => navigate("/communication"))}>
+            <CommandItem onSelect={() => runCommand("/communication")}>
               <MessageSquare className="mr-2 h-4 w-4" />
               <span>Communication Center</span>
+            </CommandItem>
+            <CommandItem onSelect={() => runCommand("/staff")}>
+              <UserCog className="mr-2 h-4 w-4" />
+              <span>Staff Management</span>
+            </CommandItem>
+            <CommandItem onSelect={() => runCommand("/compliance")}>
+              <ShieldCheck className="mr-2 h-4 w-4" />
+              <span>Compliance</span>
             </CommandItem>
           </CommandGroup>
           <CommandSeparator />
           <CommandGroup heading="Quick Actions">
-            <CommandItem onSelect={() => runCommand(() => navigate("/children?action=new"))}>
+            <CommandItem onSelect={() => runCommand("/children?action=new")}>
               <Plus className="mr-2 h-4 w-4" />
               <span>Enroll New Child</span>
             </CommandItem>
-            <CommandItem onSelect={() => runCommand(() => navigate("/communication?action=broadcast"))}>
+            <CommandItem onSelect={() => runCommand("/communication?action=broadcast")}>
               <Megaphone className="mr-2 h-4 w-4" />
               <span>Send Program Broadcast</span>
             </CommandItem>
-            <CommandItem onSelect={() => runCommand(() => navigate("/reports?action=generate"))}>
+            <CommandItem onSelect={() => runCommand("/reports?action=generate")}>
               <FileText className="mr-2 h-4 w-4" />
               <span>Generate PIR Report</span>
             </CommandItem>
           </CommandGroup>
           <CommandSeparator />
           <CommandGroup heading="Settings">
-            <CommandItem onSelect={() => runCommand(() => navigate("/settings"))}>
+            <CommandItem onSelect={() => runCommand("/settings")}>
               <Settings className="mr-2 h-4 w-4" />
               <span>Program Settings</span>
             </CommandItem>
