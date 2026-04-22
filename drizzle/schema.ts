@@ -228,3 +228,123 @@ export const pirData = mysqlTable("pir_data", {
 
 export type PirData = typeof pirData.$inferSelect;
 export type InsertPirData = typeof pirData.$inferInsert;
+
+/**
+ * Classrooms table for organizing children by classroom.
+ */
+export const classrooms = mysqlTable("classrooms", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  ageGroup: varchar("ageGroup", { length: 50 }), // e.g., "Infants", "Toddlers", "Preschool"
+  capacity: int("capacity").default(15),
+  teacherId: int("teacherId").references(() => staff.id),
+  assistantId: int("assistantId").references(() => staff.id),
+  color: varchar("color", { length: 7 }).default("#3b82f6"), // Hex color for UI
+  isActive: int("isActive").default(1),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Classroom = typeof classrooms.$inferSelect;
+export type InsertClassroom = typeof classrooms.$inferInsert;
+
+/**
+ * Child-Classroom assignment table (many-to-many).
+ */
+export const childClassroomAssignments = mysqlTable("child_classroom_assignments", {
+  id: int("id").autoincrement().primaryKey(),
+  childId: int("childId").notNull().references(() => children.id),
+  classroomId: int("classroomId").notNull().references(() => classrooms.id),
+  assignmentDate: timestamp("assignmentDate").defaultNow(),
+  endDate: timestamp("endDate"),
+  isActive: int("isActive").default(1),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ChildClassroomAssignment = typeof childClassroomAssignments.$inferSelect;
+export type InsertChildClassroomAssignment = typeof childClassroomAssignments.$inferInsert;
+
+/**
+ * Staff Caseload table (which classrooms a staff member is responsible for).
+ */
+export const staffCaseloads = mysqlTable("staff_caseloads", {
+  id: int("id").autoincrement().primaryKey(),
+  staffId: int("staffId").notNull().references(() => staff.id),
+  classroomId: int("classroomId").notNull().references(() => classrooms.id),
+  role: mysqlEnum("role", ["teacher", "assistant", "coordinator"]).default("teacher"),
+  isActive: int("isActive").default(1),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type StaffCaseload = typeof staffCaseloads.$inferSelect;
+export type InsertStaffCaseload = typeof staffCaseloads.$inferInsert;
+
+/**
+ * Student Notes table for pinned/important notes on each child.
+ */
+export const studentNotes = mysqlTable("student_notes", {
+  id: int("id").autoincrement().primaryKey(),
+  childId: int("childId").notNull().references(() => children.id),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  priority: mysqlEnum("priority", ["low", "medium", "high", "critical"]).default("medium"),
+  isPinned: int("isPinned").default(0), // 1 = pinned to top
+  category: varchar("category", { length: 50 }), // e.g., "Allergy", "Behavior", "Medical", "General"
+  expiryDate: timestamp("expiryDate"), // Optional: note expires after this date
+  createdBy: int("createdBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type StudentNote = typeof studentNotes.$inferSelect;
+export type InsertStudentNote = typeof studentNotes.$inferInsert;
+
+/**
+ * Program Calendar Events table for tracking school events, holidays, and important dates.
+ */
+export const calendarEvents = mysqlTable("calendar_events", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  eventType: mysqlEnum("eventType", ["holiday", "school_event", "parent_event", "staff_training", "deadline", "other"]).default("other"),
+  startDate: timestamp("startDate").notNull(),
+  endDate: timestamp("endDate"),
+  location: varchar("location", { length: 255 }),
+  classroomId: int("classroomId").references(() => classrooms.id), // Optional: specific to a classroom
+  allDay: int("allDay").default(1),
+  color: varchar("color", { length: 7 }).default("#3b82f6"),
+  createdBy: int("createdBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
+export type InsertCalendarEvent = typeof calendarEvents.$inferInsert;
+
+/**
+ * Family Contact Addresses table for managing multiple addresses per family.
+ */
+export const familyContactAddresses = mysqlTable("family_contact_addresses", {
+  id: int("id").autoincrement().primaryKey(),
+  familyId: int("familyId").notNull().references(() => families.id),
+  contactName: varchar("contactName", { length: 100 }).notNull(),
+  relationship: varchar("relationship", { length: 50 }), // e.g., "Mother", "Father", "Grandmother"
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 320 }),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 2 }),
+  zipCode: varchar("zipCode", { length: 10 }),
+  isPrimary: int("isPrimary").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FamilyContactAddress = typeof familyContactAddresses.$inferSelect;
+export type InsertFamilyContactAddress = typeof familyContactAddresses.$inferInsert;
