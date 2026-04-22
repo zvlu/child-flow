@@ -18,6 +18,7 @@ import Compliance from "./pages/Compliance";
 import PerformancePanel from "./pages/PerformancePanel";
 import Communication from "./pages/Communication";
 import Settings from "./pages/Settings";
+import ClassroomDashboard from "./pages/ClassroomDashboard";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
@@ -28,6 +29,13 @@ function Router() {
         {() => (
           <AppLayout>
             <Dashboard />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/classrooms">
+        {() => (
+          <AppLayout>
+            <ClassroomDashboard />
           </AppLayout>
         )}
       </Route>
