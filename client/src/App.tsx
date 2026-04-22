@@ -19,6 +19,7 @@ import PerformancePanel from "./pages/PerformancePanel";
 import Communication from "./pages/Communication";
 import Settings from "./pages/Settings";
 import ClassroomDashboard from "./pages/ClassroomDashboard";
+import Calendar from "./pages/Calendar";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
@@ -36,6 +37,13 @@ function Router() {
         {() => (
           <AppLayout>
             <ClassroomDashboard />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/calendar">
+        {() => (
+          <AppLayout>
+            <Calendar />
           </AppLayout>
         )}
       </Route>
