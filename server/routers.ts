@@ -10,7 +10,8 @@ import {
   getChildById,
   createChild,
   getOrganizationStaff,
-  getAttendanceimport { 
+  getAttendanceByDate,
+  getFamilySiblings,
   getHealthRecords,
   createHealthRecord,
   getFamilyServices,
@@ -19,7 +20,9 @@ import {
   getEducationRecords,
   getPirData,
 } from "./db";
-import { CommunicationService } from "./services/communication";export const appRouter = router({
+import { CommunicationService } from "./services/communication";
+
+export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -64,10 +67,16 @@ import { CommunicationService } from "./services/communication";export const app
           gender: z
             .enum(["male", "female", "other", "prefer_not_to_say"])
             .optional(),
+          familyId: z.number().optional(),
         })
       )
       .mutation(async ({ input }) => {
         return createChild(input);
+      }),
+    siblings: protectedProcedure
+      .input(z.number())
+      .query(async ({ input: familyId }) => {
+        return getFamilySiblings(familyId);
       }),
   }),
 

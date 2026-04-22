@@ -58,6 +58,7 @@ export const children = mysqlTable("children", {
   gender: mysqlEnum("gender", ["male", "female", "other", "prefer_not_to_say"]),
   enrollmentDate: timestamp("enrollmentDate").defaultNow(),
   status: mysqlEnum("status", ["active", "inactive", "graduated", "withdrawn"]).default("active"),
+  familyId: int("familyId").references(() => families.id),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

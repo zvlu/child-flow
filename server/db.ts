@@ -112,11 +112,18 @@ export async function getOrganizationChildren(organizationId: number) {
   return await db.select().from(children).where(eq(children.organizationId, organizationId));
 }
 
-export async function getChildById(childId: number) {
+export async function getChildById(id: number) {
   const db = await getDb();
-  if (!db) return undefined;
-  const result = await db.select().from(children).where(eq(children.id, childId)).limit(1);
-  return result.length > 0 ? result[0] : undefined;
+  if (!db) return null;
+  const results = await db.select().from(children).where(eq(children.id, id));
+  return results[0] || null;
+}
+
+export async function getFamilySiblings(familyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(children).where(eq(children.familyId, familyId));
+}n result.length > 0 ? result[0] : undefined;
 }
 
 export async function createChild(data: InsertChild) {
