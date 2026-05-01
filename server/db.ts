@@ -2,7 +2,7 @@ import { eq, and, gte, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { 
   InsertUser, users, organizations, children, staff, families, attendance, 
-  healthRecords, familyServices,
+  healthRecords, familyServices, communicationLogs, educationRecords, pirData,
   InsertChild, InsertOrganization, InsertHealthRecord, InsertFamilyService 
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -123,7 +123,6 @@ export async function getFamilySiblings(familyId: number) {
   const db = await getDb();
   if (!db) return [];
   return await db.select().from(children).where(eq(children.familyId, familyId));
-}n result.length > 0 ? result[0] : undefined;
 }
 
 export async function createChild(data: InsertChild) {
