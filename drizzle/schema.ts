@@ -410,3 +410,173 @@ export const aiInsights = mysqlTable("ai_insights", {
 
 export type AiInsight = typeof aiInsights.$inferSelect;
 export type InsertAiInsight = typeof aiInsights.$inferInsert;
+
+
+// ==================== BILLING & PAYMENTS ====================
+export const invoices = mysqlTable("invoices", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id),
+  invoiceNumber: varchar("invoiceNumber", { length: 64 }).notNull().unique(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  dueDate: date("dueDate").notNull(),
+  status: mysqlEnum("status", ["draft", "sent", "paid", "overdue", "cancelled"]).default("draft").notNull(),
+  description: text("description"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  paidAt: timestamp("paidAt"),
+});
+
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = typeof invoices.$inferInsert;
+
+export const payments = mysqlTable("payments", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceId: int("invoiceId").notNull().references(() => invoices.id),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: mysqlEnum("paymentMethod", ["credit_card", "ach", "check", "cash"]).notNull(),
+  stripePaymentId: varchar("stripePaymentId", { length: 255 }),
+  status: mysqlEnum("status", ["pending", "completed", "failed"]).default("pending").notNull(),
+  transactionDate: timestamp("transactionDate").defaultNow().notNull(),
+});
+
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = typeof payments.$inferInsert;
+
+// ==================== PARENT ENGAGEMENT PORTAL ====================
+export const activityLogs = mysqlTable("activityLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  childId: int("childId").notNull().references(() => children.id),
+  staffId: int("staffId").notNull().references(() => staff.id),
+  activityType: mysqlEnum("activityType", ["meal", "nap", "diaper", "activity", "note", "photo"]).notNull(),
+  description: text("description"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ActivityLog = typeof activityLogs.$inferSelect;
+export type InsertActivityLog = typeof activityLogs.$inferInsert;
+
+export const parentNotifications = mysqlTable("parentNotifications", {
+  id: int("id").autoincrement().primaryKey(),
+  familyId: int("familyId").notNull().references(() => families.id),
+  message: text("message").notNull(),
+  type: mysqlEnum("type", ["activity", "alert", "announcement", "photo"]).notNull(),
+  isRead: int("isRead").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ParentNotification = typeof parentNotifications.$inferSelect;
+export type InsertParentNotification = typeof parentNotifications.$inferInsert;
+
+// ==================== ELECTRONIC SIGNATURES ====================
+export const digitalDocuments = mysqlTable("digitalDocuments", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id),
+  documentType: mysqlEnum("documentType", ["enrollment", "consent", "waiver", "health_form"]).notNull(),
+  documentUrl: varchar("documentUrl", { length: 512 }).notNull(),
+  signatureUrl: varchar("signatureUrl", { length: 512 }),
+  signedBy: varchar("signedBy", { length: 255 }),
+  signedAt: timestamp("signedAt"),
+  status: mysqlEnum("status", ["pending", "signed", "expired"]).default("pending").notNull(),
+  expiresAt: date("expiresAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DigitalDocument = typeof digitalDocuments.$inferSelect;
+export type InsertDigitalDocument = typeof digitalDocuments.$inferInsert;
+
+// ==================== CACFP & MEAL PLANNING ====================
+export const mealPlans = mysqlTable("mealPlans", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  classroomId: int("classroomId").notNull().references(() => classrooms.id),
+  weekStartDate: date("weekStartDate").notNull(),
+  status: mysqlEnum("status", ["draft", "approved", "served"]).default("draft").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type MealPlan = typeof mealPlans.$inferSelect;
+export type InsertMealPlan = typeof mealPlans.$inferInsert;
+
+export const mealItems = mysqlTable("mealItems", {
+  id: int("id").autoincrement().primaryKey(),
+  mealPlanId: int("mealPlanId").notNull().references(() => mealPlans.id),
+  dayOfWeek: mysqlEnum("dayOfWeek", ["monday", "tuesday", "wednesday", "thursday", "friday"]).notNull(),
+  mealType: mysqlEnum("mealType", ["breakfast", "snack", "lunch", "afternoon_snack"]).notNull(),
+  description: text("description").notNull(),
+  servings: int("servings"),
+  cacfpCompliant: int("cacfpCompliant").default(1),
+});
+
+export type MealItem = typeof mealItems.$inferSelect;
+export type InsertMealItem = typeof mealItems.$inferInsert;
+
+export const cacfpReports = mysqlTable("cacfpReports", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  reportMonth: date("reportMonth").notNull(),
+  mealsServed: int("mealsServed").default(0),
+  reimbursementAmount: decimal("reimbursementAmount", { precision: 10, scale: 2 }),
+  status: mysqlEnum("status", ["draft", "submitted", "approved"]).default("draft").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CacfpReport = typeof cacfpReports.$inferSelect;
+export type InsertCacfpReport = typeof cacfpReports.$inferInsert;
+
+// ==================== STAFF OPERATIONS ====================
+export const timeClock = mysqlTable("timeClock", {
+  id: int("id").autoincrement().primaryKey(),
+  staffId: int("staffId").notNull().references(() => staff.id),
+  clockInTime: timestamp("clockInTime").notNull(),
+  clockOutTime: timestamp("clockOutTime"),
+  hoursWorked: decimal("hoursWorked", { precision: 5, scale: 2 }),
+  date: date("date").notNull(),
+});
+
+export type TimeClock = typeof timeClock.$inferSelect;
+export type InsertTimeClock = typeof timeClock.$inferInsert;
+
+export const certifications = mysqlTable("certifications", {
+  id: int("id").autoincrement().primaryKey(),
+  staffId: int("staffId").notNull().references(() => staff.id),
+  certificationType: varchar("certificationType", { length: 255 }).notNull(),
+  issueDate: date("issueDate").notNull(),
+  expiryDate: date("expiryDate").notNull(),
+  certificationNumber: varchar("certificationNumber", { length: 255 }),
+  documentUrl: varchar("documentUrl", { length: 512 }),
+  status: mysqlEnum("status", ["active", "expiring_soon", "expired"]).default("active").notNull(),
+});
+
+export type Certification = typeof certifications.$inferSelect;
+export type InsertCertification = typeof certifications.$inferInsert;
+
+// ==================== ADVANCED REPORTING ====================
+export const customReports = mysqlTable("customReports", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  createdByUserId: int("createdByUserId").notNull().references(() => users.id),
+  reportName: varchar("reportName", { length: 255 }).notNull(),
+  reportType: mysqlEnum("reportType", ["enrollment", "attendance", "health", "compliance", "financial", "custom"]).notNull(),
+  filters: json("filters"),
+  columns: json("columns"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  lastRunAt: timestamp("lastRunAt"),
+});
+
+export type CustomReport = typeof customReports.$inferSelect;
+export type InsertCustomReport = typeof customReports.$inferInsert;
+
+export const reportResults = mysqlTable("reportResults", {
+  id: int("id").autoincrement().primaryKey(),
+  customReportId: int("customReportId").notNull().references(() => customReports.id),
+  resultData: json("resultData").notNull(),
+  generatedAt: timestamp("generatedAt").defaultNow().notNull(),
+  exportFormat: mysqlEnum("exportFormat", ["pdf", "excel", "csv"]),
+  fileUrl: varchar("fileUrl", { length: 512 }),
+});
+
+export type ReportResult = typeof reportResults.$inferSelect;
+export type InsertReportResult = typeof reportResults.$inferInsert;

@@ -23,6 +23,12 @@ import Calendar from "./pages/Calendar";
 import { DocumentManagement } from "./pages/DocumentManagement";
 import { BulkActionCenter } from "./pages/BulkActionCenter";
 import { AIInsights } from "./pages/AIInsights";
+import { Billing } from "./pages/Billing";
+import { ParentPortal } from "./pages/ParentPortal";
+import { DigitalDocuments } from "./pages/DigitalDocuments";
+import { MealPlanning } from "./pages/MealPlanning";
+import { StaffOperations } from "./pages/StaffOperations";
+import { ReportBuilder } from "./pages/ReportBuilder";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
@@ -152,6 +158,48 @@ function Router() {
         {() => (
           <AppLayout>
             <AIInsights />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/billing">
+        {() => (
+          <AppLayout>
+            <Billing />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/parent-portal">
+        {() => (
+          <AppLayout>
+            <ParentPortal />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/documents">
+        {() => (
+          <AppLayout>
+            <DigitalDocuments />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/meal-planning">
+        {() => (
+          <AppLayout>
+            <MealPlanning />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/staff-operations">
+        {() => (
+          <AppLayout>
+            <StaffOperations />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/report-builder">
+        {() => (
+          <AppLayout>
+            <ReportBuilder />
           </AppLayout>
         )}
       </Route>
