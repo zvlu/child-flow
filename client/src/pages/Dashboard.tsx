@@ -60,6 +60,55 @@ const quickActions = [
   { label: "Compliance", href: "/compliance", icon: ShieldCheck, color: "bg-teal-50 text-teal-700 hover:bg-teal-100 border-teal-200" },
 ];
 
+const kpiCards = [
+  {
+    title: "Total Enrolled",
+    value: "47",
+    subtext: "+2 this month",
+    href: "/children",
+    borderClass: "border-l-primary",
+    iconBgClass: "bg-primary/10",
+    iconClass: "text-primary",
+    subtextClass: "text-xs text-green-600 flex items-center gap-1 mt-1",
+    icon: Baby,
+    trendIcon: TrendingUp,
+  },
+  {
+    title: "Present Today",
+    value: "42",
+    subtext: "89% attendance rate",
+    href: "/attendance",
+    borderClass: "border-l-blue-500",
+    iconBgClass: "bg-blue-50",
+    iconClass: "text-blue-500",
+    subtextClass: "text-xs text-muted-foreground mt-1",
+    icon: ClipboardCheck,
+  },
+  {
+    title: "Staff Members",
+    value: "12",
+    subtext: "10 active today",
+    href: "/staff",
+    borderClass: "border-l-purple-500",
+    iconBgClass: "bg-purple-50",
+    iconClass: "text-purple-500",
+    subtextClass: "text-xs text-muted-foreground mt-1",
+    icon: Users,
+  },
+  {
+    title: "Pending Actions",
+    value: "8",
+    subtext: "3 urgent",
+    href: "/action-queue",
+    borderClass: "border-l-amber-500",
+    iconBgClass: "bg-amber-50",
+    iconClass: "text-amber-500",
+    subtextClass: "text-xs text-red-500 flex items-center gap-1 mt-1",
+    icon: Bell,
+    trendIcon: AlertTriangle,
+  },
+];
+
 const severityColors: Record<string, string> = {
   high: "bg-red-100 text-red-700 border-red-200",
   medium: "bg-yellow-100 text-yellow-700 border-yellow-200",
@@ -87,69 +136,34 @@ export default function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-primary">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground font-medium">Total Enrolled</p>
-                <p className="text-3xl font-bold text-foreground mt-1">47</p>
-                <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
-                  <TrendingUp className="h-3 w-3" /> +2 this month
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Baby className="h-6 w-6 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {kpiCards.map((card) => {
+          const Icon = card.icon;
+          const TrendIcon = card.trendIcon;
 
-        <Card className="border-l-4 border-l-blue-500">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground font-medium">Present Today</p>
-                <p className="text-3xl font-bold text-foreground mt-1">42</p>
-                <p className="text-xs text-muted-foreground mt-1">89% attendance rate</p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-blue-50 flex items-center justify-center">
-                <ClipboardCheck className="h-6 w-6 text-blue-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-purple-500">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground font-medium">Staff Members</p>
-                <p className="text-3xl font-bold text-foreground mt-1">12</p>
-                <p className="text-xs text-muted-foreground mt-1">10 active today</p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-purple-50 flex items-center justify-center">
-                <Users className="h-6 w-6 text-purple-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-amber-500">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground font-medium">Pending Actions</p>
-                <p className="text-3xl font-bold text-foreground mt-1">8</p>
-                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                  <AlertTriangle className="h-3 w-3" /> 3 urgent
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-amber-50 flex items-center justify-center">
-                <Bell className="h-6 w-6 text-amber-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          return (
+            <Link key={card.title} href={card.href}>
+              <a className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                <Card className={`border-l-4 ${card.borderClass} transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 cursor-pointer`}>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground font-medium">{card.title}</p>
+                        <p className="text-3xl font-bold text-foreground mt-1">{card.value}</p>
+                        <p className={card.subtextClass}>
+                          {TrendIcon && <TrendIcon className="h-3 w-3" />}
+                          {card.subtext}
+                        </p>
+                      </div>
+                      <div className={`h-12 w-12 rounded-xl ${card.iconBgClass} flex items-center justify-center`}>
+                        <Icon className={`h-6 w-6 ${card.iconClass}`} />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </a>
+            </Link>
+          );
+        })}
       </div>
 
       {/* Quick Actions */}
@@ -263,13 +277,15 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-2">
             {alerts.map((alert) => (
-              <div key={alert.id} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${severityColors[alert.severity]}`}>
-                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium">{alert.message}</p>
-                  <p className="text-xs opacity-70 mt-0.5">{alert.time}</p>
-                </div>
-              </div>
+              <Link key={alert.id} href="/action-queue">
+                <a className={`flex items-start gap-3 p-3 rounded-lg border text-sm transition-shadow hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${severityColors[alert.severity]}`}>
+                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">{alert.message}</p>
+                    <p className="text-xs opacity-70 mt-0.5">{alert.time}</p>
+                  </div>
+                </a>
+              </Link>
             ))}
           </CardContent>
         </Card>

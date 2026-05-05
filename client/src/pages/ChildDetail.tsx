@@ -9,9 +9,10 @@ import { Progress } from "@/components/ui/progress";
 import { 
   ArrowLeft, Edit, Heart, Phone, Mail, MapPin, 
   CheckCircle2, Users, Baby, ChevronRight, Plus,
-  User, Calendar, Home, FileText, ShieldCheck, Clock
+  User, Calendar, Home, FileText, ShieldCheck, Clock, MessageSquare
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { cn } from "@/lib/utils";
 
 interface ChildDetailProps { id: string; }
 

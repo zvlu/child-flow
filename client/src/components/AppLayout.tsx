@@ -34,6 +34,7 @@ import {
   BookOpen,
   Printer,
   MessageSquare,
+  AlertTriangle,
   Zap,
   Briefcase,
   FileText,
@@ -54,9 +55,11 @@ const topNavItems = [
   { path: "/performance", label: "Performance Panel", icon: BarChart3 },
   { path: "/reports", label: "Reports", icon: FileText },
   { path: "/services", label: "Services", icon: Home },
+  { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
   { path: "/setup", label: "Setup", icon: Wrench },
   { path: "/todo", label: "To-Do List", icon: ListTodo },
 ];
+const TOP_NAV_PRIMARY_COUNT = 5;
 
 const sideNavItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -76,6 +79,7 @@ const sideNavItems = [
   { path: "/staff-operations", label: "Staff Ops", icon: UserCog },
   { path: "/report-builder", label: "Report Builder", icon: BarChart3 },
   { path: "/reports", label: "Reports", icon: FileText },
+  { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
   { path: "/compliance", label: "Compliance", icon: ShieldCheck },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
@@ -87,13 +91,17 @@ interface AppLayoutProps {
 export default function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [location] = useLocation();
-  const { user, logout, loading, isAuthenticated } = useAuth({ redirectOnUnauthenticated: true });
+  const { user, logout, loading, isAuthenticated } = useAuth();
   const { theme, setTheme } = useTheme();
   const loginUrl = getLoginUrl();
+  const topNavPrimaryItems = topNavItems.slice(0, TOP_NAV_PRIMARY_COUNT);
+  const topNavOverflowItems = topNavItems.slice(TOP_NAV_PRIMARY_COUNT);
 
   const handleTopNavAction = (label: string) => {
     toast.info(`${label} module selected`);
   };
+
+  const isTopNavActive = (path: string) => location === path || location.startsWith(`${path}/`);
 
   if (loading) {
     return (
@@ -123,25 +131,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className="flex h-screen bg-background overflow-hidden flex-col">
       {/* Top Navigation Bar - Matching ChildPlus Style */}
-      <header className="h-12 bg-[#5b4a8c] text-white flex items-center px-4 gap-2 flex-shrink-0 shadow-md z-20">
+      <header className="h-14 bg-[#5b4a8c] text-white flex items-center px-4 gap-2 flex-shrink-0 shadow-md z-20">
         <div className="flex items-center gap-2 mr-4">
           <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
             <Baby className="h-4 w-4 text-white" />
           </div>
-          <span className="font-bold text-sm tracking-tight">ChildFlow</span>
+          <span className="font-bold text-base tracking-tight">ChildFlow</span>
         </div>
         
-        <nav className="flex-1 flex items-center h-full overflow-x-auto no-scrollbar">
-          {topNavItems.map((item) => {
-            const isActive = location === item.path;
+        <nav className="flex-1 flex items-center h-full min-w-0">
+          {topNavPrimaryItems.map((item) => {
+            const isActive = isTopNavActive(item.path);
             return (
               <Link key={item.label} href={item.path}>
                 <a 
                   className={cn(
-                    "px-3 h-full flex items-center text-[11px] font-bold transition-colors whitespace-nowrap",
+                    "px-3 md:px-4 h-full flex items-center text-xs font-semibold transition-colors whitespace-nowrap border-b-2 border-transparent",
                     isActive 
-                      ? "bg-white/20 border-b-2 border-white" 
-                      : "hover:bg-white/10 text-white/80 hover:text-white"
+                      ? "bg-white/20 text-white border-white"
+                      : "hover:bg-white/10 text-white/85 hover:text-white"
                   )}
                 >
                   {item.label}
@@ -149,6 +157,38 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </Link>
             );
           })}
+
+          {topNavOverflowItems.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "h-full rounded-none px-3 md:px-4 text-xs font-semibold text-white/85 hover:text-white hover:bg-white/10 border-b-2 border-transparent",
+                    topNavOverflowItems.some((item) => isTopNavActive(item.path)) && "bg-white/20 text-white border-white"
+                  )}
+                >
+                  More
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 rounded-xl">
+                {topNavOverflowItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = isTopNavActive(item.path);
+                  return (
+                    <DropdownMenuItem key={item.path} asChild>
+                      <Link href={item.path}>
+                        <a className={cn("flex items-center gap-2", isActive && "font-semibold")}>
+                          <Icon className="h-4 w-4" />
+                          {item.label}
+                        </a>
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </nav>
 
         <div className="flex items-center gap-3 ml-4">

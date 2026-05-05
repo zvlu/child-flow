@@ -29,6 +29,7 @@ import { DigitalDocuments } from "./pages/DigitalDocuments";
 import { MealPlanning } from "./pages/MealPlanning";
 import { StaffOperations } from "./pages/StaffOperations";
 import { ReportBuilder } from "./pages/ReportBuilder";
+import { ActionQueue } from "./pages/ActionQueue";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
@@ -200,6 +201,13 @@ function Router() {
         {() => (
           <AppLayout>
             <ReportBuilder />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/action-queue">
+        {() => (
+          <AppLayout>
+            <ActionQueue />
           </AppLayout>
         )}
       </Route>

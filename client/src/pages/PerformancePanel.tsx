@@ -34,7 +34,7 @@ const incomeStatusData = [
 
 interface PanelCardProps {
   title: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   isEmpty?: boolean;
   isLoading?: boolean;
   emptyText?: string;

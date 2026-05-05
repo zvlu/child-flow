@@ -209,8 +209,8 @@ export default function Communication() {
                 </div>
                 <DialogFooter>
                   <Button type="button" variant="ghost" onClick={() => setIsNewMessageOpen(false)} className="rounded-xl font-bold">Cancel</Button>
-                  <Button type="submit" className="rounded-xl gap-2 font-bold px-6" disabled={sendMessageMutation.isLoading}>
-                    {sendMessageMutation.isLoading ? <Clock className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  <Button type="submit" className="rounded-xl gap-2 font-bold px-6" disabled={sendMessageMutation.isPending}>
+                    {sendMessageMutation.isPending ? <Clock className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     Send Message
                   </Button>
                 </DialogFooter>
@@ -409,8 +409,8 @@ export default function Communication() {
                   </div>
                   <DialogFooter>
                     <Button type="button" variant="ghost" onClick={() => setIsNewLogOpen(false)} className="rounded-xl font-bold">Cancel</Button>
-                    <Button type="submit" className="rounded-xl font-bold px-6" disabled={createLogMutation.isLoading}>
-                      {createLogMutation.isLoading ? <Clock className="h-4 w-4 animate-spin" /> : "Save Log Entry"}
+                    <Button type="submit" className="rounded-xl font-bold px-6" disabled={createLogMutation.isPending}>
+                      {createLogMutation.isPending ? <Clock className="h-4 w-4 animate-spin" /> : "Save Log Entry"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -485,9 +485,9 @@ export default function Communication() {
               <Button 
                 className="rounded-full px-8 py-6 h-auto text-base font-bold gap-3 shadow-lg shadow-primary/20" 
                 onClick={handleBroadcast}
-                disabled={broadcastMutation.isLoading}
+                disabled={broadcastMutation.isPending}
               >
-                {broadcastMutation.isLoading ? <Clock className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
+                {broadcastMutation.isPending ? <Clock className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
                 Create New Broadcast
               </Button>
               
