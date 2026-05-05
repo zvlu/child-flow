@@ -69,6 +69,7 @@ const sideNavItems = [
   { path: "/staff", label: "Staff", icon: UserCog },
   { path: "/documents", label: "Documents", icon: FileText },
   { path: "/bulk-actions", label: "Bulk Actions", icon: Zap },
+  { path: "/ai-insights", label: "AI Insights", icon: Zap },
   { path: "/reports", label: "Reports", icon: FileText },
   { path: "/compliance", label: "Compliance", icon: ShieldCheck },
   { path: "/settings", label: "Settings", icon: Settings },

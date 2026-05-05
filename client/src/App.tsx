@@ -22,6 +22,7 @@ import ClassroomDashboard from "./pages/ClassroomDashboard";
 import Calendar from "./pages/Calendar";
 import { DocumentManagement } from "./pages/DocumentManagement";
 import { BulkActionCenter } from "./pages/BulkActionCenter";
+import { AIInsights } from "./pages/AIInsights";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
@@ -144,6 +145,13 @@ function Router() {
         {() => (
           <AppLayout>
             <BulkActionCenter />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/ai-insights">
+        {() => (
+          <AppLayout>
+            <AIInsights />
           </AppLayout>
         )}
       </Route>
