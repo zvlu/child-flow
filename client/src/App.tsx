@@ -20,6 +20,8 @@ import Communication from "./pages/Communication";
 import Settings from "./pages/Settings";
 import ClassroomDashboard from "./pages/ClassroomDashboard";
 import Calendar from "./pages/Calendar";
+import { DocumentManagement } from "./pages/DocumentManagement";
+import { BulkActionCenter } from "./pages/BulkActionCenter";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
@@ -128,6 +130,20 @@ function Router() {
         {() => (
           <AppLayout>
             <Settings />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/documents">
+        {() => (
+          <AppLayout>
+            <DocumentManagement />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/bulk-actions">
+        {() => (
+          <AppLayout>
+            <BulkActionCenter />
           </AppLayout>
         )}
       </Route>

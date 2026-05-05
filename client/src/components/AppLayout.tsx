@@ -67,6 +67,8 @@ const sideNavItems = [
   { path: "/health", label: "Health Records", icon: Heart },
   { path: "/family-services", label: "Family Services", icon: Home },
   { path: "/staff", label: "Staff", icon: UserCog },
+  { path: "/documents", label: "Documents", icon: FileText },
+  { path: "/bulk-actions", label: "Bulk Actions", icon: Zap },
   { path: "/reports", label: "Reports", icon: FileText },
   { path: "/compliance", label: "Compliance", icon: ShieldCheck },
   { path: "/settings", label: "Settings", icon: Settings },

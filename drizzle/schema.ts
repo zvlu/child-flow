@@ -348,3 +348,65 @@ export const familyContactAddresses = mysqlTable("family_contact_addresses", {
 
 export type FamilyContactAddress = typeof familyContactAddresses.$inferSelect;
 export type InsertFamilyContactAddress = typeof familyContactAddresses.$inferInsert;
+
+
+/**
+ * Documents table for storing digital files (birth certificates, immunization records, consent forms).
+ */
+export const documents = mysqlTable("documents", {
+  id: int("id").autoincrement().primaryKey(),
+  childId: int("childId").notNull().references(() => children.id),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  documentType: mysqlEnum("documentType", ["birth_certificate", "immunization_record", "consent_form", "medical_record", "assessment", "other"]).notNull(),
+  fileName: varchar("fileName", { length: 255 }).notNull(),
+  fileUrl: text("fileUrl").notNull(), // S3 or cloud storage URL
+  fileSize: int("fileSize"), // in bytes
+  mimeType: varchar("mimeType", { length: 100 }), // e.g., "application/pdf"
+  expiryDate: timestamp("expiryDate"), // Optional: for documents that expire
+  uploadedBy: int("uploadedBy").notNull().references(() => staff.id),
+  uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Document = typeof documents.$inferSelect;
+export type InsertDocument = typeof documents.$inferInsert;
+
+/**
+ * Bulk Action Logs table for tracking bulk operations (attendance, health screenings, notes).
+ */
+export const bulkActionLogs = mysqlTable("bulk_action_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  classroomId: int("classroomId").notNull().references(() => classrooms.id),
+  actionType: mysqlEnum("actionType", ["bulk_attendance", "bulk_health_screening", "bulk_notes", "bulk_enrollment"]).notNull(),
+  description: text("description"),
+  recordCount: int("recordCount").notNull(), // Number of children affected
+  status: mysqlEnum("status", ["pending", "completed", "failed"]).default("pending"),
+  performedBy: int("performedBy").notNull().references(() => staff.id),
+  actionDate: timestamp("actionDate").defaultNow(),
+  completedAt: timestamp("completedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type BulkActionLog = typeof bulkActionLogs.$inferSelect;
+export type InsertBulkActionLog = typeof bulkActionLogs.$inferInsert;
+
+/**
+ * AI Insights table for storing AI-generated summaries and recommendations.
+ */
+export const aiInsights = mysqlTable("ai_insights", {
+  id: int("id").autoincrement().primaryKey(),
+  childId: int("childId").notNull().references(() => children.id),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  insightType: mysqlEnum("insightType", ["case_summary", "compliance_flag", "health_alert", "behavioral_note", "recommendation"]).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  priority: mysqlEnum("priority", ["low", "medium", "high", "critical"]).default("medium"),
+  actionRequired: int("actionRequired").default(0),
+  dismissedAt: timestamp("dismissedAt"),
+  generatedAt: timestamp("generatedAt").defaultNow(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AiInsight = typeof aiInsights.$inferSelect;
+export type InsertAiInsight = typeof aiInsights.$inferInsert;
