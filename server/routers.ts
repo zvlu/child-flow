@@ -14,6 +14,7 @@ import {
   getFamilySiblings,
   getHealthRecords,
   createHealthRecord,
+  getHealthFollowUpAlerts,
   getFamilyServices,
   createFamilyService,
   getCommunicationLogs,
@@ -111,6 +112,11 @@ export const appRouter = router({
       .input(z.any()) // Using any for brevity in this step, ideally use Zod schema matching InsertHealthRecord
       .mutation(async ({ input }) => {
         return createHealthRecord(input);
+      }),
+    followUps: protectedProcedure
+      .input(z.object({ organizationId: z.number(), dueWithinDays: z.number().min(1).max(365).optional() }))
+      .query(async ({ input }) => {
+        return getHealthFollowUpAlerts(input.organizationId, input.dueWithinDays ?? 30);
       }),
   }),
 

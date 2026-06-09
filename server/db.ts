@@ -7,6 +7,19 @@ import {
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
+const FOLLOW_UP_TYPES = new Set(["immunization", "physical", "dental", "vision", "hearing"]);
+
+export type HealthFollowUpAlert = {
+  childId: number;
+  childName: string;
+  recordId: number;
+  type: string;
+  expiryDate: Date;
+  daysUntilDue: number;
+  severity: "overdue" | "due_soon";
+  message: string;
+};
+
 let _db: ReturnType<typeof drizzle> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
@@ -175,6 +188,79 @@ export async function createHealthRecord(data: InsertHealthRecord) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return await db.insert(healthRecords).values(data);
+}
+
+export async function getHealthFollowUpAlerts(organizationId: number, dueWithinDays = 30): Promise<HealthFollowUpAlert[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const [records, organizationChildren] = await Promise.all([
+    db.select().from(healthRecords).where(eq(healthRecords.organizationId, organizationId)),
+    db.select().from(children).where(eq(children.organizationId, organizationId)),
+  ]);
+
+  const childNameById = new Map<number, string>();
+  for (const child of organizationChildren) {
+    childNameById.set(child.id, `${child.firstName} ${child.lastName}`);
+  }
+
+  const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const dueSoonLimit = new Date(startOfToday);
+  dueSoonLimit.setDate(dueSoonLimit.getDate() + dueWithinDays);
+
+  const latestByChildType = new Map<string, typeof records[number]>();
+  for (const record of records) {
+    if (!record.expiryDate || !FOLLOW_UP_TYPES.has(record.type)) continue;
+
+    const key = `${record.childId}:${record.type}`;
+    const existing = latestByChildType.get(key);
+    if (!existing) {
+      latestByChildType.set(key, record);
+      continue;
+    }
+
+    const existingTime = existing.expiryDate ? new Date(existing.expiryDate).getTime() : 0;
+    const currentTime = new Date(record.expiryDate).getTime();
+    if (currentTime > existingTime) {
+      latestByChildType.set(key, record);
+    }
+  }
+
+  const alerts: HealthFollowUpAlert[] = [];
+  for (const record of Array.from(latestByChildType.values())) {
+    if (!record.expiryDate) continue;
+
+    const expiry = new Date(record.expiryDate);
+    if (expiry > dueSoonLimit) continue;
+
+    const childName = childNameById.get(record.childId) || `Child #${record.childId}`;
+    const daysUntilDue = Math.ceil((expiry.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24));
+    const isOverdue = daysUntilDue < 0;
+    const normalizedType = record.type.replaceAll("_", " ");
+    const message = isOverdue
+      ? `${childName} ${normalizedType} follow-up is overdue`
+      : `${childName} ${normalizedType} follow-up is due in ${daysUntilDue} day${daysUntilDue === 1 ? "" : "s"}`;
+
+    alerts.push({
+      childId: record.childId,
+      childName,
+      recordId: record.id,
+      type: record.type,
+      expiryDate: expiry,
+      daysUntilDue,
+      severity: isOverdue ? "overdue" : "due_soon",
+      message,
+    });
+  }
+
+  alerts.sort((a, b) => {
+    if (a.severity !== b.severity) return a.severity === "overdue" ? -1 : 1;
+    return a.daysUntilDue - b.daysUntilDue;
+  });
+
+  return alerts;
 }
 
 export async function getFamilyServices(organizationId: number, familyId?: number) {
