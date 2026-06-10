@@ -171,13 +171,10 @@ struct ChildStatCell: View {
 }
 
 // MARK: - Upcoming Event
+// `FamilyEvent` is defined in Sources/Models/Models.swift (shared with the
+// APIClient); only the display helpers live here.
 
-struct FamilyEvent: Identifiable {
-    let id: String
-    let title: String
-    let date: Date
-    let type: String
-
+extension FamilyEvent {
     var icon: String {
         switch type {
         case "homeVisit": return "house.fill"

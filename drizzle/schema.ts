@@ -22,7 +22,15 @@ export const users = mysqlTable("users", {
    * Format: `scrypt$<saltHex>$<hashHex>` (see server/_core/password.ts).
    */
   passwordHash: varchar("passwordHash", { length: 255 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  /**
+   * Access tier:
+   * - admin: program administration (staff management, bulk operations)
+   * - staff: day-to-day program work (default for new internal accounts)
+   * - parent: family-app account; sees ONLY their own family via familyId
+   */
+  role: mysqlEnum("role", ["admin", "staff", "parent"]).default("staff").notNull(),
+  /** For parent accounts: the family this user belongs to. Null for staff/admin. */
+  familyId: int("familyId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -143,6 +151,30 @@ export const families = mysqlTable("families", {
 
 export type Family = typeof families.$inferSelect;
 export type InsertFamily = typeof families.$inferInsert;
+
+/**
+ * One-time invitation codes that let a parent create a family-app account
+ * bound to a specific family. Staff generate these; the family onboarding flow
+ * (verify-code → register) consumes them. A code is single-use and expires.
+ */
+export const familyInvitations = mysqlTable("family_invitations", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id),
+  /** Short human-enterable code, e.g. "CF-7K2M9Q". Unique while active. */
+  code: varchar("code", { length: 16 }).notNull().unique(),
+  /** Email the invite was addressed to (informational; registration re-asks). */
+  adultEmail: varchar("adultEmail", { length: 320 }),
+  /** users.id of the staff member who created the invite. */
+  createdBy: int("createdBy"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  /** Set when a parent registers with this code; null while unused. */
+  usedAt: timestamp("usedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type FamilyInvitation = typeof familyInvitations.$inferSelect;
+export type InsertFamilyInvitation = typeof familyInvitations.$inferInsert;
 
 /**
  * Attendance table for tracking daily attendance.

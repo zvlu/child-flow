@@ -52,6 +52,9 @@ targets:
         name: Models
       - path: Sources/Networking
         name: Networking
+      # Shared design tokens (programmatic colors/fonts; no asset-catalog deps)
+      - path: Sources/App/DesignSystem.swift
+        name: DesignSystem
       # Family-only views
       - FamilySources
     resources:

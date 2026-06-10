@@ -5,6 +5,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerAuthRoutes } from "./auth";
 import { registerOAuthRoutes } from "./oauth";
+import { registerFamilyRoutes } from "../family";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -36,6 +37,8 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // Email/password sign-in for mobile clients under /api/auth/login
   registerAuthRoutes(app);
+  // Parent (family app) onboarding + scoped data under /api/family/*
+  registerFamilyRoutes(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API

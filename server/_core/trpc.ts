@@ -1,6 +1,7 @@
 import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
+import type { User } from "../../drizzle/schema";
 import type { TrpcContext } from "./context";
 import { clientIpFromReq } from "./audit";
 import { insertAuditLog } from "../db";
@@ -29,15 +30,18 @@ const requireUser = t.middleware(async opts => {
 
 export const protectedProcedure = t.procedure.use(requireUser);
 
-export const adminProcedure = t.procedure.use(
+/**
+ * Role gate. Denied attempts are written to the audit log so
+ * privilege-escalation probes are visible. Best-effort logging; never blocks
+ * the (already rejected) request.
+ */
+const requireRole = (roles: Array<User["role"]>) =>
   t.middleware(async ({ ctx, next, path }) => {
     if (!ctx.user) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
     }
 
-    if (ctx.user.role !== 'admin') {
-      // Record the denied attempt so privilege-escalation probes are visible
-      // in the audit trail. Best-effort; never blocks the (rejected) request.
+    if (!roles.includes(ctx.user.role)) {
       await insertAuditLog({
         userId: ctx.user.id,
         actorOpenId: ctx.user.openId,
@@ -45,7 +49,7 @@ export const adminProcedure = t.procedure.use(
         resourceType: "rbac",
         resourceId: path,
         ipAddress: clientIpFromReq(ctx.req),
-        detail: `role=${ctx.user.role} required=admin`,
+        detail: `role=${ctx.user.role} required=${roles.join("|")}`,
       });
 
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
@@ -55,6 +59,47 @@ export const adminProcedure = t.procedure.use(
       ctx: {
         ...ctx,
         user: ctx.user,
+      },
+    });
+  });
+
+/** Program administration: staff management, bulk operations. */
+export const adminProcedure = t.procedure.use(requireRole(["admin"]));
+
+/**
+ * Internal program staff (admin included). This is the default tier for all
+ * program-data routes — parent accounts are denied and must use the
+ * family-scoped endpoints instead.
+ */
+export const staffProcedure = t.procedure.use(requireRole(["admin", "staff"]));
+
+/**
+ * Parent (family-app) accounts. Guarantees ctx.user.familyId is set; handlers
+ * MUST scope every query to that familyId.
+ */
+export const parentProcedure = t.procedure.use(
+  t.middleware(async ({ ctx, next, path }) => {
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    }
+
+    if (ctx.user.role !== "parent" || ctx.user.familyId == null) {
+      await insertAuditLog({
+        userId: ctx.user.id,
+        actorOpenId: ctx.user.openId,
+        action: "access_denied",
+        resourceType: "rbac",
+        resourceId: path,
+        ipAddress: clientIpFromReq(ctx.req),
+        detail: `role=${ctx.user.role} required=parent`,
+      });
+      throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        user: ctx.user as User & { familyId: number },
       },
     });
   }),

@@ -23,6 +23,7 @@
 		5E34A23295A8944FAF860502 /* FamilyEngagementEventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60B88EEA80AFFB65EE8A6609 /* FamilyEngagementEventView.swift */; };
 		5F9C761671C6A857C99C23B4 /* AttendanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E498101305B734F4E4121BD /* AttendanceView.swift */; };
 		6475E7A95225B544F55DB471 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0670080537B7AFEE9DF43001 /* DashboardView.swift */; };
+		66AB9FDF4263EE282F959408 /* ConversationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5498CD4E3CA59ACBDB8D513C /* ConversationViewModel.swift */; };
 		6DA4A66BCC30A8BCD5AC334F /* PrivacyPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAC964E983E5CA986BA59AB3 /* PrivacyPolicyView.swift */; };
 		713351DF2079F55649363930 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99780CDC23D9FB80F4397BF0 /* AppState.swift */; };
 		751622835002A9DB28AE9EE5 /* InviteFamiliesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 798ECC9719CD197E3EA13C5C /* InviteFamiliesView.swift */; };
@@ -38,6 +39,7 @@
 		9ADDC9C68F1477FDDF0F99C0 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D83EA83B94306AEE6C5CD6 /* MainTabView.swift */; };
 		A0C503101126B32B8CBD9C08 /* ChildFlowFamilyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABA17193FA8254E8385EF897 /* ChildFlowFamilyApp.swift */; };
 		A8E566D9E10FE130B28CD192 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479F40DB5B613FFEAABC4BBF /* APIClient.swift */; };
+		AB9663326B840D715612E788 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A9551953E11A0DDF02669CC /* DesignSystem.swift */; };
 		AF8D17B250BD19D984178048 /* HealthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E46D6558A7BC26F95662D4CE /* HealthView.swift */; };
 		BEC019AABF5D28B211607288 /* ComplianceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97A4E4F7D144BE6F0674324F /* ComplianceView.swift */; };
 		C08182890539CB3EAAC76E3B /* ChildrenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 513DE882CD9D310489A14DF1 /* ChildrenView.swift */; };
@@ -47,6 +49,7 @@
 		DB6D428EBCCD85C913F71C96 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2908B4589E06406D9D3ABC3 /* KeychainHelper.swift */; };
 		DF316411FB30D5D329EDAF2F /* ChildFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58A817DA82DD657B96A05963 /* ChildFlowTests.swift */; };
 		EC16055ABAD2DA9FDBC2AF71 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C5FB47E0F76579CC813F80 /* LoginView.swift */; };
+		F03B64259BAD548B07A37F9D /* ConversationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5498CD4E3CA59ACBDB8D513C /* ConversationViewModel.swift */; };
 		FC182B35EC442CE23E3A67E7 /* EnrollmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D85394B54D5D9CB4ECA7066B /* EnrollmentView.swift */; };
 /* End PBXBuildFile section */
 
@@ -75,6 +78,7 @@
 		483A8B530148A0C5E73025BB /* FamilyTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyTabView.swift; sourceTree = "<group>"; };
 		513DE882CD9D310489A14DF1 /* ChildrenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildrenView.swift; sourceTree = "<group>"; };
 		53B801EA88610650027688E8 /* FamilyProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyProfileView.swift; sourceTree = "<group>"; };
+		5498CD4E3CA59ACBDB8D513C /* ConversationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationViewModel.swift; sourceTree = "<group>"; };
 		58A817DA82DD657B96A05963 /* ChildFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildFlowTests.swift; sourceTree = "<group>"; };
 		5A91FDF3CD837468DEA594EE /* ClockInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockInView.swift; sourceTree = "<group>"; };
 		60B88EEA80AFFB65EE8A6609 /* FamilyEngagementEventView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyEngagementEventView.swift; sourceTree = "<group>"; };
@@ -233,6 +237,7 @@
 			isa = PBXGroup;
 			children = (
 				479F40DB5B613FFEAABC4BBF /* APIClient.swift */,
+				5498CD4E3CA59ACBDB8D513C /* ConversationViewModel.swift */,
 				B2908B4589E06406D9D3ABC3 /* KeychainHelper.swift */,
 			);
 			name = Networking;
@@ -462,6 +467,8 @@
 			files = (
 				2936B7A6A86EC69E8F77C916 /* APIClient.swift in Sources */,
 				A0C503101126B32B8CBD9C08 /* ChildFlowFamilyApp.swift in Sources */,
+				F03B64259BAD548B07A37F9D /* ConversationViewModel.swift in Sources */,
+				AB9663326B840D715612E788 /* DesignSystem.swift in Sources */,
 				1A3EDAE0E4E0B6337152D84C /* FamilyAppState.swift in Sources */,
 				D0AE97B797852738F8517195 /* FamilyHomeView.swift in Sources */,
 				295C055E35A2FFA0A324CBCA /* FamilyMessagesView.swift in Sources */,
@@ -494,6 +501,7 @@
 				C08182890539CB3EAAC76E3B /* ChildrenView.swift in Sources */,
 				7B708F85D76A61145779D31F /* ClockInView.swift in Sources */,
 				BEC019AABF5D28B211607288 /* ComplianceView.swift in Sources */,
+				66AB9FDF4263EE282F959408 /* ConversationViewModel.swift in Sources */,
 				6475E7A95225B544F55DB471 /* DashboardView.swift in Sources */,
 				814962CA06027F37B9D85CAB /* DesignSystem.swift in Sources */,
 				4EE4E2734488E6CB2DBD2936 /* DocumentsView.swift in Sources */,

@@ -24,6 +24,7 @@ const DEV_MOCK_USER: User = {
   loginMethod: "dev",
   passwordHash: null,
   role: "admin",
+  familyId: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   lastSignedIn: new Date(),

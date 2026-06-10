@@ -1,7 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router, protectedProcedure, adminProcedure } from "./_core/trpc";
+import { publicProcedure, router, staffProcedure, adminProcedure } from "./_core/trpc";
 import { auditAccess } from "./_core/audit";
 import { z } from "zod";
 import {
@@ -23,6 +23,7 @@ import {
   getPirData,
 } from "./db";
 import * as mod from "./moduleDb";
+import { createFamilyInvitation, listFamilyInvitations } from "./family";
 import { CommunicationService } from "./services/communication";
 
 export const appRouter = router({
@@ -45,7 +46,7 @@ export const appRouter = router({
   }),
 
   organizations: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
+    list: staffProcedure.query(async ({ ctx }) => {
       return getUserOrganizations(ctx.user.id);
     }),
     getByAgencyId: publicProcedure
@@ -56,18 +57,18 @@ export const appRouter = router({
   }),
 
   children: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return getOrganizationChildren(organizationId);
       }),
-    getById: protectedProcedure
+    getById: staffProcedure
       .input(z.number())
       .query(async ({ input: childId, ctx }) => {
         await auditAccess(ctx, { action: "read", resourceType: "child", resourceId: childId });
         return getChildById(childId);
       }),
-    create: protectedProcedure
+    create: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -85,12 +86,12 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "create", resourceType: "child", detail: `org:${input.organizationId}` });
         return result;
       }),
-    siblings: protectedProcedure
+    siblings: staffProcedure
       .input(z.number())
       .query(async ({ input: familyId }) => {
         return getFamilySiblings(familyId);
       }),
-    update: protectedProcedure
+    update: staffProcedure
       .input(
         z.object({
           id: z.number(),
@@ -107,7 +108,7 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "update", resourceType: "child", resourceId: id });
         return mod.updateChild(id, data);
       }),
-    classroomMap: protectedProcedure
+    classroomMap: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getChildClassroomMap(organizationId);
@@ -115,12 +116,12 @@ export const appRouter = router({
   }),
 
   families: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getOrganizationFamilies(organizationId);
       }),
-    create: protectedProcedure
+    create: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -137,7 +138,34 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return mod.createFamily(input);
       }),
-    contacts: protectedProcedure
+    // Parent onboarding: generate a one-time code a parent uses in the family
+    // app to create an account scoped to this family.
+    createInvitation: staffProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          familyId: z.number(),
+          adultEmail: z.string().email().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const invitation = await createFamilyInvitation({
+          ...input,
+          createdBy: ctx.user.id,
+        });
+        await auditAccess(ctx, {
+          action: "create",
+          resourceType: "family_invitation",
+          resourceId: input.familyId,
+        });
+        return invitation;
+      }),
+    invitations: staffProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId }) => {
+        return listFamilyInvitations(organizationId);
+      }),
+    contacts: staffProcedure
       .input(z.number())
       .query(async ({ input: familyId }) => {
         return mod.getFamilyContacts(familyId);
@@ -145,7 +173,7 @@ export const appRouter = router({
   }),
 
   staff: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return getOrganizationStaff(organizationId);
@@ -189,12 +217,12 @@ export const appRouter = router({
   }),
 
   classrooms: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getOrganizationClassrooms(organizationId);
       }),
-    roster: protectedProcedure
+    roster: staffProcedure
       .input(z.number())
       .query(async ({ input: classroomId }) => {
         return mod.getClassroomRoster(classroomId);
@@ -202,7 +230,7 @@ export const appRouter = router({
   }),
 
   attendance: router({
-    getByDate: protectedProcedure
+    getByDate: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -212,7 +240,7 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return getAttendanceByDate(input.organizationId, input.date);
       }),
-    getRange: protectedProcedure
+    getRange: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -223,7 +251,7 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return mod.getAttendanceRange(input.organizationId, input.start, input.end);
       }),
-    save: protectedProcedure
+    save: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -245,7 +273,7 @@ export const appRouter = router({
   }),
 
   dashboard: router({
-    stats: protectedProcedure
+    stats: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getDashboardStats(organizationId);
@@ -253,12 +281,12 @@ export const appRouter = router({
   }),
 
   calendar: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getCalendarEvents(organizationId);
       }),
-    create: protectedProcedure
+    create: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -275,7 +303,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return mod.createCalendarEvent(input);
       }),
-    delete: protectedProcedure
+    delete: staffProcedure
       .input(z.number())
       .mutation(async ({ input: id }) => {
         return mod.deleteCalendarEvent(id);
@@ -283,12 +311,12 @@ export const appRouter = router({
   }),
 
   notes: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
       .query(async ({ input }) => {
         return mod.getStudentNotes(input.organizationId, input.childId);
       }),
-    create: protectedProcedure
+    create: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -306,12 +334,12 @@ export const appRouter = router({
   }),
 
   documents: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
       .query(async ({ input }) => {
         return mod.getDocuments(input.organizationId, input.childId);
       }),
-    create: protectedProcedure
+    create: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -328,7 +356,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return mod.createDocument(input);
       }),
-    delete: protectedProcedure
+    delete: staffProcedure
       .input(z.number())
       .mutation(async ({ input: id }) => {
         return mod.deleteDocument(id);
@@ -336,12 +364,12 @@ export const appRouter = router({
   }),
 
   digitalDocuments: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getDigitalDocuments(organizationId);
       }),
-    create: protectedProcedure
+    create: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -357,7 +385,7 @@ export const appRouter = router({
           expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined,
         });
       }),
-    sign: protectedProcedure
+    sign: staffProcedure
       .input(z.object({ id: z.number(), signedBy: z.string().min(1) }))
       .mutation(async ({ input }) => {
         return mod.signDigitalDocument(input.id, input.signedBy);
@@ -365,12 +393,12 @@ export const appRouter = router({
   }),
 
   billing: router({
-    invoices: protectedProcedure
+    invoices: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getInvoices(organizationId);
       }),
-    createInvoice: protectedProcedure
+    createInvoice: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -385,12 +413,12 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return mod.createInvoice({ ...input, dueDate: new Date(input.dueDate) });
       }),
-    payments: protectedProcedure
+    payments: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getPayments(organizationId);
       }),
-    recordPayment: protectedProcedure
+    recordPayment: staffProcedure
       .input(
         z.object({
           invoiceId: z.number(),
@@ -405,17 +433,17 @@ export const appRouter = router({
   }),
 
   meals: router({
-    plans: protectedProcedure
+    plans: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getMealPlans(organizationId);
       }),
-    items: protectedProcedure
+    items: staffProcedure
       .input(z.number())
       .query(async ({ input: mealPlanId }) => {
         return mod.getMealItems(mealPlanId);
       }),
-    createPlan: protectedProcedure
+    createPlan: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -435,12 +463,12 @@ export const appRouter = router({
         const { items, ...plan } = input;
         return mod.createMealPlan({ ...plan, weekStartDate: new Date(plan.weekStartDate) }, items);
       }),
-    updatePlanStatus: protectedProcedure
+    updatePlanStatus: staffProcedure
       .input(z.object({ id: z.number(), status: z.enum(["draft", "approved", "served"]) }))
       .mutation(async ({ input }) => {
         return mod.updateMealPlanStatus(input.id, input.status);
       }),
-    cacfpReports: protectedProcedure
+    cacfpReports: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getCacfpReports(organizationId);
@@ -448,27 +476,27 @@ export const appRouter = router({
   }),
 
   staffOps: router({
-    timeClock: protectedProcedure
+    timeClock: staffProcedure
       .input(z.object({ organizationId: z.number(), sinceDays: z.number().optional() }))
       .query(async ({ input }) => {
         return mod.getTimeClockEntries(input.organizationId, input.sinceDays);
       }),
-    clockIn: protectedProcedure
+    clockIn: staffProcedure
       .input(z.number())
       .mutation(async ({ input: staffId }) => {
         return mod.clockIn(staffId);
       }),
-    clockOut: protectedProcedure
+    clockOut: staffProcedure
       .input(z.number())
       .mutation(async ({ input: entryId }) => {
         return mod.clockOut(entryId);
       }),
-    certifications: protectedProcedure
+    certifications: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getCertifications(organizationId);
       }),
-    createCertification: protectedProcedure
+    createCertification: staffProcedure
       .input(
         z.object({
           staffId: z.number(),
@@ -489,12 +517,12 @@ export const appRouter = router({
   }),
 
   aiInsights: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.object({ organizationId: z.number(), includeDismissed: z.boolean().optional() }))
       .query(async ({ input }) => {
         return mod.getAiInsights(input.organizationId, input.includeDismissed);
       }),
-    dismiss: protectedProcedure
+    dismiss: staffProcedure
       .input(z.number())
       .mutation(async ({ input: id }) => {
         return mod.dismissAiInsight(id);
@@ -502,7 +530,7 @@ export const appRouter = router({
   }),
 
   bulkActions: router({
-    logs: protectedProcedure
+    logs: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getBulkActionLogs(organizationId);
@@ -540,12 +568,12 @@ export const appRouter = router({
   }),
 
   parentPortal: router({
-    activities: protectedProcedure
+    activities: staffProcedure
       .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
       .query(async ({ input }) => {
         return mod.getActivityLogs(input.organizationId, input.childId);
       }),
-    logActivity: protectedProcedure
+    logActivity: staffProcedure
       .input(
         z.object({
           childId: z.number(),
@@ -557,12 +585,12 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return mod.createActivityLog(input);
       }),
-    notifications: protectedProcedure
+    notifications: staffProcedure
       .input(z.number())
       .query(async ({ input: familyId }) => {
         return mod.getParentNotifications(familyId);
       }),
-    markRead: protectedProcedure
+    markRead: staffProcedure
       .input(z.number())
       .mutation(async ({ input: id }) => {
         return mod.markNotificationRead(id);
@@ -570,12 +598,12 @@ export const appRouter = router({
   }),
 
   reportBuilder: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getCustomReports(organizationId);
       }),
-    create: protectedProcedure
+    create: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -588,7 +616,7 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         return mod.createCustomReport({ ...input, createdByUserId: ctx.user.id });
       }),
-    run: protectedProcedure
+    run: staffProcedure
       .input(z.number())
       .mutation(async ({ input: reportId }) => {
         return mod.runCustomReport(reportId);
@@ -596,7 +624,7 @@ export const appRouter = router({
   }),
 
   health: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
       .query(async ({ input, ctx }) => {
         await auditAccess(ctx, {
@@ -607,7 +635,7 @@ export const appRouter = router({
         });
         return getHealthRecords(input.organizationId, input.childId);
       }),
-    create: protectedProcedure
+    create: staffProcedure
       .input(z.any()) // Using any for brevity in this step, ideally use Zod schema matching InsertHealthRecord
       .mutation(async ({ input, ctx }) => {
         const result = await createHealthRecord(input);
@@ -618,7 +646,7 @@ export const appRouter = router({
         });
         return result;
       }),
-    followUps: protectedProcedure
+    followUps: staffProcedure
       .input(z.object({ organizationId: z.number(), dueWithinDays: z.number().min(1).max(365).optional() }))
       .query(async ({ input }) => {
         return getHealthFollowUpAlerts(input.organizationId, input.dueWithinDays ?? 30);
@@ -626,12 +654,12 @@ export const appRouter = router({
   }),
 
   familyServices: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.object({ organizationId: z.number(), familyId: z.number().optional() }))
       .query(async ({ input }) => {
         return getFamilyServices(input.organizationId, input.familyId);
       }),
-    create: protectedProcedure
+    create: staffProcedure
       .input(z.any())
       .mutation(async ({ input }) => {
         return createFamilyService(input);
@@ -639,7 +667,7 @@ export const appRouter = router({
   }),
 
   messaging: router({
-    send: protectedProcedure
+    send: staffProcedure
       .input(z.object({
         organizationId: z.number(),
         recipientId: z.number(),
@@ -651,7 +679,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return await CommunicationService.sendMessage(input);
       }),
-    broadcast: protectedProcedure
+    broadcast: staffProcedure
       .input(z.object({
         organizationId: z.number(),
         content: z.string(),
@@ -662,7 +690,7 @@ export const appRouter = router({
         console.log(`[Broadcast] Sending to organization ${input.organizationId} via ${input.channels.join(', ')}`);
         return { success: true, count: 150 }; // Mock count
       }),
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.object({ organizationId: z.number(), recipientId: z.number().optional() }))
       .query(async ({ input }) => {
         return await getCommunicationLogs(input.organizationId, input.recipientId);
@@ -670,12 +698,12 @@ export const appRouter = router({
   }),
 
   education: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
       .query(async ({ input }) => {
         return await getEducationRecords(input.organizationId, input.childId);
       }),
-    create: protectedProcedure
+    create: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -693,12 +721,12 @@ export const appRouter = router({
   }),
 
   compliance: router({
-    getPir: protectedProcedure
+    getPir: staffProcedure
       .input(z.object({ organizationId: z.number(), year: z.string() }))
       .query(async ({ input }) => {
         return await getPirData(input.organizationId, input.year);
       }),
-    setPirValue: protectedProcedure
+    setPirValue: staffProcedure
       .input(
         z.object({
           organizationId: z.number(),
