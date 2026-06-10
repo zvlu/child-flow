@@ -5,6 +5,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerAuthRoutes } from "./auth";
 import { registerOAuthRoutes } from "./oauth";
+import { registerDashboardRoutes } from "../dashboard";
 import { registerFamilyRoutes } from "../family";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -39,6 +40,8 @@ async function startServer() {
   registerAuthRoutes(app);
   // Parent (family app) onboarding + scoped data under /api/family/*
   registerFamilyRoutes(app);
+  // Staff dashboard stats + live alerts under /api/dashboard/stats
+  registerDashboardRoutes(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API

@@ -134,6 +134,8 @@ struct ProgramAlert: Codable, Identifiable {
         case "health": return "heart.fill"
         case "attendance": return "exclamationmark.circle"
         case "compliance": return "checkmark.seal"
+        case "message": return "envelope.badge.fill"
+        case "document": return "doc.text.fill"
         default: return "bell"
         }
     }
@@ -143,6 +145,8 @@ struct ProgramAlert: Codable, Identifiable {
         case "health":     return .cfHealth
         case "attendance": return .cfAttendance
         case "compliance": return .cfCompliance
+        case "message":    return .cfChildren
+        case "document":   return .cfFamily
         default:           return .cfPrimary
         }
     }
