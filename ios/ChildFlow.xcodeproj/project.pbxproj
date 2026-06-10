@@ -1,0 +1,795 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0142188FE8918BF382DF3EF2 /* TimesheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 357777D8991A2BEA9B834FBA /* TimesheetView.swift */; };
+		02F4B074096C205D89149F80 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB067BAB4E33FB7EE2602F60 /* Models.swift */; };
+		0744B223E994702BB1E132F4 /* ApplicationVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB3D7F61212C3F6F804AF66 /* ApplicationVerificationView.swift */; };
+		1A3EDAE0E4E0B6337152D84C /* FamilyAppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C5075C2841E9D5DEBBA3959 /* FamilyAppState.swift */; };
+		1DA52FF349549CFB9182B02C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB067BAB4E33FB7EE2602F60 /* Models.swift */; };
+		2936B7A6A86EC69E8F77C916 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479F40DB5B613FFEAABC4BBF /* APIClient.swift */; };
+		295C055E35A2FFA0A324CBCA /* FamilyMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A38A9F8EE297D1E56CEF591 /* FamilyMessagesView.swift */; };
+		3335914233EFED881E4E831B /* FamilyOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBAB0D9A422204C1E8F62EE9 /* FamilyOnboardingView.swift */; };
+		33F60F708FDCE01671C41C5A /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBE2FC8EECEEE5F154AC9040 /* ReportsView.swift */; };
+		4DAF73296036F00B4A27FCDB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78076EFEBACB38517E2D33D8 /* SettingsView.swift */; };
+		4EE4E2734488E6CB2DBD2936 /* DocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E1747D66A6B33A02847E703 /* DocumentsView.swift */; };
+		4F47FF563E260B44AB7CCC13 /* NutritionFormsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FF6A0E599CC1CDFCD9BB848 /* NutritionFormsView.swift */; };
+		5CCAF479502C488493D6D69B /* MessagingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18EB22F3C3C8A119E343B8ED /* MessagingView.swift */; };
+		5E34A23295A8944FAF860502 /* FamilyEngagementEventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60B88EEA80AFFB65EE8A6609 /* FamilyEngagementEventView.swift */; };
+		5F9C761671C6A857C99C23B4 /* AttendanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E498101305B734F4E4121BD /* AttendanceView.swift */; };
+		6475E7A95225B544F55DB471 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0670080537B7AFEE9DF43001 /* DashboardView.swift */; };
+		713351DF2079F55649363930 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99780CDC23D9FB80F4397BF0 /* AppState.swift */; };
+		751622835002A9DB28AE9EE5 /* InviteFamiliesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 798ECC9719CD197E3EA13C5C /* InviteFamiliesView.swift */; };
+		7B708F85D76A61145779D31F /* ClockInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A91FDF3CD837468DEA594EE /* ClockInView.swift */; };
+		7D1EB4F31B42828345B8A263 /* FamilyProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53B801EA88610650027688E8 /* FamilyProfileView.swift */; };
+		7DD29EBCA08C25339EB29906 /* StaffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D25D8DA0C0025A9D50725D2D /* StaffView.swift */; };
+		7ED9D5FB149F9FC825D4F67C /* FamilyServicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E692C0B9C9D804A18A9D26A1 /* FamilyServicesView.swift */; };
+		814962CA06027F37B9D85CAB /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A9551953E11A0DDF02669CC /* DesignSystem.swift */; };
+		8458644517B9B74B430EC7D9 /* FamilyTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 483A8B530148A0C5E73025BB /* FamilyTabView.swift */; };
+		8BFAB0593974DD5FCB97AC90 /* ChildFlowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89634BB98A90426A05FD1CE3 /* ChildFlowApp.swift */; };
+		8C55BE0E078F2A47220BFE66 /* MockData.swift in Sources */ = {isa = PBXBuildFile; fileRef = B09422F915723322F4F723BB /* MockData.swift */; };
+		9886581C26CEAD115B55EFF6 /* AttendancePlansView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2933386CACAF53C8F1122291 /* AttendancePlansView.swift */; };
+		9ADDC9C68F1477FDDF0F99C0 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D83EA83B94306AEE6C5CD6 /* MainTabView.swift */; };
+		A0C503101126B32B8CBD9C08 /* ChildFlowFamilyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABA17193FA8254E8385EF897 /* ChildFlowFamilyApp.swift */; };
+		A8E566D9E10FE130B28CD192 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479F40DB5B613FFEAABC4BBF /* APIClient.swift */; };
+		AF8D17B250BD19D984178048 /* HealthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E46D6558A7BC26F95662D4CE /* HealthView.swift */; };
+		BEC019AABF5D28B211607288 /* ComplianceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97A4E4F7D144BE6F0674324F /* ComplianceView.swift */; };
+		C08182890539CB3EAAC76E3B /* ChildrenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 513DE882CD9D310489A14DF1 /* ChildrenView.swift */; };
+		C98078C3380D23571DD68ABA /* ProgramStoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C77110B1C8E78D88A2E9D0CD /* ProgramStoryView.swift */; };
+		D0AE97B797852738F8517195 /* FamilyHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FDF45394B7822101CF49D60 /* FamilyHomeView.swift */; };
+		DF316411FB30D5D329EDAF2F /* ChildFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58A817DA82DD657B96A05963 /* ChildFlowTests.swift */; };
+		EC16055ABAD2DA9FDBC2AF71 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C5FB47E0F76579CC813F80 /* LoginView.swift */; };
+		FC182B35EC442CE23E3A67E7 /* EnrollmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D85394B54D5D9CB4ECA7066B /* EnrollmentView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		F92A7390F073EFAFE059017F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7ECBB49DF9B9E35FDC398E38 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 715DA1811291A120D44D3E24;
+			remoteInfo = ChildFlow;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0670080537B7AFEE9DF43001 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		0A38A9F8EE297D1E56CEF591 /* FamilyMessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMessagesView.swift; sourceTree = "<group>"; };
+		0FDF45394B7822101CF49D60 /* FamilyHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyHomeView.swift; sourceTree = "<group>"; };
+		18EB22F3C3C8A119E343B8ED /* MessagingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagingView.swift; sourceTree = "<group>"; };
+		1DA21453442C4FC79AF59DA9 /* ChildFlow.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ChildFlow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1E498101305B734F4E4121BD /* AttendanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttendanceView.swift; sourceTree = "<group>"; };
+		20C5FB47E0F76579CC813F80 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		2933386CACAF53C8F1122291 /* AttendancePlansView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttendancePlansView.swift; sourceTree = "<group>"; };
+		2C5075C2841E9D5DEBBA3959 /* FamilyAppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyAppState.swift; sourceTree = "<group>"; };
+		357777D8991A2BEA9B834FBA /* TimesheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimesheetView.swift; sourceTree = "<group>"; };
+		479F40DB5B613FFEAABC4BBF /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		483A8B530148A0C5E73025BB /* FamilyTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyTabView.swift; sourceTree = "<group>"; };
+		513DE882CD9D310489A14DF1 /* ChildrenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildrenView.swift; sourceTree = "<group>"; };
+		53B801EA88610650027688E8 /* FamilyProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyProfileView.swift; sourceTree = "<group>"; };
+		58A817DA82DD657B96A05963 /* ChildFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildFlowTests.swift; sourceTree = "<group>"; };
+		5A91FDF3CD837468DEA594EE /* ClockInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockInView.swift; sourceTree = "<group>"; };
+		60B88EEA80AFFB65EE8A6609 /* FamilyEngagementEventView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyEngagementEventView.swift; sourceTree = "<group>"; };
+		69F6B93708462C2F99FB8A52 /* ChildFlowFamily.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ChildFlowFamily.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6E1747D66A6B33A02847E703 /* DocumentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentsView.swift; sourceTree = "<group>"; };
+		78076EFEBACB38517E2D33D8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		798ECC9719CD197E3EA13C5C /* InviteFamiliesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteFamiliesView.swift; sourceTree = "<group>"; };
+		7A9551953E11A0DDF02669CC /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		7FF6A0E599CC1CDFCD9BB848 /* NutritionFormsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionFormsView.swift; sourceTree = "<group>"; };
+		86D83EA83B94306AEE6C5CD6 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		89634BB98A90426A05FD1CE3 /* ChildFlowApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildFlowApp.swift; sourceTree = "<group>"; };
+		97A4E4F7D144BE6F0674324F /* ComplianceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplianceView.swift; sourceTree = "<group>"; };
+		99780CDC23D9FB80F4397BF0 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		AB067BAB4E33FB7EE2602F60 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		ABA17193FA8254E8385EF897 /* ChildFlowFamilyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildFlowFamilyApp.swift; sourceTree = "<group>"; };
+		B09422F915723322F4F723BB /* MockData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockData.swift; sourceTree = "<group>"; };
+		BBE2FC8EECEEE5F154AC9040 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
+		BEB3D7F61212C3F6F804AF66 /* ApplicationVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationVerificationView.swift; sourceTree = "<group>"; };
+		C77110B1C8E78D88A2E9D0CD /* ProgramStoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramStoryView.swift; sourceTree = "<group>"; };
+		CBAB0D9A422204C1E8F62EE9 /* FamilyOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyOnboardingView.swift; sourceTree = "<group>"; };
+		D25D8DA0C0025A9D50725D2D /* StaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffView.swift; sourceTree = "<group>"; };
+		D85394B54D5D9CB4ECA7066B /* EnrollmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrollmentView.swift; sourceTree = "<group>"; };
+		DCC522EA3120CF5EF4B8FD32 /* ChildFlowTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ChildFlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E46D6558A7BC26F95662D4CE /* HealthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthView.swift; sourceTree = "<group>"; };
+		E692C0B9C9D804A18A9D26A1 /* FamilyServicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyServicesView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		02C0E1077774017A668893CB /* App */ = {
+			isa = PBXGroup;
+			children = (
+				99780CDC23D9FB80F4397BF0 /* AppState.swift */,
+				89634BB98A90426A05FD1CE3 /* ChildFlowApp.swift */,
+				7A9551953E11A0DDF02669CC /* DesignSystem.swift */,
+				20C5FB47E0F76579CC813F80 /* LoginView.swift */,
+				86D83EA83B94306AEE6C5CD6 /* MainTabView.swift */,
+				B09422F915723322F4F723BB /* MockData.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		1AEC3281EEC86F7729C2C4E8 /* Compliance */ = {
+			isa = PBXGroup;
+			children = (
+				97A4E4F7D144BE6F0674324F /* ComplianceView.swift */,
+			);
+			path = Compliance;
+			sourceTree = "<group>";
+		};
+		1F2849FE9E2AF259D646464B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1DA21453442C4FC79AF59DA9 /* ChildFlow.app */,
+				69F6B93708462C2F99FB8A52 /* ChildFlowFamily.app */,
+				DCC522EA3120CF5EF4B8FD32 /* ChildFlowTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		23AE4D0140F4588A3996B647 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				CBAB0D9A422204C1E8F62EE9 /* FamilyOnboardingView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		33749D17FDFB19EA3553E7C9 /* Events */ = {
+			isa = PBXGroup;
+			children = (
+				60B88EEA80AFFB65EE8A6609 /* FamilyEngagementEventView.swift */,
+			);
+			path = Events;
+			sourceTree = "<group>";
+		};
+		43E841A45C9DB756CF8B05B7 /* FamilyServices */ = {
+			isa = PBXGroup;
+			children = (
+				E692C0B9C9D804A18A9D26A1 /* FamilyServicesView.swift */,
+			);
+			path = FamilyServices;
+			sourceTree = "<group>";
+		};
+		4AE92CFE641992C3636CCBEC /* Staff */ = {
+			isa = PBXGroup;
+			children = (
+				5A91FDF3CD837468DEA594EE /* ClockInView.swift */,
+				D25D8DA0C0025A9D50725D2D /* StaffView.swift */,
+				357777D8991A2BEA9B834FBA /* TimesheetView.swift */,
+			);
+			path = Staff;
+			sourceTree = "<group>";
+		};
+		534BB051454D73D019644963 /* Health */ = {
+			isa = PBXGroup;
+			children = (
+				E46D6558A7BC26F95662D4CE /* HealthView.swift */,
+			);
+			path = Health;
+			sourceTree = "<group>";
+		};
+		58EC94A4A5721BADEA22CACE /* Children */ = {
+			isa = PBXGroup;
+			children = (
+				513DE882CD9D310489A14DF1 /* ChildrenView.swift */,
+			);
+			path = Children;
+			sourceTree = "<group>";
+		};
+		62BA39E5F407F59886960CAE /* App */ = {
+			isa = PBXGroup;
+			children = (
+				ABA17193FA8254E8385EF897 /* ChildFlowFamilyApp.swift */,
+				2C5075C2841E9D5DEBBA3959 /* FamilyAppState.swift */,
+				483A8B530148A0C5E73025BB /* FamilyTabView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		63852BB0C8872F1447EE9239 /* Nutrition */ = {
+			isa = PBXGroup;
+			children = (
+				7FF6A0E599CC1CDFCD9BB848 /* NutritionFormsView.swift */,
+			);
+			path = Nutrition;
+			sourceTree = "<group>";
+		};
+		64AE7256E69603BCEEC2DC55 /* Attendance */ = {
+			isa = PBXGroup;
+			children = (
+				1E498101305B734F4E4121BD /* AttendanceView.swift */,
+			);
+			path = Attendance;
+			sourceTree = "<group>";
+		};
+		6DBF9AC7FBBB11DDA3E48AE6 /* Messaging */ = {
+			isa = PBXGroup;
+			children = (
+				798ECC9719CD197E3EA13C5C /* InviteFamiliesView.swift */,
+				18EB22F3C3C8A119E343B8ED /* MessagingView.swift */,
+			);
+			path = Messaging;
+			sourceTree = "<group>";
+		};
+		72722EFF8EA1A4B9C6FA6189 /* Documents */ = {
+			isa = PBXGroup;
+			children = (
+				6E1747D66A6B33A02847E703 /* DocumentsView.swift */,
+			);
+			path = Documents;
+			sourceTree = "<group>";
+		};
+		774EF9AA9B316EAD6380624C /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				479F40DB5B613FFEAABC4BBF /* APIClient.swift */,
+			);
+			name = Networking;
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		81D7C72F99DBC7E6CFE1DFE3 /* FamilySources */ = {
+			isa = PBXGroup;
+			children = (
+				62BA39E5F407F59886960CAE /* App */,
+				D2995F22EBA295A5BC9D4F4B /* Home */,
+				A5A05EF1556DBD001B8395C2 /* Messages */,
+				23AE4D0140F4588A3996B647 /* Onboarding */,
+			);
+			path = FamilySources;
+			sourceTree = "<group>";
+		};
+		8E3978770CDD377F4AB3E537 = {
+			isa = PBXGroup;
+			children = (
+				81D7C72F99DBC7E6CFE1DFE3 /* FamilySources */,
+				A15B84C8DAB063405CB404D2 /* Sources */,
+				F8667802C2DC89409FEBABB9 /* Tests */,
+				1F2849FE9E2AF259D646464B /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		903236073D2240F541F4E434 /* Enrollment */ = {
+			isa = PBXGroup;
+			children = (
+				BEB3D7F61212C3F6F804AF66 /* ApplicationVerificationView.swift */,
+				2933386CACAF53C8F1122291 /* AttendancePlansView.swift */,
+				D85394B54D5D9CB4ECA7066B /* EnrollmentView.swift */,
+			);
+			path = Enrollment;
+			sourceTree = "<group>";
+		};
+		99E3B59C472A3AE90682D684 /* Reports */ = {
+			isa = PBXGroup;
+			children = (
+				BBE2FC8EECEEE5F154AC9040 /* ReportsView.swift */,
+			);
+			path = Reports;
+			sourceTree = "<group>";
+		};
+		A15B84C8DAB063405CB404D2 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				02C0E1077774017A668893CB /* App */,
+				64AE7256E69603BCEEC2DC55 /* Attendance */,
+				58EC94A4A5721BADEA22CACE /* Children */,
+				1AEC3281EEC86F7729C2C4E8 /* Compliance */,
+				D30BA40A737C82BA5510DD75 /* Dashboard */,
+				72722EFF8EA1A4B9C6FA6189 /* Documents */,
+				903236073D2240F541F4E434 /* Enrollment */,
+				33749D17FDFB19EA3553E7C9 /* Events */,
+				43E841A45C9DB756CF8B05B7 /* FamilyServices */,
+				534BB051454D73D019644963 /* Health */,
+				6DBF9AC7FBBB11DDA3E48AE6 /* Messaging */,
+				DB73CF5965F9026489DF24B5 /* Models */,
+				774EF9AA9B316EAD6380624C /* Networking */,
+				63852BB0C8872F1447EE9239 /* Nutrition */,
+				99E3B59C472A3AE90682D684 /* Reports */,
+				AF66D3FD933005B8C49A21FA /* Settings */,
+				4AE92CFE641992C3636CCBEC /* Staff */,
+				FAE0513FCF98CE4C7D3136DB /* Story */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		A5A05EF1556DBD001B8395C2 /* Messages */ = {
+			isa = PBXGroup;
+			children = (
+				0A38A9F8EE297D1E56CEF591 /* FamilyMessagesView.swift */,
+			);
+			path = Messages;
+			sourceTree = "<group>";
+		};
+		AF66D3FD933005B8C49A21FA /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				78076EFEBACB38517E2D33D8 /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		D2995F22EBA295A5BC9D4F4B /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				0FDF45394B7822101CF49D60 /* FamilyHomeView.swift */,
+				53B801EA88610650027688E8 /* FamilyProfileView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		D30BA40A737C82BA5510DD75 /* Dashboard */ = {
+			isa = PBXGroup;
+			children = (
+				0670080537B7AFEE9DF43001 /* DashboardView.swift */,
+			);
+			path = Dashboard;
+			sourceTree = "<group>";
+		};
+		DB73CF5965F9026489DF24B5 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				AB067BAB4E33FB7EE2602F60 /* Models.swift */,
+			);
+			name = Models;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		F8667802C2DC89409FEBABB9 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				58A817DA82DD657B96A05963 /* ChildFlowTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		FAE0513FCF98CE4C7D3136DB /* Story */ = {
+			isa = PBXGroup;
+			children = (
+				C77110B1C8E78D88A2E9D0CD /* ProgramStoryView.swift */,
+			);
+			path = Story;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		16A1C69BC54ACC2AB50C102E /* ChildFlowFamily */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 112BE94B69487A63F6D516AF /* Build configuration list for PBXNativeTarget "ChildFlowFamily" */;
+			buildPhases = (
+				3917AEEEF6C12F59FDE7DC83 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ChildFlowFamily;
+			packageProductDependencies = (
+			);
+			productName = ChildFlowFamily;
+			productReference = 69F6B93708462C2F99FB8A52 /* ChildFlowFamily.app */;
+			productType = "com.apple.product-type.application";
+		};
+		715DA1811291A120D44D3E24 /* ChildFlow */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2BB2ACE07346A995D37A4C11 /* Build configuration list for PBXNativeTarget "ChildFlow" */;
+			buildPhases = (
+				AAFA5890D22ADC8CFC3B141D /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ChildFlow;
+			packageProductDependencies = (
+			);
+			productName = ChildFlow;
+			productReference = 1DA21453442C4FC79AF59DA9 /* ChildFlow.app */;
+			productType = "com.apple.product-type.application";
+		};
+		CD042676ABEBCF15B054DADC /* ChildFlowTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5D78855D9881B3F0CDD21899 /* Build configuration list for PBXNativeTarget "ChildFlowTests" */;
+			buildPhases = (
+				3A657ACB6269DEAD334514F0 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				44184BF3A7D706D9A5A43AEA /* PBXTargetDependency */,
+			);
+			name = ChildFlowTests;
+			packageProductDependencies = (
+			);
+			productName = ChildFlowTests;
+			productReference = DCC522EA3120CF5EF4B8FD32 /* ChildFlowTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		7ECBB49DF9B9E35FDC398E38 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					16A1C69BC54ACC2AB50C102E = {
+						DevelopmentTeam = "";
+					};
+					715DA1811291A120D44D3E24 = {
+						DevelopmentTeam = "";
+					};
+				};
+			};
+			buildConfigurationList = 93595A02ECB3C31ADD26136D /* Build configuration list for PBXProject "ChildFlow" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 8E3978770CDD377F4AB3E537;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 1F2849FE9E2AF259D646464B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				715DA1811291A120D44D3E24 /* ChildFlow */,
+				16A1C69BC54ACC2AB50C102E /* ChildFlowFamily */,
+				CD042676ABEBCF15B054DADC /* ChildFlowTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3917AEEEF6C12F59FDE7DC83 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2936B7A6A86EC69E8F77C916 /* APIClient.swift in Sources */,
+				A0C503101126B32B8CBD9C08 /* ChildFlowFamilyApp.swift in Sources */,
+				1A3EDAE0E4E0B6337152D84C /* FamilyAppState.swift in Sources */,
+				D0AE97B797852738F8517195 /* FamilyHomeView.swift in Sources */,
+				295C055E35A2FFA0A324CBCA /* FamilyMessagesView.swift in Sources */,
+				3335914233EFED881E4E831B /* FamilyOnboardingView.swift in Sources */,
+				7D1EB4F31B42828345B8A263 /* FamilyProfileView.swift in Sources */,
+				8458644517B9B74B430EC7D9 /* FamilyTabView.swift in Sources */,
+				02F4B074096C205D89149F80 /* Models.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3A657ACB6269DEAD334514F0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DF316411FB30D5D329EDAF2F /* ChildFlowTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AAFA5890D22ADC8CFC3B141D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A8E566D9E10FE130B28CD192 /* APIClient.swift in Sources */,
+				713351DF2079F55649363930 /* AppState.swift in Sources */,
+				0744B223E994702BB1E132F4 /* ApplicationVerificationView.swift in Sources */,
+				9886581C26CEAD115B55EFF6 /* AttendancePlansView.swift in Sources */,
+				5F9C761671C6A857C99C23B4 /* AttendanceView.swift in Sources */,
+				8BFAB0593974DD5FCB97AC90 /* ChildFlowApp.swift in Sources */,
+				C08182890539CB3EAAC76E3B /* ChildrenView.swift in Sources */,
+				7B708F85D76A61145779D31F /* ClockInView.swift in Sources */,
+				BEC019AABF5D28B211607288 /* ComplianceView.swift in Sources */,
+				6475E7A95225B544F55DB471 /* DashboardView.swift in Sources */,
+				814962CA06027F37B9D85CAB /* DesignSystem.swift in Sources */,
+				4EE4E2734488E6CB2DBD2936 /* DocumentsView.swift in Sources */,
+				FC182B35EC442CE23E3A67E7 /* EnrollmentView.swift in Sources */,
+				5E34A23295A8944FAF860502 /* FamilyEngagementEventView.swift in Sources */,
+				7ED9D5FB149F9FC825D4F67C /* FamilyServicesView.swift in Sources */,
+				AF8D17B250BD19D984178048 /* HealthView.swift in Sources */,
+				751622835002A9DB28AE9EE5 /* InviteFamiliesView.swift in Sources */,
+				EC16055ABAD2DA9FDBC2AF71 /* LoginView.swift in Sources */,
+				9ADDC9C68F1477FDDF0F99C0 /* MainTabView.swift in Sources */,
+				5CCAF479502C488493D6D69B /* MessagingView.swift in Sources */,
+				8C55BE0E078F2A47220BFE66 /* MockData.swift in Sources */,
+				1DA52FF349549CFB9182B02C /* Models.swift in Sources */,
+				4F47FF563E260B44AB7CCC13 /* NutritionFormsView.swift in Sources */,
+				C98078C3380D23571DD68ABA /* ProgramStoryView.swift in Sources */,
+				33F60F708FDCE01671C41C5A /* ReportsView.swift in Sources */,
+				4DAF73296036F00B4A27FCDB /* SettingsView.swift in Sources */,
+				7DD29EBCA08C25339EB29906 /* StaffView.swift in Sources */,
+				0142188FE8918BF382DF3EF2 /* TimesheetView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		44184BF3A7D706D9A5A43AEA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 715DA1811291A120D44D3E24 /* ChildFlow */;
+			targetProxy = F92A7390F073EFAFE059017F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		03E7E74C4E49D1FBC6F0DE2B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		2BF20DBE2BE17F2583A0A17A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.childflow.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ChildFlow.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ChildFlow";
+			};
+			name = Release;
+		};
+		68238359ED65C06608DC1697 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		6A84D2DA212DF5790DEAD96A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = FamilyResources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.childflow.family;
+				PRODUCT_NAME = ChildFlow;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7ED83BCBE7731288CF5EA3BF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.childflow.app;
+				PRODUCT_NAME = ChildFlow;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		92634A09C13EABCAF81F7479 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.childflow.app;
+				PRODUCT_NAME = ChildFlow;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C3814DF262504F57BAF9C439 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.childflow.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ChildFlow.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ChildFlow";
+			};
+			name = Debug;
+		};
+		CEC8951666931A46FEBB3354 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = FamilyResources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.childflow.family;
+				PRODUCT_NAME = ChildFlow;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		112BE94B69487A63F6D516AF /* Build configuration list for PBXNativeTarget "ChildFlowFamily" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6A84D2DA212DF5790DEAD96A /* Debug */,
+				CEC8951666931A46FEBB3354 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		2BB2ACE07346A995D37A4C11 /* Build configuration list for PBXNativeTarget "ChildFlow" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				92634A09C13EABCAF81F7479 /* Debug */,
+				7ED83BCBE7731288CF5EA3BF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5D78855D9881B3F0CDD21899 /* Build configuration list for PBXNativeTarget "ChildFlowTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C3814DF262504F57BAF9C439 /* Debug */,
+				2BF20DBE2BE17F2583A0A17A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		93595A02ECB3C31ADD26136D /* Build configuration list for PBXProject "ChildFlow" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				68238359ED65C06608DC1697 /* Debug */,
+				03E7E74C4E49D1FBC6F0DE2B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 7ECBB49DF9B9E35FDC398E38 /* Project object */;
+}

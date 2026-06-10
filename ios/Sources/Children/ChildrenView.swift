@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ChildrenView: View {
     @StateObject private var viewModel = ChildrenViewModel()
+    @State private var showMenu = false
 
     var body: some View {
         NavigationStack {
@@ -15,6 +16,12 @@ struct ChildrenView: View {
             .searchable(text: $viewModel.searchText, prompt: "Search children")
             .navigationTitle("Children")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button { showMenu = true } label: {
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundColor(.cfPrimary)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Picker("Status", selection: $viewModel.statusFilter) {
@@ -27,12 +34,22 @@ struct ChildrenView: View {
                     }
                 }
             }
+            .sheet(isPresented: $showMenu) { AppMenuSheet() }
             .task { await viewModel.load() }
             .overlay {
                 if viewModel.isLoading {
                     ProgressView()
                 } else if viewModel.filteredChildren.isEmpty {
-                    ContentUnavailableView("No Children Found", systemImage: "person.2", description: Text("Try adjusting your search or filters."))
+                    VStack(spacing: 8) {
+                        Image(systemName: "person.2")
+                            .font(.largeTitle)
+                            .foregroundColor(.secondary)
+                        Text("No Children Found")
+                            .font(.headline)
+                        Text("Try adjusting your search or filters.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
         }
@@ -174,29 +191,6 @@ struct ChildFamilyTab: View {
     }
 }
 
-struct HealthStatusBadge: View {
-    let status: String
-
-    var color: Color {
-        switch status.lowercased() {
-        case "current": return .green
-        case "due soon": return .orange
-        case "overdue": return .red
-        default: return .gray
-        }
-    }
-
-    var body: some View {
-        Text(status)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(color.opacity(0.15))
-            .foregroundColor(color)
-            .clipShape(Capsule())
-    }
-}
-
 @MainActor
 class ChildrenViewModel: ObservableObject {
     @Published var children: [Child] = []
@@ -219,7 +213,9 @@ class ChildrenViewModel: ObservableObject {
         do {
             children = try await APIClient.shared.getChildren()
         } catch {
-            // Handle error
+            #if DEBUG
+            children = MockData.children
+            #endif
         }
         isLoading = false
     }

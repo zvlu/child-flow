@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AttendanceView: View {
     @StateObject private var viewModel = AttendanceViewModel()
+    @State private var showMenu = false
 
     var body: some View {
         NavigationStack {
@@ -46,11 +47,18 @@ struct AttendanceView: View {
             }
             .navigationTitle("Attendance")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button { showMenu = true } label: {
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundColor(.cfPrimary)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") { viewModel.saveAll() }
                         .disabled(!viewModel.hasChanges)
                 }
             }
+            .sheet(isPresented: $showMenu) { AppMenuSheet() }
             .task { await viewModel.load() }
         }
     }
@@ -100,7 +108,21 @@ class AttendanceViewModel: ObservableObject {
             let data = try await APIClient.shared.getAttendance(date: selectedDate, classroom: selectedClassroom)
             records = data.records
             classrooms = data.classrooms
-        } catch {}
+        } catch {
+            #if DEBUG
+            classrooms = ["Room 1A", "Room 1B", "Room 2A", "Room 2B"]
+            records = MockData.children.map { child in
+                AttendanceRecord(
+                    id: UUID().uuidString,
+                    childId: child.id,
+                    childName: child.fullName,
+                    classroom: child.classroom,
+                    status: child.id == "child-5" ? .absent : .present,
+                    date: selectedDate
+                )
+            }
+            #endif
+        }
         isLoading = false
     }
 
