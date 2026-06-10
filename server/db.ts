@@ -1,9 +1,10 @@
 import { eq, and, gte, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { 
-  InsertUser, users, organizations, children, staff, families, attendance, 
+import {
+  InsertUser, users, organizations, children, staff, families, attendance,
   healthRecords, familyServices, communicationLogs, educationRecords, pirData,
-  InsertChild, InsertOrganization, InsertHealthRecord, InsertFamilyService 
+  InsertChild, InsertOrganization, InsertHealthRecord, InsertFamilyService,
+  auditLogs, InsertAuditLog
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -104,6 +105,53 @@ export async function getUserByOpenId(openId: string) {
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
 
   return result.length > 0 ? result[0] : undefined;
+}
+
+/** Look up a user by email for password-based sign-in. */
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/** Set (or clear, with null) a user's scrypt password hash. */
+export async function setUserPassword(openId: string, passwordHash: string | null) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot set password: database not available");
+    return;
+  }
+
+  await db.update(users).set({ passwordHash }).where(eq(users.openId, openId));
+}
+
+/**
+ * Append a row to the audit log.
+ * Best-effort: failures are logged but never propagated into the request path,
+ * so audit-write problems can't deny access to (or block writes of) care records.
+ */
+export async function insertAuditLog(entry: InsertAuditLog): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    console.warn(
+      "[Audit] DB unavailable, dropping audit event:",
+      entry.action,
+      entry.resourceType
+    );
+    return;
+  }
+
+  try {
+    await db.insert(auditLogs).values(entry);
+  } catch (error) {
+    console.error("[Audit] Failed to write audit log:", error);
+  }
 }
 
 export async function getOrganizationByAgencyId(agencyId: string) {

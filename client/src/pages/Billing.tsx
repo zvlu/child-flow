@@ -1,27 +1,126 @@
 import { useState } from "react";
-import { DollarSign, Plus, Eye, Send, Download, Filter } from "lucide-react";
+import { DollarSign, Plus, Eye, Download, Filter, CreditCard, Loader2 } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { ORGANIZATION_ID } from "@/const";
+import { toast } from "sonner";
+
+const statusColors = {
+  paid: "bg-green-100 text-green-700",
+  sent: "bg-blue-100 text-blue-700",
+  overdue: "bg-red-100 text-red-700",
+  draft: "bg-gray-100 text-gray-700",
+  cancelled: "bg-slate-100 text-slate-500",
+};
+
+const paymentMethodLabels: Record<string, string> = {
+  credit_card: "Credit Card",
+  ach: "ACH",
+  check: "Check",
+  cash: "Cash",
+};
+
+function formatMoney(amount: string | number) {
+  const n = typeof amount === "string" ? parseFloat(amount) : amount;
+  if (Number.isNaN(n)) return "$0.00";
+  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatDate(d: string | Date | null | undefined) {
+  if (!d) return "—";
+  const date = new Date(d);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString();
+}
 
 export function Billing() {
-  const [invoices, setInvoices] = useState([
-    { id: 1, number: "INV-2025-001", family: "Johnson Family", amount: 1200, dueDate: "2025-02-15", status: "paid", createdDate: "2025-01-20" },
-    { id: 2, number: "INV-2025-002", family: "Chen Family", amount: 950, dueDate: "2025-02-15", status: "sent", createdDate: "2025-01-20" },
-    { id: 3, number: "INV-2025-003", family: "Rodriguez Family", amount: 1200, dueDate: "2025-02-15", status: "overdue", createdDate: "2025-01-10" },
-    { id: 4, number: "INV-2025-004", family: "Williams Family", amount: 850, dueDate: "2025-02-20", status: "draft", createdDate: "2025-01-19" },
-  ]);
+  const utils = trpc.useUtils();
+  const { data: invoices, isLoading } = trpc.billing.invoices.useQuery(ORGANIZATION_ID);
+  const { data: payments, isLoading: paymentsLoading } = trpc.billing.payments.useQuery(ORGANIZATION_ID);
+  const { data: families } = trpc.families.list.useQuery(ORGANIZATION_ID);
 
   const [showModal, setShowModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const statusColors = {
-    paid: "bg-green-100 text-green-700",
-    sent: "bg-blue-100 text-blue-700",
-    overdue: "bg-red-100 text-red-700",
-    draft: "bg-gray-100 text-gray-700",
+  // New invoice form state
+  const [familyId, setFamilyId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [description, setDescription] = useState("");
+
+  // Record payment state
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState<number | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState("credit_card");
+
+  const createInvoice = trpc.billing.createInvoice.useMutation({
+    onSuccess: () => {
+      utils.billing.invoices.invalidate(ORGANIZATION_ID);
+      toast.success("Invoice created");
+      setShowModal(false);
+      setFamilyId("");
+      setAmount("");
+      setDueDate("");
+      setDescription("");
+    },
+    onError: (err) => toast.error(err.message || "Failed to create invoice"),
+  });
+
+  const recordPayment = trpc.billing.recordPayment.useMutation({
+    onSuccess: () => {
+      utils.billing.invoices.invalidate(ORGANIZATION_ID);
+      utils.billing.payments.invalidate(ORGANIZATION_ID);
+      toast.success("Payment recorded — invoice marked paid");
+      setPaymentInvoiceId(null);
+    },
+    onError: (err) => toast.error(err.message || "Failed to record payment"),
+  });
+
+  const allInvoices = invoices ?? [];
+  const filteredInvoices =
+    filterStatus === "all" ? allInvoices : allInvoices.filter((i) => i.status === filterStatus);
+  const totalRevenue = allInvoices
+    .filter((i) => i.status === "paid")
+    .reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
+  const pendingAmount = allInvoices
+    .filter((i) => i.status === "sent" || i.status === "overdue")
+    .reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
+
+  const nextInvoiceNumber = () => {
+    const year = new Date().getFullYear();
+    const max = allInvoices.reduce((m, inv) => {
+      const match = /(\d+)\s*$/.exec(inv.invoiceNumber || "");
+      return match ? Math.max(m, parseInt(match[1], 10)) : m;
+    }, 0);
+    return `INV-${year}-${String(max + 1).padStart(4, "0")}`;
   };
 
-  const filteredInvoices = filterStatus === "all" ? invoices : invoices.filter(i => i.status === filterStatus);
-  const totalRevenue = invoices.filter(i => i.status === "paid").reduce((sum, i) => sum + i.amount, 0);
-  const pendingAmount = invoices.filter(i => i.status === "sent" || i.status === "overdue").reduce((sum, i) => sum + i.amount, 0);
+  const handleCreateInvoice = () => {
+    if (!familyId) return toast.error("Please select a family");
+    const parsed = parseFloat(amount);
+    if (!amount || Number.isNaN(parsed) || parsed <= 0) return toast.error("Please enter a valid amount");
+    if (!dueDate) return toast.error("Please select a due date");
+    createInvoice.mutate({
+      organizationId: ORGANIZATION_ID,
+      familyId: Number(familyId),
+      invoiceNumber: nextInvoiceNumber(),
+      amount: parsed.toFixed(2),
+      dueDate,
+      description: description || undefined,
+    });
+  };
+
+  const paymentInvoice = allInvoices.find((i) => i.id === paymentInvoiceId);
+
+  const handleRecordPayment = () => {
+    if (!paymentInvoice) return;
+    recordPayment.mutate({
+      invoiceId: paymentInvoice.id,
+      organizationId: ORGANIZATION_ID,
+      amount: paymentInvoice.amount,
+      paymentMethod: paymentMethod as "credit_card" | "ach" | "check" | "cash",
+    });
+  };
+
+  const invoiceNumberById = (id: number) =>
+    allInvoices.find((i) => i.id === id)?.invoiceNumber || `#${id}`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
@@ -44,18 +143,18 @@ export function Billing() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <p className="text-slate-600 text-sm font-medium">Total Revenue</p>
-            <p className="text-3xl font-bold text-green-600 mt-2">${totalRevenue.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-green-600 mt-2">{formatMoney(totalRevenue)}</p>
             <p className="text-xs text-slate-500 mt-2">From paid invoices</p>
           </div>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <p className="text-slate-600 text-sm font-medium">Pending Amount</p>
-            <p className="text-3xl font-bold text-orange-600 mt-2">${pendingAmount.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-orange-600 mt-2">{formatMoney(pendingAmount)}</p>
             <p className="text-xs text-slate-500 mt-2">Awaiting payment</p>
           </div>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <p className="text-slate-600 text-sm font-medium">Total Invoices</p>
-            <p className="text-3xl font-bold text-slate-900 mt-2">{invoices.length}</p>
-            <p className="text-xs text-slate-500 mt-2">This month</p>
+            <p className="text-3xl font-bold text-slate-900 mt-2">{allInvoices.length}</p>
+            <p className="text-xs text-slate-500 mt-2">All time</p>
           </div>
         </div>
 
@@ -74,7 +173,7 @@ export function Billing() {
         </div>
 
         {/* Invoices Table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
@@ -88,24 +187,95 @@ export function Billing() {
                 </tr>
               </thead>
               <tbody>
+                {isLoading && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-10 text-center text-slate-500">
+                      <Loader2 className="w-5 h-5 animate-spin inline-block mr-2 align-middle" />
+                      Loading invoices...
+                    </td>
+                  </tr>
+                )}
+                {!isLoading && filteredInvoices.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-10 text-center text-slate-500">
+                      No invoices found{filterStatus !== "all" ? " for this status" : ""}.
+                    </td>
+                  </tr>
+                )}
                 {filteredInvoices.map((invoice) => (
                   <tr key={invoice.id} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{invoice.number}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{invoice.family}</td>
-                    <td className="px-6 py-4 text-sm font-semibold text-slate-900">${invoice.amount}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{invoice.dueDate}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{invoice.invoiceNumber}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{invoice.familyName || "—"}</td>
+                    <td className="px-6 py-4 text-sm font-semibold text-slate-900">{formatMoney(invoice.amount)}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{formatDate(invoice.dueDate)}</td>
                     <td className="px-6 py-4 text-sm">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColors[invoice.status as keyof typeof statusColors]}`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColors[invoice.status as keyof typeof statusColors] || "bg-gray-100 text-gray-700"}`}>
                         {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex items-center gap-2">
-                        <button className="p-2 hover:bg-slate-200 rounded-lg transition-colors"><Eye className="w-4 h-4 text-slate-600" /></button>
-                        {invoice.status !== "paid" && <button className="p-2 hover:bg-slate-200 rounded-lg transition-colors"><Send className="w-4 h-4 text-slate-600" /></button>}
-                        <button className="p-2 hover:bg-slate-200 rounded-lg transition-colors"><Download className="w-4 h-4 text-slate-600" /></button>
+                        <button title={invoice.description || "View invoice"} className="p-2 hover:bg-slate-200 rounded-lg transition-colors"><Eye className="w-4 h-4 text-slate-600" /></button>
+                        {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+                          <button
+                            title="Record payment"
+                            onClick={() => { setPaymentInvoiceId(invoice.id); setPaymentMethod("credit_card"); }}
+                            className="p-2 hover:bg-slate-200 rounded-lg transition-colors"
+                          >
+                            <CreditCard className="w-4 h-4 text-teal-600" />
+                          </button>
+                        )}
+                        <button title="Download" className="p-2 hover:bg-slate-200 rounded-lg transition-colors"><Download className="w-4 h-4 text-slate-600" /></button>
                       </div>
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Payments History */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200">
+            <h2 className="text-xl font-bold text-slate-900">Payment History</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Invoice</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Amount</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Method</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Status</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paymentsLoading && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                      <Loader2 className="w-5 h-5 animate-spin inline-block mr-2 align-middle" />
+                      Loading payments...
+                    </td>
+                  </tr>
+                )}
+                {!paymentsLoading && (payments ?? []).length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">No payments recorded yet.</td>
+                  </tr>
+                )}
+                {(payments ?? []).map((p) => (
+                  <tr key={p.id} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{invoiceNumberById(p.invoiceId)}</td>
+                    <td className="px-6 py-4 text-sm font-semibold text-slate-900">{formatMoney(p.amount)}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{paymentMethodLabels[p.paymentMethod] || p.paymentMethod}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                        {p.status ? p.status.charAt(0).toUpperCase() + p.status.slice(1) : "Completed"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{formatDate(p.transactionDate)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -122,30 +292,62 @@ export function Billing() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Family</label>
-                    <select className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500">
-                      <option>Select family...</option>
-                      <option>Johnson Family</option>
-                      <option>Chen Family</option>
+                    <select value={familyId} onChange={(e) => setFamilyId(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500">
+                      <option value="">Select family...</option>
+                      {(families ?? []).map((f) => (
+                        <option key={f.id} value={f.id}>{f.primaryContactName}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Amount</label>
-                    <input type="number" placeholder="1200.00" className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    <input type="number" min="0" step="0.01" placeholder="1200.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Due Date</label>
-                    <input type="date" className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Description</label>
-                    <input type="text" placeholder="Tuition for January..." className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    <input type="text" placeholder="Tuition for January..." value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500" />
                   </div>
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button onClick={() => setShowModal(false)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
-                  <button className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl transition-colors font-medium">Create Invoice</button>
+                  <button onClick={handleCreateInvoice} disabled={createInvoice.isPending} className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium">
+                    {createInvoice.isPending ? "Creating..." : "Create Invoice"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Record Payment Modal */}
+        {paymentInvoice && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-6">
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Record Payment</h2>
+              <p className="text-sm text-slate-600 mb-6">
+                {paymentInvoice.invoiceNumber} · {paymentInvoice.familyName} · {formatMoney(paymentInvoice.amount)}
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Payment Method</label>
+                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    <option value="credit_card">Credit Card</option>
+                    <option value="ach">ACH</option>
+                    <option value="check">Check</option>
+                    <option value="cash">Cash</option>
+                  </select>
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button onClick={() => setPaymentInvoiceId(null)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
+                  <button onClick={handleRecordPayment} disabled={recordPayment.isPending} className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium">
+                    {recordPayment.isPending ? "Recording..." : "Record Payment"}
+                  </button>
                 </div>
               </div>
             </div>

@@ -23,6 +23,7 @@
 		5E34A23295A8944FAF860502 /* FamilyEngagementEventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60B88EEA80AFFB65EE8A6609 /* FamilyEngagementEventView.swift */; };
 		5F9C761671C6A857C99C23B4 /* AttendanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E498101305B734F4E4121BD /* AttendanceView.swift */; };
 		6475E7A95225B544F55DB471 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0670080537B7AFEE9DF43001 /* DashboardView.swift */; };
+		6DA4A66BCC30A8BCD5AC334F /* PrivacyPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAC964E983E5CA986BA59AB3 /* PrivacyPolicyView.swift */; };
 		713351DF2079F55649363930 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99780CDC23D9FB80F4397BF0 /* AppState.swift */; };
 		751622835002A9DB28AE9EE5 /* InviteFamiliesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 798ECC9719CD197E3EA13C5C /* InviteFamiliesView.swift */; };
 		7B708F85D76A61145779D31F /* ClockInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A91FDF3CD837468DEA594EE /* ClockInView.swift */; };
@@ -42,6 +43,8 @@
 		C08182890539CB3EAAC76E3B /* ChildrenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 513DE882CD9D310489A14DF1 /* ChildrenView.swift */; };
 		C98078C3380D23571DD68ABA /* ProgramStoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C77110B1C8E78D88A2E9D0CD /* ProgramStoryView.swift */; };
 		D0AE97B797852738F8517195 /* FamilyHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FDF45394B7822101CF49D60 /* FamilyHomeView.swift */; };
+		D9D7BB33D61DB07D9F70BB01 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2908B4589E06406D9D3ABC3 /* KeychainHelper.swift */; };
+		DB6D428EBCCD85C913F71C96 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2908B4589E06406D9D3ABC3 /* KeychainHelper.swift */; };
 		DF316411FB30D5D329EDAF2F /* ChildFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58A817DA82DD657B96A05963 /* ChildFlowTests.swift */; };
 		EC16055ABAD2DA9FDBC2AF71 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20C5FB47E0F76579CC813F80 /* LoginView.swift */; };
 		FC182B35EC442CE23E3A67E7 /* EnrollmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D85394B54D5D9CB4ECA7066B /* EnrollmentView.swift */; };
@@ -88,12 +91,14 @@
 		AB067BAB4E33FB7EE2602F60 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		ABA17193FA8254E8385EF897 /* ChildFlowFamilyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildFlowFamilyApp.swift; sourceTree = "<group>"; };
 		B09422F915723322F4F723BB /* MockData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockData.swift; sourceTree = "<group>"; };
+		B2908B4589E06406D9D3ABC3 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		BBE2FC8EECEEE5F154AC9040 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
 		BEB3D7F61212C3F6F804AF66 /* ApplicationVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationVerificationView.swift; sourceTree = "<group>"; };
 		C77110B1C8E78D88A2E9D0CD /* ProgramStoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramStoryView.swift; sourceTree = "<group>"; };
 		CBAB0D9A422204C1E8F62EE9 /* FamilyOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyOnboardingView.swift; sourceTree = "<group>"; };
 		D25D8DA0C0025A9D50725D2D /* StaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffView.swift; sourceTree = "<group>"; };
 		D85394B54D5D9CB4ECA7066B /* EnrollmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrollmentView.swift; sourceTree = "<group>"; };
+		DAC964E983E5CA986BA59AB3 /* PrivacyPolicyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPolicyView.swift; sourceTree = "<group>"; };
 		DCC522EA3120CF5EF4B8FD32 /* ChildFlowTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ChildFlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E46D6558A7BC26F95662D4CE /* HealthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthView.swift; sourceTree = "<group>"; };
 		E692C0B9C9D804A18A9D26A1 /* FamilyServicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyServicesView.swift; sourceTree = "<group>"; };
@@ -228,6 +233,7 @@
 			isa = PBXGroup;
 			children = (
 				479F40DB5B613FFEAABC4BBF /* APIClient.swift */,
+				B2908B4589E06406D9D3ABC3 /* KeychainHelper.swift */,
 			);
 			name = Networking;
 			path = Networking;
@@ -308,6 +314,7 @@
 		AF66D3FD933005B8C49A21FA /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				DAC964E983E5CA986BA59AB3 /* PrivacyPolicyView.swift */,
 				78076EFEBACB38517E2D33D8 /* SettingsView.swift */,
 			);
 			path = Settings;
@@ -461,6 +468,7 @@
 				3335914233EFED881E4E831B /* FamilyOnboardingView.swift in Sources */,
 				7D1EB4F31B42828345B8A263 /* FamilyProfileView.swift in Sources */,
 				8458644517B9B74B430EC7D9 /* FamilyTabView.swift in Sources */,
+				D9D7BB33D61DB07D9F70BB01 /* KeychainHelper.swift in Sources */,
 				02F4B074096C205D89149F80 /* Models.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -494,12 +502,14 @@
 				7ED9D5FB149F9FC825D4F67C /* FamilyServicesView.swift in Sources */,
 				AF8D17B250BD19D984178048 /* HealthView.swift in Sources */,
 				751622835002A9DB28AE9EE5 /* InviteFamiliesView.swift in Sources */,
+				DB6D428EBCCD85C913F71C96 /* KeychainHelper.swift in Sources */,
 				EC16055ABAD2DA9FDBC2AF71 /* LoginView.swift in Sources */,
 				9ADDC9C68F1477FDDF0F99C0 /* MainTabView.swift in Sources */,
 				5CCAF479502C488493D6D69B /* MessagingView.swift in Sources */,
 				8C55BE0E078F2A47220BFE66 /* MockData.swift in Sources */,
 				1DA52FF349549CFB9182B02C /* Models.swift in Sources */,
 				4F47FF563E260B44AB7CCC13 /* NutritionFormsView.swift in Sources */,
+				6DA4A66BCC30A8BCD5AC334F /* PrivacyPolicyView.swift in Sources */,
 				C98078C3380D23571DD68ABA /* ProgramStoryView.swift in Sources */,
 				33F60F708FDCE01671C41C5A /* ReportsView.swift in Sources */,
 				4DAF73296036F00B4A27FCDB /* SettingsView.swift in Sources */,

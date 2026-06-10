@@ -2,23 +2,20 @@ import SwiftUI
 import Combine
 
 class AppState: ObservableObject {
-    #if DEBUG
-    @Published var isAuthenticated: Bool = true
-    @Published var currentUser: User? = User(
-        id: "dev-test-user",
-        fullName: "Test Administrator",
-        email: "admin@childflow.org",
-        role: "admin"
-    )
-    #else
     @Published var isAuthenticated: Bool = false
     @Published var currentUser: User?
-    #endif
 
     init() {
-        #if DEBUG
-        Task { await APIClient.shared.setToken("dev-test-token") }
-        #endif
+        // Restore a previously stored session from the Keychain on launch.
+        Task { await checkAuth() }
+    }
+
+    /// Restore the session if a token is present in the Keychain.
+    /// Note: `currentUser` is left nil until a profile endpoint is wired up;
+    /// the UI degrades gracefully (see DashboardView / SettingsView).
+    func checkAuth() async {
+        let hasToken = await APIClient.shared.loadStoredToken()
+        await MainActor.run { isAuthenticated = hasToken }
     }
 
     func login(token: String) {

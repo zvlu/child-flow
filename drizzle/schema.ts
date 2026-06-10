@@ -16,6 +16,12 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
+  /**
+   * scrypt password hash for email/password (native mobile) sign-in.
+   * Null for OAuth-only accounts. Never returned to clients.
+   * Format: `scrypt$<saltHex>$<hashHex>` (see server/_core/password.ts).
+   */
+  passwordHash: varchar("passwordHash", { length: 255 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -24,6 +30,33 @@ export const users = mysqlTable("users", {
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+/**
+ * Audit log of access to sensitive records (child PII, health/PHI).
+ * Append-only; rows are never updated or deleted by the application.
+ * Supports the HIPAA audit-control safeguard (45 CFR §164.312(b)).
+ */
+export const auditLogs = mysqlTable("audit_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  /** User who performed the action. Null only for unauthenticated/system events. */
+  userId: int("userId"),
+  /** Stable identifier for the actor even if the user row is later removed. */
+  actorOpenId: varchar("actorOpenId", { length: 64 }),
+  /** e.g. "read", "create", "update", "delete", "login", "login_failed". */
+  action: varchar("action", { length: 32 }).notNull(),
+  /** e.g. "health_record", "child", "family", "auth". */
+  resourceType: varchar("resourceType", { length: 48 }).notNull(),
+  /** Identifier of the specific record acted on, when applicable. */
+  resourceId: varchar("resourceId", { length: 64 }),
+  /** Source IP, best-effort. */
+  ipAddress: varchar("ipAddress", { length: 64 }),
+  /** Optional human-readable context. */
+  detail: text("detail"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
 
 /**
  * Organizations table for multi-tenant support.

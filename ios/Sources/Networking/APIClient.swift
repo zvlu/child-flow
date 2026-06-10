@@ -18,18 +18,30 @@ actor APIClient {
     }()
 
     // MARK: - Auth
+    private let tokenAccount = "auth_token"
+
     func setToken(_ token: String) {
         authToken = token
-        UserDefaults.standard.set(token, forKey: "auth_token")
+        KeychainHelper.set(token, for: tokenAccount)
     }
 
     func clearToken() {
         authToken = nil
-        UserDefaults.standard.removeObject(forKey: "auth_token")
+        KeychainHelper.delete(tokenAccount)
     }
 
-    func loadStoredToken() {
-        authToken = UserDefaults.standard.string(forKey: "auth_token")
+    /// Load a previously stored token from the Keychain into memory.
+    /// Returns true if a token was found.
+    @discardableResult
+    func loadStoredToken() -> Bool {
+        authToken = KeychainHelper.get(tokenAccount)
+        return authToken != nil
+    }
+
+    /// Whether a session token is currently available (in memory or Keychain).
+    func hasStoredToken() -> Bool {
+        if authToken != nil { return true }
+        return KeychainHelper.get(tokenAccount) != nil
     }
 
     // MARK: - Auth Endpoints

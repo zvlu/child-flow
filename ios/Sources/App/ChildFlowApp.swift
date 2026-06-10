@@ -24,14 +24,14 @@ struct ChildFlowApp: App {
 
     var body: some Scene {
         WindowGroup {
-            // TODO: re-enable auth gate before production
-            // if appState.isAuthenticated {
-            MainTabView()
-                .environmentObject(appState)
-            // } else {
-            //     LoginView()
-            //         .environmentObject(appState)
-            // }
+            Group {
+                if appState.isAuthenticated {
+                    MainTabView()
+                } else {
+                    LoginView()
+                }
+            }
+            .environmentObject(appState)
         }
     }
 }

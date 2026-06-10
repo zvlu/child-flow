@@ -102,16 +102,6 @@ struct LoginView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    // DEV BYPASS — remove before production
-                    Button("Skip Sign In (Testing)") {
-                        appState.isAuthenticated = true
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.orange.opacity(0.15))
-                    .foregroundColor(.orange)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-
                     // Sign In button
                     Button(action: login) {
                         Group {
@@ -191,18 +181,24 @@ struct LoginView: View {
     }
 
     private func loginWithBiometrics() {
+        // Biometrics only unlock an EXISTING stored session — they are not a
+        // credential on their own. If no token is stored (e.g. first launch or
+        // after logout), the user must sign in with email/password first.
         let context = LAContext()
         context.evaluatePolicy(
             .deviceOwnerAuthenticationWithBiometrics,
             localizedReason: "Sign in to ChildFlow"
         ) { success, error in
-            DispatchQueue.main.async {
-                if success {
-                    // Load stored token and authenticate
-                    Task { await APIClient.shared.loadStoredToken() }
+            Task { @MainActor in
+                guard success else {
+                    errorMessage = error?.localizedDescription
+                    return
+                }
+                let hasToken = await APIClient.shared.loadStoredToken()
+                if hasToken {
                     appState.isAuthenticated = true
                 } else {
-                    errorMessage = error?.localizedDescription
+                    errorMessage = "No saved sign-in found. Please sign in with your email and password."
                 }
             }
         }

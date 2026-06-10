@@ -109,13 +109,8 @@ struct WelcomeView: View {
 }
 
 // MARK: - Invite Code Entry
-
-struct VerifiedInvitation: Codable {
-    let code: String
-    let childName: String
-    let programName: String
-    let adultEmail: String
-}
+// `VerifiedInvitation` is defined in Sources/Models/Models.swift, which is also
+// compiled into the ChildFlowFamily target. Don't redeclare it here.
 
 struct InviteCodeView: View {
     let onVerified: (VerifiedInvitation) -> Void

@@ -11,6 +11,9 @@ import "./index.css";
 const queryClient = new QueryClient();
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
+  // Auth disabled in dev for UI/API testing.
+  if (import.meta.env.DEV) return;
+
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
 

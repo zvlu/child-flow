@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
+import { ORGANIZATION_ID } from "@/const";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -33,14 +33,19 @@ import {
   Baby,
   BookOpen,
   Printer,
+  Briefcase,
   MessageSquare,
   AlertTriangle,
   Zap,
-  Briefcase,
   FileText,
-  Wrench,
-  ListTodo,
-  MoreHorizontal
+  MoreHorizontal,
+  CalendarDays,
+  DollarSign,
+  UtensilsCrossed,
+  Clock,
+  FileSignature,
+  Layers,
+  School
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -51,14 +56,14 @@ import { CommandPalette } from "./CommandPalette";
 const topNavItems = [
   { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
   { path: "/communication", label: "Communication", icon: MessageSquare },
-  { path: "/entry-express", label: "Entry Express", icon: Zap },
-  { path: "/management", label: "Management", icon: Briefcase },
-  { path: "/performance", label: "Performance Panel", icon: BarChart3 },
+  { path: "/calendar", label: "Calendar", icon: CalendarDays },
   { path: "/reports", label: "Reports", icon: FileText },
-  { path: "/services", label: "Services", icon: Home },
   { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
-  { path: "/setup", label: "Setup", icon: Wrench },
-  { path: "/todo", label: "To-Do List", icon: ListTodo },
+  { path: "/performance", label: "Performance Panel", icon: BarChart3 },
+  { path: "/billing", label: "Billing", icon: DollarSign },
+  { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
+  { path: "/staff-operations", label: "Staff Operations", icon: Clock },
+  { path: "/bulk-actions", label: "Bulk Actions", icon: Layers },
 ];
 const TOP_NAV_PRIMARY_COUNT = 5;
 
@@ -71,6 +76,7 @@ const sideNavSections = [
       { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
       { path: "/staff", label: "Staff", icon: UserCog },
       { path: "/family-services", label: "Family Services", icon: Home },
+      { path: "/classrooms", label: "Classrooms", icon: School },
     ],
   },
   {
@@ -78,9 +84,21 @@ const sideNavSections = [
     items: [
       { path: "/enrollment", label: "Enrollment", icon: BookOpen },
       { path: "/health", label: "Health Records", icon: Heart },
+      { path: "/calendar", label: "Calendar", icon: CalendarDays },
       { path: "/documents", label: "Documents", icon: FileText },
+      { path: "/digital-documents", label: "E-Signatures", icon: FileSignature },
       { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
+      { path: "/bulk-actions", label: "Bulk Actions", icon: Layers },
       { path: "/compliance", label: "Compliance", icon: ShieldCheck },
+    ],
+  },
+  {
+    title: "Business",
+    items: [
+      { path: "/billing", label: "Billing", icon: DollarSign },
+      { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
+      { path: "/staff-operations", label: "Staff Operations", icon: Clock },
+      { path: "/parent-portal", label: "Parent Portal", icon: Users },
     ],
   },
   {
@@ -88,6 +106,7 @@ const sideNavSections = [
     items: [
       { path: "/performance", label: "Performance Panel", icon: BarChart3 },
       { path: "/reports", label: "Reports", icon: FileText },
+      { path: "/report-builder", label: "Report Builder", icon: Zap },
       { path: "/ai-insights", label: "AI Insights", icon: Zap },
       { path: "/settings", label: "Settings", icon: Settings },
     ],
@@ -103,9 +122,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [moreToolsOpen, setMoreToolsOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [location] = useLocation();
-  const { user, logout, loading, isAuthenticated } = useAuth();
+  const { user, logout, loading } = useAuth();
   const { theme, setTheme } = useTheme();
-  const loginUrl = getLoginUrl();
   const topNavPrimaryItems = topNavItems.slice(0, TOP_NAV_PRIMARY_COUNT);
   const topNavOverflowItems = topNavItems.slice(TOP_NAV_PRIMARY_COUNT);
 
@@ -127,7 +145,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const activeMoreTool = moreToolsItems.some((item) => isNavItemActive(item.path));
   const showMoreTools = moreToolsOpen || activeMoreTool;
   const { data: healthFollowUps = [] } = trpc.health.followUps.useQuery(
-    { organizationId: 1, dueWithinDays: 30 },
+    { organizationId: ORGANIZATION_ID, dueWithinDays: 30 },
     { refetchInterval: 60_000 }
   );
   const overdueCount = healthFollowUps.filter((item) => item.severity === "overdue").length;
@@ -136,19 +154,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-muted-foreground mb-4">Please sign in to continue</p>
-          <a href={loginUrl}>
-            <Button>Sign In</Button>
-          </a>
-        </div>
       </div>
     );
   }

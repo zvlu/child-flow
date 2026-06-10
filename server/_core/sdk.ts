@@ -256,22 +256,34 @@ class SDKServer {
     } as GetUserInfoWithJwtResponse;
   }
 
+  private parseBearerToken(req: Request): string | null {
+    const header = req.headers.authorization;
+    const value = Array.isArray(header) ? header[0] : header;
+    if (typeof value !== "string") return null;
+    const match = value.match(/^Bearer\s+(.+)$/i);
+    return match ? match[1]!.trim() : null;
+  }
+
   async authenticateRequest(req: Request): Promise<User> {
-    // Regular authentication flow
+    // Web clients send the session JWT as a cookie; native/mobile clients send
+    // it as `Authorization: Bearer <token>`. Accept either, preferring Bearer.
+    const bearerToken = this.parseBearerToken(req);
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
-    const session = await this.verifySession(sessionCookie);
+    const session = await this.verifySession(bearerToken ?? sessionCookie);
 
     if (!session) {
-      throw ForbiddenError("Invalid session cookie");
+      throw ForbiddenError("Invalid session");
     }
 
     const sessionUserId = session.openId;
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically
-    if (!user) {
+    // If an OAuth (cookie) user isn't in the DB yet, sync from the OAuth server.
+    // Bearer/password accounts are provisioned directly and must already exist,
+    // so we don't attempt an OAuth sync for them.
+    if (!user && !bearerToken) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
         await db.upsertUser({

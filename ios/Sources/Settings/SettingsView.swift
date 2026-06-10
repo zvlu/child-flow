@@ -48,6 +48,9 @@ struct SettingsView: View {
                 NavigationLink("About ChildFlow") {
                     AboutView()
                 }
+                NavigationLink("Privacy & Security") {
+                    PrivacyPolicyView()
+                }
                 LabeledContent("Version", value: viewModel.appVersion)
             }
 
