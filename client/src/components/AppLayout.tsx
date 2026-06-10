@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
+import { ORGANIZATION_ID } from "@/const";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -33,16 +33,22 @@ import {
   Baby,
   BookOpen,
   Printer,
+  Briefcase,
   MessageSquare,
   AlertTriangle,
   Zap,
-  Briefcase,
   FileText,
-  Wrench,
-  ListTodo,
-  MoreHorizontal
+  MoreHorizontal,
+  CalendarDays,
+  DollarSign,
+  UtensilsCrossed,
+  Clock,
+  FileSignature,
+  Layers,
+  School
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { CommandPalette } from "./CommandPalette";
@@ -50,38 +56,61 @@ import { CommandPalette } from "./CommandPalette";
 const topNavItems = [
   { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
   { path: "/communication", label: "Communication", icon: MessageSquare },
-  { path: "/entry-express", label: "Entry Express", icon: Zap },
-  { path: "/management", label: "Management", icon: Briefcase },
-  { path: "/performance", label: "Performance Panel", icon: BarChart3 },
+  { path: "/calendar", label: "Calendar", icon: CalendarDays },
   { path: "/reports", label: "Reports", icon: FileText },
-  { path: "/services", label: "Services", icon: Home },
   { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
-  { path: "/setup", label: "Setup", icon: Wrench },
-  { path: "/todo", label: "To-Do List", icon: ListTodo },
+  { path: "/performance", label: "Performance Panel", icon: BarChart3 },
+  { path: "/billing", label: "Billing", icon: DollarSign },
+  { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
+  { path: "/staff-operations", label: "Staff Operations", icon: Clock },
+  { path: "/bulk-actions", label: "Bulk Actions", icon: Layers },
 ];
 const TOP_NAV_PRIMARY_COUNT = 5;
 
-const sideNavItems = [
-  { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/performance", label: "Performance Panel", icon: BarChart3 },
-  { path: "/enrollment", label: "Enrollment", icon: BookOpen },
-  { path: "/children", label: "Children", icon: Baby },
-  { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
-  { path: "/health", label: "Health Records", icon: Heart },
-  { path: "/family-services", label: "Family Services", icon: Home },
-  { path: "/staff", label: "Staff", icon: UserCog },
-  { path: "/documents", label: "Documents", icon: FileText },
-  { path: "/bulk-actions", label: "Bulk Actions", icon: Zap },
-  { path: "/ai-insights", label: "AI Insights", icon: Zap },
-  { path: "/billing", label: "Billing", icon: FileText },
-  { path: "/parent-portal", label: "Parent Portal", icon: Home },
-  { path: "/meal-planning", label: "Meal Planning", icon: FileText },
-  { path: "/staff-operations", label: "Staff Ops", icon: UserCog },
-  { path: "/report-builder", label: "Report Builder", icon: BarChart3 },
-  { path: "/reports", label: "Reports", icon: FileText },
-  { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
-  { path: "/compliance", label: "Compliance", icon: ShieldCheck },
-  { path: "/settings", label: "Settings", icon: Settings },
+const sideNavSections = [
+  {
+    title: "Core",
+    items: [
+      { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { path: "/children", label: "Children", icon: Baby },
+      { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
+      { path: "/staff", label: "Staff", icon: UserCog },
+      { path: "/family-services", label: "Family Services", icon: Home },
+      { path: "/classrooms", label: "Classrooms", icon: School },
+    ],
+  },
+  {
+    title: "Operations",
+    items: [
+      { path: "/enrollment", label: "Enrollment", icon: BookOpen },
+      { path: "/health", label: "Health Records", icon: Heart },
+      { path: "/calendar", label: "Calendar", icon: CalendarDays },
+      { path: "/documents", label: "Documents", icon: FileText },
+      { path: "/digital-documents", label: "E-Signatures", icon: FileSignature },
+      { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
+      { path: "/bulk-actions", label: "Bulk Actions", icon: Layers },
+      { path: "/compliance", label: "Compliance", icon: ShieldCheck },
+    ],
+  },
+  {
+    title: "Business",
+    items: [
+      { path: "/billing", label: "Billing", icon: DollarSign },
+      { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
+      { path: "/staff-operations", label: "Staff Operations", icon: Clock },
+      { path: "/parent-portal", label: "Parent Portal", icon: Users },
+    ],
+  },
+  {
+    title: "Insights",
+    items: [
+      { path: "/performance", label: "Performance Panel", icon: BarChart3 },
+      { path: "/reports", label: "Reports", icon: FileText },
+      { path: "/report-builder", label: "Report Builder", icon: Zap },
+      { path: "/ai-insights", label: "AI Insights", icon: Zap },
+      { path: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
 ];
 
 interface AppLayoutProps {
@@ -90,10 +119,11 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [moreToolsOpen, setMoreToolsOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [location] = useLocation();
-  const { user, logout, loading, isAuthenticated } = useAuth();
+  const { user, logout, loading } = useAuth();
   const { theme, setTheme } = useTheme();
-  const loginUrl = getLoginUrl();
   const topNavPrimaryItems = topNavItems.slice(0, TOP_NAV_PRIMARY_COUNT);
   const topNavOverflowItems = topNavItems.slice(TOP_NAV_PRIMARY_COUNT);
 
@@ -102,24 +132,28 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   const isTopNavActive = (path: string) => location === path || location.startsWith(`${path}/`);
+  const isNavItemActive = (path: string) => location === path || (path !== "/dashboard" && location.startsWith(path));
+  const allSideNavItems = sideNavSections.flatMap((section) => section.items);
+  const moreToolsItems = [
+    { path: "/bulk-actions", label: "Bulk Actions", icon: Zap },
+    { path: "/billing", label: "Billing", icon: FileText },
+    { path: "/parent-portal", label: "Parent Portal", icon: Home },
+    { path: "/meal-planning", label: "Meal Planning", icon: FileText },
+    { path: "/staff-operations", label: "Staff Ops", icon: UserCog },
+    { path: "/report-builder", label: "Report Builder", icon: BarChart3 },
+  ];
+  const activeMoreTool = moreToolsItems.some((item) => isNavItemActive(item.path));
+  const showMoreTools = moreToolsOpen || activeMoreTool;
+  const { data: healthFollowUps = [] } = trpc.health.followUps.useQuery(
+    { organizationId: ORGANIZATION_ID, dueWithinDays: 30 },
+    { refetchInterval: 60_000 }
+  );
+  const overdueCount = healthFollowUps.filter((item) => item.severity === "overdue").length;
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-muted-foreground mb-4">Please sign in to continue</p>
-          <a href={loginUrl}>
-            <Button>Sign In</Button>
-          </a>
-        </div>
       </div>
     );
   }
@@ -131,7 +165,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className="flex h-screen bg-background overflow-hidden flex-col">
       {/* Top Navigation Bar - Matching ChildPlus Style */}
-      <header className="h-14 bg-[#5b4a8c] text-white flex items-center px-4 gap-2 flex-shrink-0 shadow-md z-20">
+      <header className="h-14 bg-[#5b4a8c] text-white flex items-center px-3 md:px-4 gap-2 flex-shrink-0 shadow-md z-20">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-white/85 hover:text-white hover:bg-white/10 md:hidden"
+          onClick={() => setMobileNavOpen(true)}
+          aria-label="Open navigation"
+        >
+          <Menu className="h-4 w-4" />
+        </Button>
         <div className="flex items-center gap-2 mr-4">
           <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
             <Baby className="h-4 w-4 text-white" />
@@ -139,7 +182,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <span className="font-bold text-base tracking-tight">ChildFlow</span>
         </div>
         
-        <nav className="flex-1 flex items-center h-full min-w-0">
+        <nav className="hidden md:flex flex-1 items-center h-full min-w-0 overflow-x-auto no-scrollbar">
           {topNavPrimaryItems.map((item) => {
             const isActive = isTopNavActive(item.path);
             return (
@@ -191,8 +234,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
           )}
         </nav>
 
-        <div className="flex items-center gap-3 ml-4">
-          <div className="hidden md:block">
+        <div className="flex items-center gap-2 md:gap-3 ml-auto md:ml-4 shrink-0">
+          <div className="hidden xl:block">
             <CommandPalette />
           </div>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10" onClick={() => handleTopNavAction("Print")}>
@@ -223,47 +266,135 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
+        {mobileNavOpen && (
+          <button
+            className="fixed inset-0 z-30 bg-black/40 md:hidden"
+            onClick={() => setMobileNavOpen(false)}
+            aria-label="Close navigation overlay"
+          />
+        )}
         {/* Sidebar */}
         <aside
           className={cn(
-            "flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-200 ease-in-out flex-shrink-0 border-r border-sidebar-border",
-            sidebarOpen ? "w-64" : "w-16"
+            "fixed top-14 bottom-0 left-0 z-40 flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-all duration-200 ease-in-out",
+            "w-72 md:static md:top-auto md:bottom-auto md:left-auto md:z-auto",
+            mobileNavOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+            sidebarOpen ? "md:w-64" : "md:w-16"
           )}
         >
           <div className="flex items-center h-12 px-4 border-b border-sidebar-border justify-between">
             {sidebarOpen && <span className="text-[10px] font-bold uppercase tracking-wider text-sidebar-foreground/40">Main Menu</span>}
             <button
+              onClick={() => setMobileNavOpen(false)}
+              className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors md:hidden"
+              aria-label="Close mobile navigation"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+            <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
+              className="hidden md:inline-flex p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors"
+              aria-label="Toggle sidebar width"
             >
               {sidebarOpen ? <X className="h-3.5 w-3.5" /> : <Menu className="h-3.5 w-3.5" />}
             </button>
           </div>
 
           <nav className="flex-1 overflow-y-auto py-4 px-2">
-            <ul className="space-y-1">
-              {sideNavItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = location === item.path || (item.path !== "/dashboard" && location.startsWith(item.path));
-                return (
-                  <li key={item.path}>
-                    <Link href={item.path}>
-                      <a
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-150",
-                          isActive
-                            ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        )}
-                      >
-                        <Icon className="h-4 w-4 flex-shrink-0" />
-                        {sidebarOpen && <span className="flex-1 truncate">{item.label}</span>}
-                      </a>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="space-y-4">
+              {sideNavSections.map((section) => (
+                <div key={section.title}>
+                  {sidebarOpen && (
+                    <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-sidebar-foreground/40">
+                      {section.title}
+                    </p>
+                  )}
+                  <ul className="space-y-1">
+                    {section.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = isNavItemActive(item.path);
+                      return (
+                        <li key={item.path}>
+                          <Link href={item.path}>
+                            <a
+                              onClick={() => setMobileNavOpen(false)}
+                              className={cn(
+                                "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-150",
+                                isActive
+                                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                              )}
+                            >
+                              <Icon className="h-4 w-4 flex-shrink-0" />
+                              {sidebarOpen && <span className="flex-1 truncate">{item.label}</span>}
+                            </a>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+
+              <div className="pt-1">
+                {sidebarOpen ? (
+                  <>
+                    <button
+                      onClick={() => setMoreToolsOpen(!moreToolsOpen)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-150",
+                        activeMoreTool
+                          ? "bg-sidebar-primary/15 text-sidebar-foreground"
+                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      )}
+                    >
+                      <Briefcase className="h-4 w-4 flex-shrink-0" />
+                      <span className="flex-1 text-left">More tools</span>
+                      <ChevronRight className={cn("h-4 w-4 transition-transform", showMoreTools && "rotate-90")} />
+                    </button>
+                    {showMoreTools && (
+                      <ul className="space-y-1 mt-1 pl-2">
+                        {moreToolsItems.map((item) => {
+                          const Icon = item.icon;
+                          const isActive = isNavItemActive(item.path);
+                          return (
+                            <li key={item.path}>
+                              <Link href={item.path}>
+                                <a
+                                  onClick={() => setMobileNavOpen(false)}
+                                  className={cn(
+                                    "flex items-center gap-3 px-3 py-2 rounded-lg text-[12px] font-semibold transition-all duration-150",
+                                    isActive
+                                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                  )}
+                                >
+                                  <Icon className="h-4 w-4 flex-shrink-0" />
+                                  <span className="flex-1 truncate">{item.label}</span>
+                                </a>
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setMoreToolsOpen(!moreToolsOpen)}
+                    className={cn(
+                      "w-full flex items-center justify-center px-3 py-2 rounded-lg transition-all duration-150",
+                      activeMoreTool
+                        ? "bg-sidebar-primary/15 text-sidebar-foreground"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    )}
+                    aria-label="Toggle more tools"
+                  >
+                    <Briefcase className="h-4 w-4 flex-shrink-0" />
+                  </button>
+                )}
+              </div>
+            </div>
           </nav>
 
           {/* User section */}
@@ -287,12 +418,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
         {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Page Header (Breadcrumb style) */}
-          <header className="h-10 border-b border-border bg-white flex items-center px-6 gap-4 flex-shrink-0">
+          <header className="h-10 border-b border-border bg-white flex items-center px-3 md:px-6 gap-3 md:gap-4 flex-shrink-0">
             <div className="flex-1 flex items-center gap-2">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">ChildFlow</span>
               <ChevronRight className="h-3 w-3 text-slate-300" />
               <h2 className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">
-                {sideNavItems.find(i => location === i.path || (i.path !== "/dashboard" && location.startsWith(i.path)))?.label || "Dashboard"}
+                {allSideNavItems.find((i) => isNavItemActive(i.path))?.label || "Dashboard"}
               </h2>
             </div>
             <div className="flex items-center gap-4">
@@ -300,10 +431,56 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <CalendarIcon className="h-3 w-3" />
                 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
-              <Button variant="ghost" size="icon" className="h-7 w-7 relative">
-                <Bell className="h-3.5 w-3.5 text-slate-400" />
-                <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 bg-destructive rounded-full" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 relative">
+                    <Bell className="h-3.5 w-3.5 text-slate-400" />
+                    {healthFollowUps.length > 0 && (
+                      <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 bg-destructive rounded-full" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-96 rounded-xl">
+                  <div className="px-3 py-2 border-b">
+                    <p className="text-sm font-semibold">Health Follow-up Alerts</p>
+                    <p className="text-xs text-muted-foreground">
+                      {healthFollowUps.length} total · {overdueCount} overdue
+                    </p>
+                  </div>
+                  {healthFollowUps.length === 0 ? (
+                    <div className="px-3 py-4 text-xs text-muted-foreground">
+                      No upcoming or overdue health follow-ups in the next 30 days.
+                    </div>
+                  ) : (
+                    healthFollowUps.slice(0, 6).map((alert) => (
+                      <DropdownMenuItem key={alert.recordId} asChild>
+                        <Link href="/health">
+                          <a className="flex flex-col items-start gap-0.5 py-2">
+                            <span className={cn(
+                              "text-[11px] font-semibold uppercase tracking-wide",
+                              alert.severity === "overdue" ? "text-destructive" : "text-amber-600"
+                            )}>
+                              {alert.severity === "overdue" ? "Overdue" : "Due Soon"}
+                            </span>
+                            <span className="text-sm leading-tight">{alert.message}</span>
+                          </a>
+                        </Link>
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/health">
+                      <a className="text-sm font-medium">Open Health Records</a>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/action-queue">
+                      <a className="text-sm font-medium">Open Action Queue</a>
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </header>
 

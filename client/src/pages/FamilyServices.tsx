@@ -1,66 +1,140 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Plus, Home, Phone, Mail, MapPin, Calendar, CheckCircle2, Clock, Users, Heart, BookOpen } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, Plus, Home, Phone, Mail, MapPin, Calendar, CheckCircle2, Clock, Users, Heart, BookOpen, Loader2 } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { ORGANIZATION_ID } from "@/const";
+import { toast } from "sonner";
 
-const families = [
-  {
-    id: 1, primaryContact: "Sarah Johnson", children: ["Emma Johnson"], phone: "(555) 234-5678",
-    email: "sarah.johnson@email.com", address: "123 Oak St, Springfield, IL",
-    incomeLevel: "Below 100% FPL", householdSize: 4, language: "English",
-    lastContact: "2024-11-01", nextContact: "2024-12-01",
-    goals: ["Employment support", "GED completion"],
-    services: ["Food assistance", "Housing support"],
-    homeVisits: 3, parentMeetings: 2, status: "active",
-  },
-  {
-    id: 2, primaryContact: "James Williams", children: ["Marcus Williams"], phone: "(555) 345-6789",
-    email: "james.williams@email.com", address: "456 Maple Ave, Springfield, IL",
-    incomeLevel: "Below 100% FPL", householdSize: 3, language: "English",
-    lastContact: "2024-10-15", nextContact: "2024-11-15",
-    goals: ["Job training", "Transportation assistance"],
-    services: ["Job placement", "Transportation vouchers"],
-    homeVisits: 2, parentMeetings: 1, status: "active",
-  },
-  {
-    id: 3, primaryContact: "Maria Rodriguez", children: ["Sofia Rodriguez"], phone: "(555) 456-7890",
-    email: "maria.rodriguez@email.com", address: "789 Pine Rd, Springfield, IL",
-    incomeLevel: "Below 130% FPL", householdSize: 5, language: "Spanish",
-    lastContact: "2024-11-05", nextContact: "2024-12-05",
-    goals: ["English language learning", "Healthcare access"],
-    services: ["ESL classes", "Health insurance enrollment"],
-    homeVisits: 4, parentMeetings: 3, status: "active",
-  },
-  {
-    id: 4, primaryContact: "Tanya Brown", children: ["Jaylen Brown"], phone: "(555) 567-8901",
-    email: "tanya.brown@email.com", address: "321 Elm St, Springfield, IL",
-    incomeLevel: "Below 100% FPL", householdSize: 2, language: "English",
-    lastContact: "2024-09-20", nextContact: "2024-10-20",
-    goals: ["Stable housing", "Mental health support"],
-    services: ["Housing assistance", "Counseling referral"],
-    homeVisits: 1, parentMeetings: 1, status: "needs_contact",
-  },
-];
+const SERVICE_TYPE_LABELS: Record<string, string> = {
+  home_visit: "Home Visit",
+  office_visit: "Office Visit",
+  phone_call: "Phone Call",
+  email: "Email",
+  referral: "Referral",
+  other: "Other",
+};
 
-const upcomingContacts = [
-  { family: "Johnson Family", type: "Home Visit", date: "Nov 15, 2024", coordinator: "Ms. Davis" },
-  { family: "Williams Family", type: "Phone Check-in", date: "Nov 15, 2024", coordinator: "Ms. Davis" },
-  { family: "Rodriguez Family", type: "Parent Meeting", date: "Nov 18, 2024", coordinator: "Mr. Chen" },
-  { family: "Brown Family", type: "Home Visit", date: "Nov 20, 2024", coordinator: "Ms. Davis" },
-];
+function serviceIcon(type: string) {
+  if (type === "home_visit") return <Home className="h-5 w-5 text-primary" />;
+  if (type === "phone_call") return <Phone className="h-5 w-5 text-primary" />;
+  if (type === "email") return <Mail className="h-5 w-5 text-primary" />;
+  return <Users className="h-5 w-5 text-primary" />;
+}
 
 export default function FamilyServices() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("families");
+  const [logOpen, setLogOpen] = useState(false);
+  const [logFamilyId, setLogFamilyId] = useState<string>("");
+  const [logType, setLogType] = useState<string>("");
+  const [logDescription, setLogDescription] = useState("");
+  const [logFollowUp, setLogFollowUp] = useState(false);
+  const [logFollowUpDate, setLogFollowUpDate] = useState("");
 
-  const filtered = families.filter(f =>
-    f.primaryContact.toLowerCase().includes(search.toLowerCase()) ||
-    f.children.some(c => c.toLowerCase().includes(search.toLowerCase()))
+  const utils = trpc.useUtils();
+  const { data: families, isLoading: familiesLoading } = trpc.families.list.useQuery(ORGANIZATION_ID);
+  const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID);
+  const { data: services, isLoading: servicesLoading } = trpc.familyServices.list.useQuery({ organizationId: ORGANIZATION_ID });
+
+  const createService = trpc.familyServices.create.useMutation({
+    onSuccess: () => {
+      utils.familyServices.list.invalidate();
+      toast.success("Service contact logged successfully.");
+      setLogOpen(false);
+      setLogFamilyId("");
+      setLogType("");
+      setLogDescription("");
+      setLogFollowUp(false);
+      setLogFollowUpDate("");
+    },
+    onError: (error) => toast.error(`Failed to log contact: ${error.message}`),
+  });
+
+  const childrenByFamily = useMemo(() => {
+    const map = new Map<number, string[]>();
+    (children ?? []).forEach((c) => {
+      if (!c.familyId) return;
+      const list = map.get(c.familyId) ?? [];
+      list.push(`${c.firstName} ${c.lastName}`);
+      map.set(c.familyId, list);
+    });
+    return map;
+  }, [children]);
+
+  const servicesByFamily = useMemo(() => {
+    const map = new Map<number, NonNullable<typeof services>>();
+    (services ?? []).forEach((s) => {
+      const list = map.get(s.familyId) ?? [];
+      list.push(s);
+      map.set(s.familyId, list);
+    });
+    return map;
+  }, [services]);
+
+  const familyNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    (families ?? []).forEach((f) => map.set(f.id, f.primaryContactName));
+    return map;
+  }, [families]);
+
+  const now = new Date();
+  const allServices = services ?? [];
+  const homeVisitsMtd = allServices.filter((s) => {
+    if (s.type !== "home_visit") return false;
+    const d = new Date(s.serviceDate);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+  const needsFollowUp = allServices.filter((s) => Number(s.followUpRequired) === 1).length;
+
+  const filtered = (families ?? []).filter((f) => {
+    const kids = childrenByFamily.get(f.id) ?? [];
+    return (
+      f.primaryContactName.toLowerCase().includes(search.toLowerCase()) ||
+      kids.some((c) => c.toLowerCase().includes(search.toLowerCase()))
+    );
+  });
+
+  const sortedServices = [...allServices].sort(
+    (a, b) => new Date(b.serviceDate).getTime() - new Date(a.serviceDate).getTime()
   );
+
+  const handleLogSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!logFamilyId || !logType || !logDescription.trim()) {
+      toast.error("Please select a family, contact type, and add a description.");
+      return;
+    }
+    createService.mutate({
+      organizationId: ORGANIZATION_ID,
+      familyId: Number(logFamilyId),
+      type: logType,
+      serviceDate: new Date(),
+      description: logDescription.trim(),
+      followUpRequired: logFollowUp ? 1 : 0,
+      followUpDate: logFollowUp && logFollowUpDate ? new Date(logFollowUpDate) : undefined,
+      recordedBy: 1,
+    });
+  };
+
+  const openLogDialog = (familyId?: number) => {
+    if (familyId) setLogFamilyId(String(familyId));
+    setLogOpen(true);
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -70,17 +144,17 @@ export default function FamilyServices() {
           <p className="text-muted-foreground text-sm mt-0.5">Manage family partnerships, goals, and community resources</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" className="gap-2"><Plus className="h-4 w-4" />Log Contact</Button>
+          <Button size="sm" className="gap-2" onClick={() => openLogDialog()}><Plus className="h-4 w-4" />Log Contact</Button>
         </div>
       </div>
 
       {/* Summary */}
       <div className="grid grid-cols-4 gap-4">
         {[
-          { label: "Families Served", value: families.length, icon: Users, color: "text-primary" },
-          { label: "Home Visits (MTD)", value: families.reduce((a, f) => a + f.homeVisits, 0), icon: Home, color: "text-blue-600" },
-          { label: "Parent Meetings", value: families.reduce((a, f) => a + f.parentMeetings, 0), icon: Calendar, color: "text-green-600" },
-          { label: "Needs Contact", value: families.filter(f => f.status === "needs_contact").length, icon: Clock, color: "text-amber-600" },
+          { label: "Families Served", value: families?.length ?? 0, icon: Users, color: "text-primary" },
+          { label: "Home Visits (MTD)", value: homeVisitsMtd, icon: Home, color: "text-blue-600" },
+          { label: "Services Logged", value: allServices.length, icon: Calendar, color: "text-green-600" },
+          { label: "Needs Follow-up", value: needsFollowUp, icon: Clock, color: "text-amber-600" },
         ].map(stat => {
           const Icon = stat.icon;
           return (
@@ -102,7 +176,7 @@ export default function FamilyServices() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="families">Family Records</TabsTrigger>
-          <TabsTrigger value="contacts">Upcoming Contacts</TabsTrigger>
+          <TabsTrigger value="contacts">Service Contacts</TabsTrigger>
           <TabsTrigger value="resources">Community Resources</TabsTrigger>
         </TabsList>
 
@@ -112,77 +186,150 @@ export default function FamilyServices() {
             <Input placeholder="Search families..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filtered.map(family => (
-              <Card key={family.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-5">
-                  <div className="flex items-start gap-4">
-                    <Avatar className="h-11 w-11 flex-shrink-0">
-                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                        {family.primaryContact.split(" ").map(n => n[0]).join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="font-semibold text-foreground">{family.primaryContact}</h3>
-                        <Badge className={family.status === "active" ? "bg-green-100 text-green-700 hover:bg-green-100 text-xs" : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100 text-xs"}>
-                          {family.status === "active" ? "Active" : "Needs Contact"}
-                        </Badge>
+          {familiesLoading ? (
+            <div className="py-16 flex flex-col items-center justify-center text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin mb-2" />
+              <p className="text-sm">Loading families...</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-16 flex flex-col items-center justify-center text-center">
+              <Users className="h-10 w-10 text-muted-foreground/30 mb-3" />
+              <h3 className="font-semibold text-foreground">No families found</h3>
+              <p className="text-sm text-muted-foreground">Try adjusting your search.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {filtered.map(family => {
+                const kids = childrenByFamily.get(family.id) ?? [];
+                const famServices = servicesByFamily.get(family.id) ?? [];
+                const lastContact = famServices.length > 0
+                  ? new Date(Math.max(...famServices.map(s => new Date(s.serviceDate).getTime())))
+                  : null;
+                const familyNeedsFollowUp = famServices.some(s => Number(s.followUpRequired) === 1);
+                const homeVisits = famServices.filter(s => s.type === "home_visit").length;
+                const serviceTypes = Array.from(new Set(famServices.map(s => SERVICE_TYPE_LABELS[s.type] ?? s.type)));
+                const addressLine = [family.address, family.city, family.state].filter(Boolean).join(", ");
+                return (
+                  <Card key={family.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-5">
+                      <div className="flex items-start gap-4">
+                        <Avatar className="h-11 w-11 flex-shrink-0">
+                          <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                            {family.primaryContactName.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="font-semibold text-foreground">{family.primaryContactName}</h3>
+                            <Badge className={!familyNeedsFollowUp ? "bg-green-100 text-green-700 hover:bg-green-100 text-xs" : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100 text-xs"}>
+                              {!familyNeedsFollowUp ? "Active" : "Needs Follow-up"}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Children: {kids.length > 0 ? kids.join(", ") : "None enrolled"}
+                          </p>
+                          <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+                            {family.primaryContactPhone && (
+                              <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5" />{family.primaryContactPhone}</div>
+                            )}
+                            {family.primaryContactEmail && (
+                              <div className="flex items-center gap-2"><Mail className="h-3.5 w-3.5" />{family.primaryContactEmail}</div>
+                            )}
+                            {addressLine && (
+                              <div className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5" />{addressLine}</div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-3.5 w-3.5" />
+                              Last contact: {lastContact ? lastContact.toLocaleDateString() : "No contacts yet"}
+                            </div>
+                          </div>
+                          {serviceTypes.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              {serviceTypes.map(t => (
+                                <span key={t} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{t}</span>
+                              ))}
+                            </div>
+                          )}
+                          <div className="mt-3 flex items-center gap-4 text-xs">
+                            <span className="text-muted-foreground">Home Visits: <strong className="text-foreground">{homeVisits}</strong></span>
+                            <span className="text-muted-foreground">Services: <strong className="text-foreground">{famServices.length}</strong></span>
+                            <span className="text-muted-foreground">Children: <strong className="text-foreground">{kids.length}</strong></span>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">Children: {family.children.join(", ")}</p>
-                      <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5" />{family.phone}</div>
-                        <div className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5" />{family.address}</div>
-                        <div className="flex items-center gap-2"><Calendar className="h-3.5 w-3.5" />Last contact: {family.lastContact}</div>
+                      <div className="mt-4 flex gap-2">
+                        <Button variant="outline" size="sm" className="flex-1 text-xs gap-1" asChild>
+                          <a href={family.primaryContactPhone ? `tel:${family.primaryContactPhone}` : undefined}>
+                            <Phone className="h-3.5 w-3.5" />Call
+                          </a>
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1 text-xs gap-1" onClick={() => openLogDialog(family.id)}>
+                          <Home className="h-3.5 w-3.5" />Log Visit
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1 text-xs gap-1"><BookOpen className="h-3.5 w-3.5" />View File</Button>
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {family.goals.map(goal => (
-                          <span key={goal} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{goal}</span>
-                        ))}
-                      </div>
-                      <div className="mt-3 flex items-center gap-4 text-xs">
-                        <span className="text-muted-foreground">Home Visits: <strong className="text-foreground">{family.homeVisits}</strong></span>
-                        <span className="text-muted-foreground">Meetings: <strong className="text-foreground">{family.parentMeetings}</strong></span>
-                        <span className="text-muted-foreground">Language: <strong className="text-foreground">{family.language}</strong></span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1 text-xs gap-1"><Phone className="h-3.5 w-3.5" />Call</Button>
-                    <Button variant="outline" size="sm" className="flex-1 text-xs gap-1"><Home className="h-3.5 w-3.5" />Log Visit</Button>
-                    <Button variant="outline" size="sm" className="flex-1 text-xs gap-1"><BookOpen className="h-3.5 w-3.5" />View File</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="contacts" className="mt-4">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Upcoming Family Contacts</CardTitle>
-              <CardDescription>Scheduled home visits, phone check-ins, and parent meetings</CardDescription>
+              <CardTitle className="text-base">Service Contacts</CardTitle>
+              <CardDescription>Home visits, phone check-ins, referrals, and follow-ups</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {upcomingContacts.map((contact, i) => (
-                <div key={i} className="flex items-center gap-4 p-4 rounded-lg border border-border hover:bg-muted/20 transition-colors">
-                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    {contact.type === "Home Visit" ? <Home className="h-5 w-5 text-primary" /> :
-                     contact.type === "Phone Check-in" ? <Phone className="h-5 w-5 text-primary" /> :
-                     <Users className="h-5 w-5 text-primary" />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm text-foreground">{contact.family}</p>
-                    <p className="text-xs text-muted-foreground">{contact.type} &bull; {contact.coordinator}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-foreground">{contact.date}</p>
-                    <Badge variant="outline" className="text-xs mt-1">Scheduled</Badge>
-                  </div>
-                  <Button variant="ghost" size="sm" className="text-xs">Complete</Button>
+              {servicesLoading ? (
+                <div className="py-10 flex flex-col items-center justify-center text-muted-foreground">
+                  <Loader2 className="h-6 w-6 animate-spin mb-2" />
+                  <p className="text-sm">Loading service contacts...</p>
                 </div>
-              ))}
+              ) : sortedServices.length === 0 ? (
+                <div className="py-10 flex flex-col items-center justify-center text-center">
+                  <Calendar className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                  <h3 className="font-semibold text-foreground">No service contacts yet</h3>
+                  <p className="text-sm text-muted-foreground">Log a contact to start tracking family services.</p>
+                </div>
+              ) : (
+                sortedServices.map((service) => {
+                  const followUp = Number(service.followUpRequired) === 1;
+                  return (
+                    <div key={service.id} className="flex items-center gap-4 p-4 rounded-lg border border-border hover:bg-muted/20 transition-colors">
+                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        {serviceIcon(service.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm text-foreground">
+                          {familyNameById.get(service.familyId) ?? `Family #${service.familyId}`}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {SERVICE_TYPE_LABELS[service.type] ?? service.type}
+                          {service.description ? <> &bull; {service.description}</> : null}
+                        </p>
+                        {service.outcome && (
+                          <p className="text-xs text-muted-foreground mt-0.5 italic truncate">Outcome: {service.outcome}</p>
+                        )}
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-medium text-foreground">{new Date(service.serviceDate).toLocaleDateString()}</p>
+                        {followUp ? (
+                          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs mt-1">
+                            Follow-up{service.followUpDate ? `: ${new Date(service.followUpDate).toLocaleDateString()}` : " required"}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs mt-1">
+                            <CheckCircle2 className="h-3 w-3 mr-1 text-green-500" />Completed
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -223,6 +370,83 @@ export default function FamilyServices() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Log Contact Dialog */}
+      <Dialog open={logOpen} onOpenChange={setLogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <form onSubmit={handleLogSubmit}>
+            <DialogHeader>
+              <DialogTitle>Log Service Contact</DialogTitle>
+              <DialogDescription>Record a home visit, phone call, referral, or other family service.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase">Family</label>
+                  <Select value={logFamilyId} onValueChange={setLogFamilyId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select family..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(families ?? []).map(f => (
+                        <SelectItem key={f.id} value={String(f.id)}>{f.primaryContactName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase">Contact Type</label>
+                  <Select value={logType} onValueChange={setLogType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(SERVICE_TYPE_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-xs font-medium text-muted-foreground uppercase">Description</label>
+                <Textarea
+                  value={logDescription}
+                  onChange={e => setLogDescription(e.target.value)}
+                  placeholder="What was discussed or provided?"
+                  className="min-h-[100px]"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={logFollowUp}
+                    onChange={e => setLogFollowUp(e.target.checked)}
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  Follow-up required
+                </label>
+                {logFollowUp && (
+                  <Input
+                    type="date"
+                    value={logFollowUpDate}
+                    onChange={e => setLogFollowUpDate(e.target.value)}
+                    className="max-w-[180px]"
+                  />
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setLogOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={createService.isPending}>
+                {createService.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Save Contact
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

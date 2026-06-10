@@ -1,46 +1,220 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Plus, Mail, Phone, Award, BookOpen, Calendar, MoreHorizontal, Download } from "lucide-react";
+import { Search, Plus, Mail, Phone, Award, BookOpen, MoreHorizontal, Download, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { trpc } from "@/lib/trpc";
+import { ORGANIZATION_ID } from "@/const";
+import { toast } from "sonner";
 
-const staffMembers = [
-  { id: 1, name: "Patricia Lee", role: "Lead Teacher", classroom: "Room A", email: "p.lee@childflow.org", phone: "(555) 111-2222", status: "active", hireDate: "2019-08-15", certifications: ["CDA", "First Aid/CPR"], trainingHours: 24, requiredHours: 24, education: "BA Early Childhood Education" },
-  { id: 2, name: "Robert Chen", role: "Lead Teacher", classroom: "Room B", email: "r.chen@childflow.org", phone: "(555) 222-3333", status: "active", hireDate: "2021-01-10", certifications: ["CDA", "First Aid/CPR"], trainingHours: 18, requiredHours: 24, education: "AA Child Development" },
-  { id: 3, name: "Angela Davis", role: "Teacher Assistant", classroom: "Room A", email: "a.davis@childflow.org", phone: "(555) 333-4444", status: "active", hireDate: "2022-09-01", certifications: ["First Aid/CPR"], trainingHours: 20, requiredHours: 24, education: "HS Diploma + CDA in progress" },
-  { id: 4, name: "Michael Torres", role: "Lead Teacher", classroom: "Room C", email: "m.torres@childflow.org", phone: "(555) 444-5555", status: "active", hireDate: "2020-03-15", certifications: ["CDA", "First Aid/CPR", "CLASS Observer"], trainingHours: 24, requiredHours: 24, education: "BA Education" },
-  { id: 5, name: "Jennifer Kim", role: "Family Service Worker", classroom: "N/A", email: "j.kim@childflow.org", phone: "(555) 555-6666", status: "active", hireDate: "2021-06-01", certifications: ["First Aid/CPR"], trainingHours: 16, requiredHours: 20, education: "BA Social Work" },
-  { id: 6, name: "David Martinez", role: "Health Coordinator", classroom: "N/A", email: "d.martinez@childflow.org", phone: "(555) 666-7777", status: "active", hireDate: "2018-11-01", certifications: ["RN", "First Aid/CPR"], trainingHours: 20, requiredHours: 20, education: "BSN Nursing" },
-  { id: 7, name: "Lisa Thompson", role: "Program Director", classroom: "N/A", email: "l.thompson@childflow.org", phone: "(555) 777-8888", status: "active", hireDate: "2015-07-01", certifications: ["CDA", "First Aid/CPR", "CLASS Observer"], trainingHours: 24, requiredHours: 24, education: "MA Early Childhood Administration" },
-  { id: 8, name: "Carlos Reyes", role: "Teacher Assistant", classroom: "Room B", email: "c.reyes@childflow.org", phone: "(555) 888-9999", status: "active", hireDate: "2023-08-15", certifications: ["First Aid/CPR"], trainingHours: 8, requiredHours: 24, education: "HS Diploma" },
-];
-
-const roleColors: Record<string, string> = {
-  "Lead Teacher": "bg-blue-100 text-blue-700 border-blue-200",
-  "Teacher Assistant": "bg-green-100 text-green-700 border-green-200",
-  "Family Service Worker": "bg-purple-100 text-purple-700 border-purple-200",
-  "Health Coordinator": "bg-red-100 text-red-700 border-red-200",
-  "Program Director": "bg-amber-100 text-amber-700 border-amber-200",
+const roleLabels: Record<string, string> = {
+  admin: "Administrator",
+  teacher: "Teacher",
+  assistant: "Assistant",
+  coordinator: "Coordinator",
 };
 
+const roleColors: Record<string, string> = {
+  admin: "bg-amber-100 text-amber-700 border-amber-200",
+  teacher: "bg-blue-100 text-blue-700 border-blue-200",
+  assistant: "bg-green-100 text-green-700 border-green-200",
+  coordinator: "bg-purple-100 text-purple-700 border-purple-200",
+};
+
+const certStatusBadges: Record<string, string> = {
+  active: "bg-green-100 text-green-700 hover:bg-green-100",
+  expiring_soon: "bg-amber-100 text-amber-700 hover:bg-amber-100",
+  expired: "bg-red-100 text-red-700 hover:bg-red-100",
+};
+
+const certStatusLabels: Record<string, string> = {
+  active: "Active",
+  expiring_soon: "Expiring Soon",
+  expired: "Expired",
+};
+
+// Training events have no backend yet — kept as static placeholders.
 const trainingEvents = [
-  { title: "Trauma-Informed Care", date: "Nov 20, 2024", hours: 3, required: true },
-  { title: "Child Assessment Strategies", date: "Dec 5, 2024", hours: 2, required: true },
-  { title: "Family Engagement Best Practices", date: "Dec 12, 2024", hours: 2, required: false },
-  { title: "CPR/First Aid Renewal", date: "Jan 15, 2025", hours: 4, required: true },
+  { title: "Trauma-Informed Care", date: "Nov 20, 2026", hours: 3, required: true },
+  { title: "Child Assessment Strategies", date: "Dec 5, 2026", hours: 2, required: true },
+  { title: "Family Engagement Best Practices", date: "Dec 12, 2026", hours: 2, required: false },
+  { title: "CPR/First Aid Renewal", date: "Jan 15, 2027", hours: 4, required: true },
 ];
+
+type StaffFormState = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  position: string;
+  role: "admin" | "teacher" | "assistant" | "coordinator";
+};
+
+const emptyForm: StaffFormState = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  position: "",
+  role: "teacher",
+};
+
+function initials(first: string, last: string) {
+  return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
+}
+
+function formatDate(value: string | Date | null | undefined) {
+  if (!value) return "—";
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
+}
 
 export default function Staff() {
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [addOpen, setAddOpen] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [form, setForm] = useState<StaffFormState>(emptyForm);
 
-  const filtered = staffMembers.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.role.toLowerCase().includes(search.toLowerCase())
+  const utils = trpc.useUtils();
+  const { data: staff, isLoading: staffLoading } = trpc.staff.list.useQuery(ORGANIZATION_ID);
+  const { data: classrooms } = trpc.classrooms.list.useQuery(ORGANIZATION_ID);
+  const { data: certifications, isLoading: certsLoading } = trpc.staffOps.certifications.useQuery(ORGANIZATION_ID);
+
+  const createStaff = trpc.staff.create.useMutation({
+    onSuccess: () => {
+      utils.staff.list.invalidate();
+      toast.success("Staff member added");
+      setAddOpen(false);
+      setForm(emptyForm);
+    },
+    onError: (err) => toast.error(`Failed to add staff: ${err.message}`),
+  });
+
+  const updateStaff = trpc.staff.update.useMutation({
+    onSuccess: () => {
+      utils.staff.list.invalidate();
+      toast.success("Staff member updated");
+      setEditId(null);
+      setForm(emptyForm);
+    },
+    onError: (err) => toast.error(`Failed to update staff: ${err.message}`),
+  });
+
+  const staffList = staff ?? [];
+
+  // Derive classroom assignments from classroom teacher/assistant names.
+  const classroomByStaffName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const room of classrooms ?? []) {
+      if (room.teacherName) map.set(room.teacherName, room.name);
+      if (room.assistantName) map.set(room.assistantName, room.name);
+    }
+    return map;
+  }, [classrooms]);
+
+  const certsByStaffId = useMemo(() => {
+    const map = new Map<number, NonNullable<typeof certifications>>();
+    for (const cert of certifications ?? []) {
+      const list = map.get(cert.staffId) ?? [];
+      list.push(cert);
+      map.set(cert.staffId, list);
+    }
+    return map;
+  }, [certifications]);
+
+  const filtered = staffList.filter((s) => {
+    const name = `${s.firstName} ${s.lastName}`.toLowerCase();
+    const q = search.toLowerCase();
+    const matchesSearch =
+      name.includes(q) ||
+      (s.position ?? "").toLowerCase().includes(q) ||
+      (roleLabels[s.role] ?? s.role).toLowerCase().includes(q);
+    const matchesRole = roleFilter === "all" || s.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
+
+  const certAlerts = (certifications ?? []).filter((c) => c.status !== "active").length;
+
+  const openEdit = (member: (typeof staffList)[number]) => {
+    setForm({
+      firstName: member.firstName ?? "",
+      lastName: member.lastName ?? "",
+      email: member.email ?? "",
+      phone: member.phone ?? "",
+      position: member.position ?? "",
+      role: member.role,
+    });
+    setEditId(member.id);
+  };
+
+  const submitForm = () => {
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      toast.error("First and last name are required");
+      return;
+    }
+    const payload = {
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
+      email: form.email.trim() || undefined,
+      phone: form.phone.trim() || undefined,
+      position: form.position.trim() || undefined,
+      role: form.role,
+    };
+    if (editId !== null) {
+      updateStaff.mutate({ id: editId, ...payload });
+    } else {
+      createStaff.mutate({ organizationId: ORGANIZATION_ID, ...payload });
+    }
+  };
+
+  const staffFormFields = (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="staff-first">First Name</Label>
+          <Input id="staff-first" value={form.firstName} onChange={(e) => setForm(f => ({ ...f, firstName: e.target.value }))} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="staff-last">Last Name</Label>
+          <Input id="staff-last" value={form.lastName} onChange={(e) => setForm(f => ({ ...f, lastName: e.target.value }))} />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="staff-email">Email</Label>
+        <Input id="staff-email" type="email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="staff-phone">Phone</Label>
+        <Input id="staff-phone" value={form.phone} onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="staff-position">Position</Label>
+          <Input id="staff-position" placeholder="e.g. Lead Teacher" value={form.position} onChange={(e) => setForm(f => ({ ...f, position: e.target.value }))} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Role</Label>
+          <Select value={form.role} onValueChange={(v) => setForm(f => ({ ...f, role: v as StaffFormState["role"] }))}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(roleLabels).map(([value, label]) => (
+                <SelectItem key={value} value={value}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
   );
 
   return (
@@ -48,26 +222,30 @@ export default function Staff() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Staff Management</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{staffMembers.length} staff members</p>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {staffLoading ? "Loading staff…" : `${staffList.length} staff members`}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />Export</Button>
-          <Button size="sm" className="gap-2"><Plus className="h-4 w-4" />Add Staff</Button>
+          <Button size="sm" className="gap-2" onClick={() => { setForm(emptyForm); setAddOpen(true); }}>
+            <Plus className="h-4 w-4" />Add Staff
+          </Button>
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
         {[
-          { label: "Total Staff", value: staffMembers.length },
-          { label: "Lead Teachers", value: staffMembers.filter(s => s.role === "Lead Teacher").length },
-          { label: "Training Complete", value: staffMembers.filter(s => s.trainingHours >= s.requiredHours).length },
-          { label: "Training Needed", value: staffMembers.filter(s => s.trainingHours < s.requiredHours).length },
+          { label: "Total Staff", value: staffList.length },
+          { label: "Teachers", value: staffList.filter(s => s.role === "teacher").length },
+          { label: "Active", value: staffList.filter(s => s.isActive === 1).length },
+          { label: "Certification Alerts", value: certAlerts },
         ].map(stat => (
           <Card key={stat.label}>
             <CardContent className="p-4 text-center">
               <p className="text-xs text-muted-foreground font-medium">{stat.label}</p>
-              <p className="text-2xl font-bold text-foreground mt-1">{stat.value}</p>
+              <p className="text-2xl font-bold text-foreground mt-1">{staffLoading ? "—" : stat.value}</p>
             </CardContent>
           </Card>
         ))}
@@ -81,61 +259,96 @@ export default function Staff() {
         </TabsList>
 
         <TabsContent value="directory" className="mt-4 space-y-4">
-          <div className="relative max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search staff..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+          <div className="flex items-center gap-3">
+            <div className="relative max-w-xs flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search staff..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="All roles" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                {Object.entries(roleLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filtered.map(member => (
-              <Card key={member.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-5">
-                  <div className="flex items-start gap-4">
-                    <Avatar className="h-12 w-12 flex-shrink-0">
-                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                        {member.name.split(" ").map(n => n[0]).join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="font-semibold text-foreground">{member.name}</h3>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>View Profile</DropdownMenuItem>
-                            <DropdownMenuItem>Edit</DropdownMenuItem>
-                            <DropdownMenuItem>Training Records</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                      <Badge className={`text-xs mt-1 ${roleColors[member.role] || "bg-gray-100 text-gray-700"} hover:bg-opacity-100`}>
-                        {member.role}
-                      </Badge>
-                      <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                        {member.classroom !== "N/A" && <p>Classroom: {member.classroom}</p>}
-                        <div className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{member.email}</div>
-                        <div className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{member.phone}</div>
-                        <p>Hired: {member.hireDate}</p>
-                      </div>
-                      <div className="mt-3">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-muted-foreground">Training Hours</span>
-                          <span className={member.trainingHours >= member.requiredHours ? "text-green-600 font-medium" : "text-amber-600 font-medium"}>
-                            {member.trainingHours}/{member.requiredHours}
-                          </span>
+          {staffLoading ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" /> Loading staff…
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              No staff members match your search.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {filtered.map(member => {
+                const fullName = `${member.firstName} ${member.lastName}`;
+                const classroom = classroomByStaffName.get(fullName);
+                const memberCerts = certsByStaffId.get(member.id) ?? [];
+                return (
+                  <Card key={member.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-5">
+                      <div className="flex items-start gap-4">
+                        <Avatar className="h-12 w-12 flex-shrink-0">
+                          <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                            {initials(member.firstName, member.lastName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="font-semibold text-foreground">{fullName}</h3>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEdit(member)}>Edit</DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => updateStaff.mutate({ id: member.id, isActive: member.isActive === 1 ? 0 : 1 })}
+                                >
+                                  {member.isActive === 1 ? "Deactivate" : "Activate"}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <Badge className={`text-xs ${roleColors[member.role] || "bg-gray-100 text-gray-700"} hover:bg-opacity-100`}>
+                              {member.position || roleLabels[member.role] || member.role}
+                            </Badge>
+                            {member.isActive !== 1 && (
+                              <Badge variant="outline" className="text-xs text-muted-foreground">Inactive</Badge>
+                            )}
+                          </div>
+                          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                            {classroom && <p>Classroom: {classroom}</p>}
+                            {member.email && <div className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{member.email}</div>}
+                            {member.phone && <div className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{member.phone}</div>}
+                          </div>
+                          {memberCerts.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-1">
+                              {memberCerts.map(cert => (
+                                <Badge key={cert.id} variant="outline" className="text-xs">
+                                  {cert.certificationType}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <Progress value={(member.trainingHours / member.requiredHours) * 100} className="h-1.5" />
                       </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="training" className="mt-4 space-y-4">
@@ -159,7 +372,7 @@ export default function Staff() {
                     </div>
                     <p className="text-xs text-muted-foreground">{event.date} &bull; {event.hours} hours</p>
                   </div>
-                  <Button variant="outline" size="sm" className="text-xs">Register</Button>
+                  <Button variant="outline" size="sm" className="text-xs" disabled title="Training registration coming soon">Register</Button>
                 </div>
               ))}
             </CardContent>
@@ -167,29 +380,44 @@ export default function Staff() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Training Hours Summary</CardTitle>
+              <CardTitle className="text-base">Certification Status by Staff</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {staffMembers.map(member => (
-                  <div key={member.id} className="flex items-center gap-4">
-                    <Avatar className="h-8 w-8 flex-shrink-0">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                        {member.name.split(" ").map(n => n[0]).join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm font-medium truncate">{member.name}</span>
-                        <span className={`text-xs font-medium ${member.trainingHours >= member.requiredHours ? "text-green-600" : "text-amber-600"}`}>
-                          {member.trainingHours}/{member.requiredHours} hrs
-                        </span>
+              {staffLoading ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" /> Loading…
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {staffList.map(member => {
+                    const memberCerts = certsByStaffId.get(member.id) ?? [];
+                    const alerts = memberCerts.filter(c => c.status !== "active").length;
+                    return (
+                      <div key={member.id} className="flex items-center gap-4">
+                        <Avatar className="h-8 w-8 flex-shrink-0">
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                            {initials(member.firstName, member.lastName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium truncate">{member.firstName} {member.lastName}</span>
+                          {memberCerts.length === 0 ? (
+                            <span className="text-xs text-muted-foreground">No certifications on file</span>
+                          ) : alerts > 0 ? (
+                            <span className="text-xs font-medium text-amber-600">
+                              {memberCerts.length} certification{memberCerts.length > 1 ? "s" : ""} &bull; {alerts} need{alerts === 1 ? "s" : ""} attention
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium text-green-600">
+                              {memberCerts.length} certification{memberCerts.length > 1 ? "s" : ""} current
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <Progress value={(member.trainingHours / member.requiredHours) * 100} className="h-1.5" />
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -203,49 +431,84 @@ export default function Staff() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/30">
-                      <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-6 py-3">Staff Member</th>
-                      <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Role</th>
-                      <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Education</th>
-                      <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Certifications</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {staffMembers.map(member => (
-                      <tr key={member.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                                {member.name.split(" ").map(n => n[0]).join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium text-sm">{member.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <Badge className={`text-xs ${roleColors[member.role] || ""} hover:bg-opacity-100`}>{member.role}</Badge>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-muted-foreground">{member.education}</td>
-                        <td className="px-4 py-4">
-                          <div className="flex flex-wrap gap-1">
-                            {member.certifications.map(cert => (
-                              <Badge key={cert} variant="outline" className="text-xs">{cert}</Badge>
-                            ))}
-                          </div>
-                        </td>
+              {certsLoading ? (
+                <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" /> Loading certifications…
+                </div>
+              ) : (certifications ?? []).length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground text-sm">No certifications on file.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/30">
+                        <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-6 py-3">Staff Member</th>
+                        <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Certification</th>
+                        <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Number</th>
+                        <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Issued</th>
+                        <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Expires</th>
+                        <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 py-3">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {(certifications ?? []).map(cert => (
+                        <tr key={cert.id} className="hover:bg-muted/20 transition-colors">
+                          <td className="px-6 py-4">
+                            <span className="font-medium text-sm">{cert.staffName}</span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-muted-foreground">{cert.certificationType}</td>
+                          <td className="px-4 py-4 text-sm text-muted-foreground">{cert.certificationNumber || "—"}</td>
+                          <td className="px-4 py-4 text-sm text-muted-foreground">{formatDate(cert.issueDate)}</td>
+                          <td className="px-4 py-4 text-sm text-muted-foreground">{formatDate(cert.expiryDate)}</td>
+                          <td className="px-4 py-4">
+                            <Badge className={`text-xs ${certStatusBadges[cert.status] ?? ""}`}>
+                              {certStatusLabels[cert.status] ?? cert.status}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Add Staff dialog */}
+      <Dialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) setForm(emptyForm); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Staff Member</DialogTitle>
+          </DialogHeader>
+          {staffFormFields}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={submitForm} disabled={createStaff.isPending}>
+              {createStaff.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Add Staff
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Staff dialog */}
+      <Dialog open={editId !== null} onOpenChange={(open) => { if (!open) { setEditId(null); setForm(emptyForm); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Staff Member</DialogTitle>
+          </DialogHeader>
+          {staffFormFields}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditId(null)}>Cancel</Button>
+            <Button onClick={submitForm} disabled={updateStaff.isPending}>
+              {updateStaff.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

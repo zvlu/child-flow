@@ -1,5 +1,11 @@
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
+/**
+ * Active organization for all data queries. Single-tenant for now;
+ * replace with an organization context when multi-tenant support lands.
+ */
+export const ORGANIZATION_ID = 1;
+
 // Generate login URL at runtime so redirect URI reflects the current origin.
 export const getLoginUrl = () => {
   const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;

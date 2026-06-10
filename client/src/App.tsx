@@ -176,7 +176,7 @@ function Router() {
           </AppLayout>
         )}
       </Route>
-      <Route path="/documents">
+      <Route path="/digital-documents">
         {() => (
           <AppLayout>
             <DigitalDocuments />

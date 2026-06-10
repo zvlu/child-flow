@@ -1,0 +1,85 @@
+name: ChildFlow
+options:
+  bundleIdPrefix: org.childflow
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+# Shared sources used by both targets
+# (Sources/Models and Sources/Networking are included in both targets below)
+
+targets:
+
+  # ─────────────────────────────────────────────
+  # STAFF APP
+  # ─────────────────────────────────────────────
+  ChildFlow:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    resources:
+      - Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.childflow.app
+        INFOPLIST_FILE: Resources/Info.plist
+        DEVELOPMENT_TEAM: ""
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: false
+        PRODUCT_NAME: ChildFlow
+    scheme:
+      testTargets:
+        - ChildFlowTests
+
+  # ─────────────────────────────────────────────
+  # FAMILY APP
+  # ─────────────────────────────────────────────
+  ChildFlowFamily:
+    type: application
+    platform: iOS
+    sources:
+      # Shared: models + networking from the staff project
+      - path: Sources/Models
+        name: Models
+      - path: Sources/Networking
+        name: Networking
+      # Shared design tokens (programmatic colors/fonts; no asset-catalog deps)
+      - path: Sources/App/DesignSystem.swift
+        name: DesignSystem
+      # Family-only views
+      - FamilySources
+    resources:
+      - FamilyResources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.childflow.family
+        INFOPLIST_FILE: FamilyResources/Info.plist
+        DEVELOPMENT_TEAM: ""
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: false
+        PRODUCT_NAME: ChildFlow
+
+  # ─────────────────────────────────────────────
+  # TESTS
+  # ─────────────────────────────────────────────
+  ChildFlowTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.childflow.tests
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/ChildFlow.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ChildFlow"
+    dependencies:
+      - target: ChildFlow

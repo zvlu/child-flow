@@ -1,11 +1,25 @@
 import { eq, and, gte, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { 
-  InsertUser, users, organizations, children, staff, families, attendance, 
+import {
+  InsertUser, users, organizations, children, staff, families, attendance,
   healthRecords, familyServices, communicationLogs, educationRecords, pirData,
-  InsertChild, InsertOrganization, InsertHealthRecord, InsertFamilyService 
+  InsertChild, InsertOrganization, InsertHealthRecord, InsertFamilyService,
+  auditLogs, InsertAuditLog
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
+
+const FOLLOW_UP_TYPES = new Set(["immunization", "physical", "dental", "vision", "hearing"]);
+
+export type HealthFollowUpAlert = {
+  childId: number;
+  childName: string;
+  recordId: number;
+  type: string;
+  expiryDate: Date;
+  daysUntilDue: number;
+  severity: "overdue" | "due_soon";
+  message: string;
+};
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -93,6 +107,53 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+/** Look up a user by email for password-based sign-in. */
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/** Set (or clear, with null) a user's scrypt password hash. */
+export async function setUserPassword(openId: string, passwordHash: string | null) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot set password: database not available");
+    return;
+  }
+
+  await db.update(users).set({ passwordHash }).where(eq(users.openId, openId));
+}
+
+/**
+ * Append a row to the audit log.
+ * Best-effort: failures are logged but never propagated into the request path,
+ * so audit-write problems can't deny access to (or block writes of) care records.
+ */
+export async function insertAuditLog(entry: InsertAuditLog): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    console.warn(
+      "[Audit] DB unavailable, dropping audit event:",
+      entry.action,
+      entry.resourceType
+    );
+    return;
+  }
+
+  try {
+    await db.insert(auditLogs).values(entry);
+  } catch (error) {
+    console.error("[Audit] Failed to write audit log:", error);
+  }
+}
+
 export async function getOrganizationByAgencyId(agencyId: string) {
   const db = await getDb();
   if (!db) return undefined;
@@ -175,6 +236,79 @@ export async function createHealthRecord(data: InsertHealthRecord) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return await db.insert(healthRecords).values(data);
+}
+
+export async function getHealthFollowUpAlerts(organizationId: number, dueWithinDays = 30): Promise<HealthFollowUpAlert[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const [records, organizationChildren] = await Promise.all([
+    db.select().from(healthRecords).where(eq(healthRecords.organizationId, organizationId)),
+    db.select().from(children).where(eq(children.organizationId, organizationId)),
+  ]);
+
+  const childNameById = new Map<number, string>();
+  for (const child of organizationChildren) {
+    childNameById.set(child.id, `${child.firstName} ${child.lastName}`);
+  }
+
+  const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const dueSoonLimit = new Date(startOfToday);
+  dueSoonLimit.setDate(dueSoonLimit.getDate() + dueWithinDays);
+
+  const latestByChildType = new Map<string, typeof records[number]>();
+  for (const record of records) {
+    if (!record.expiryDate || !FOLLOW_UP_TYPES.has(record.type)) continue;
+
+    const key = `${record.childId}:${record.type}`;
+    const existing = latestByChildType.get(key);
+    if (!existing) {
+      latestByChildType.set(key, record);
+      continue;
+    }
+
+    const existingTime = existing.expiryDate ? new Date(existing.expiryDate).getTime() : 0;
+    const currentTime = new Date(record.expiryDate).getTime();
+    if (currentTime > existingTime) {
+      latestByChildType.set(key, record);
+    }
+  }
+
+  const alerts: HealthFollowUpAlert[] = [];
+  for (const record of Array.from(latestByChildType.values())) {
+    if (!record.expiryDate) continue;
+
+    const expiry = new Date(record.expiryDate);
+    if (expiry > dueSoonLimit) continue;
+
+    const childName = childNameById.get(record.childId) || `Child #${record.childId}`;
+    const daysUntilDue = Math.ceil((expiry.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24));
+    const isOverdue = daysUntilDue < 0;
+    const normalizedType = record.type.replaceAll("_", " ");
+    const message = isOverdue
+      ? `${childName} ${normalizedType} follow-up is overdue`
+      : `${childName} ${normalizedType} follow-up is due in ${daysUntilDue} day${daysUntilDue === 1 ? "" : "s"}`;
+
+    alerts.push({
+      childId: record.childId,
+      childName,
+      recordId: record.id,
+      type: record.type,
+      expiryDate: expiry,
+      daysUntilDue,
+      severity: isOverdue ? "overdue" : "due_soon",
+      message,
+    });
+  }
+
+  alerts.sort((a, b) => {
+    if (a.severity !== b.severity) return a.severity === "overdue" ? -1 : 1;
+    return a.daysUntilDue - b.daysUntilDue;
+  });
+
+  return alerts;
 }
 
 export async function getFamilyServices(organizationId: number, familyId?: number) {

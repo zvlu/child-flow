@@ -16,7 +16,21 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  /**
+   * scrypt password hash for email/password (native mobile) sign-in.
+   * Null for OAuth-only accounts. Never returned to clients.
+   * Format: `scrypt$<saltHex>$<hashHex>` (see server/_core/password.ts).
+   */
+  passwordHash: varchar("passwordHash", { length: 255 }),
+  /**
+   * Access tier:
+   * - admin: program administration (staff management, bulk operations)
+   * - staff: day-to-day program work (default for new internal accounts)
+   * - parent: family-app account; sees ONLY their own family via familyId
+   */
+  role: mysqlEnum("role", ["admin", "staff", "parent"]).default("staff").notNull(),
+  /** For parent accounts: the family this user belongs to. Null for staff/admin. */
+  familyId: int("familyId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -24,6 +38,33 @@ export const users = mysqlTable("users", {
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+/**
+ * Audit log of access to sensitive records (child PII, health/PHI).
+ * Append-only; rows are never updated or deleted by the application.
+ * Supports the HIPAA audit-control safeguard (45 CFR §164.312(b)).
+ */
+export const auditLogs = mysqlTable("audit_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  /** User who performed the action. Null only for unauthenticated/system events. */
+  userId: int("userId"),
+  /** Stable identifier for the actor even if the user row is later removed. */
+  actorOpenId: varchar("actorOpenId", { length: 64 }),
+  /** e.g. "read", "create", "update", "delete", "login", "login_failed". */
+  action: varchar("action", { length: 32 }).notNull(),
+  /** e.g. "health_record", "child", "family", "auth". */
+  resourceType: varchar("resourceType", { length: 48 }).notNull(),
+  /** Identifier of the specific record acted on, when applicable. */
+  resourceId: varchar("resourceId", { length: 64 }),
+  /** Source IP, best-effort. */
+  ipAddress: varchar("ipAddress", { length: 64 }),
+  /** Optional human-readable context. */
+  detail: text("detail"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
 
 /**
  * Organizations table for multi-tenant support.
@@ -110,6 +151,30 @@ export const families = mysqlTable("families", {
 
 export type Family = typeof families.$inferSelect;
 export type InsertFamily = typeof families.$inferInsert;
+
+/**
+ * One-time invitation codes that let a parent create a family-app account
+ * bound to a specific family. Staff generate these; the family onboarding flow
+ * (verify-code → register) consumes them. A code is single-use and expires.
+ */
+export const familyInvitations = mysqlTable("family_invitations", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id),
+  /** Short human-enterable code, e.g. "CF-7K2M9Q". Unique while active. */
+  code: varchar("code", { length: 16 }).notNull().unique(),
+  /** Email the invite was addressed to (informational; registration re-asks). */
+  adultEmail: varchar("adultEmail", { length: 320 }),
+  /** users.id of the staff member who created the invite. */
+  createdBy: int("createdBy"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  /** Set when a parent registers with this code; null while unused. */
+  usedAt: timestamp("usedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type FamilyInvitation = typeof familyInvitations.$inferSelect;
+export type InsertFamilyInvitation = typeof familyInvitations.$inferInsert;
 
 /**
  * Attendance table for tracking daily attendance.
