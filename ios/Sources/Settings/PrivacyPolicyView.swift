@@ -54,9 +54,12 @@ struct PrivacyPolicyView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Questions")
                         .font(.headline)
-                    Text("Contact your program's Privacy Officer:")
+                    Text("Contact our Privacy Officer:")
                         .foregroundColor(.secondary)
                     Link("privacy@childflow.org", destination: URL(string: "mailto:privacy@childflow.org")!)
+                    Text("ChildFlow\n47 Lovell Ave\nWindsor, CT 06096")
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .font(.subheadline)
             }

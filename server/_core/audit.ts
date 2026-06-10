@@ -11,7 +11,8 @@ type AuditParams = {
   detail?: string;
 };
 
-function ipFromReq(req: TrpcContext["req"]): string | undefined {
+/** Best-effort source IP for a request, honoring a single proxy hop. */
+export function clientIpFromReq(req: TrpcContext["req"]): string | undefined {
   const fwd = req.headers["x-forwarded-for"];
   if (typeof fwd === "string" && fwd.length > 0) {
     return fwd.split(",")[0]!.trim();
@@ -36,7 +37,7 @@ export async function auditAccess(
     action: params.action,
     resourceType: params.resourceType,
     resourceId: params.resourceId != null ? String(params.resourceId) : null,
-    ipAddress: ipFromReq(ctx.req),
+    ipAddress: clientIpFromReq(ctx.req),
     detail: params.detail ?? null,
   });
 }
