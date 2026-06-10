@@ -240,6 +240,8 @@ struct CFSecondaryButton: View {
 /// Alert / info banner row used on Dashboard
 struct CFAlertRow: View {
     let alert: ProgramAlert
+    /// Show a trailing chevron when the row is wrapped in a NavigationLink.
+    var showsChevron: Bool = false
 
     private var accentColor: Color {
         switch alert.type {
@@ -286,6 +288,11 @@ struct CFAlertRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
+                if showsChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(accentColor.opacity(0.6))
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)

@@ -71,13 +71,14 @@ struct DashboardView: View {
                             QuickActionsRow()
                                 .padding(.horizontal)
 
-                            // Alerts
+                            // Alerts — each navigates to the module where the
+                            // flagged work lives (see AlertLinkRow).
                             if !viewModel.alerts.isEmpty {
                                 VStack(spacing: 10) {
                                     CFSectionHeader(title: "Alerts & Reminders")
                                         .padding(.horizontal)
                                     ForEach(viewModel.alerts) { alert in
-                                        CFAlertRow(alert: alert)
+                                        AlertLinkRow(alert: alert)
                                             .padding(.horizontal)
                                     }
                                 }
@@ -291,7 +292,7 @@ struct PendingTasksCard: View {
                     }
                 }
                 if tasks.count > 4 {
-                    NavigationLink(destination: FamilyServicesView()) {
+                    NavigationLink(destination: AllTasksView(tasks: tasks)) {
                         Text("View all \(tasks.count) tasks →")
                             .font(.cfCaption.bold())
                             .foregroundColor(.cfPrimary)
@@ -607,6 +608,58 @@ struct AgendaEvent: Identifiable {
     let subtitle: String?
     let color: Color
     var destination: DashboardTask.TaskDestination = .familyServices
+}
+
+// MARK: - Alert Link Row
+// Program alerts navigate to the module that owns the flagged work:
+// attendance alerts → attendance success plans, health → health records,
+// compliance → compliance dashboard. Unknown types render as a plain row.
+
+struct AlertLinkRow: View {
+    let alert: ProgramAlert
+
+    @ViewBuilder
+    private var destination: some View {
+        switch alert.type {
+        case "attendance": AttendancePlansView()
+        case "health":     HealthView()
+        case "compliance": ComplianceView()
+        default:           EmptyView()
+        }
+    }
+
+    private var isNavigable: Bool {
+        ["attendance", "health", "compliance"].contains(alert.type)
+    }
+
+    var body: some View {
+        if isNavigable {
+            NavigationLink(destination: destination) {
+                CFAlertRow(alert: alert, showsChevron: true)
+            }
+            .buttonStyle(.plain)
+        } else {
+            CFAlertRow(alert: alert)
+        }
+    }
+}
+
+// MARK: - All Tasks View
+// Full task list behind the "View all N tasks" link.
+
+struct AllTasksView: View {
+    let tasks: [DashboardTask]
+
+    var body: some View {
+        List(tasks) { task in
+            DashboardTaskRow(task: task)
+                .listRowBackground(Color.cfSurface)
+        }
+        .listStyle(.insetGrouped)
+        .background(Color.cfBackground)
+        .navigationTitle("Pending Tasks")
+        .navigationBarTitleDisplayMode(.inline)
+    }
 }
 
 // MARK: - Task Destination Resolver
