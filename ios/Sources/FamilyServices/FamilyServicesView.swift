@@ -46,9 +46,19 @@ struct FamilyRow: View {
 
 // MARK: - Family Detail (tabbed hub)
 
+/// Named tab indices for FamilyDetailView, used by dashboard task deep links.
+enum FamilyDetailTab: Int {
+    case overview = 0, contacts = 1, goals = 2, fna = 3, cfcr = 4, notes = 5, moments = 6
+}
+
 struct FamilyDetailView: View {
     let family: Family
-    @State private var selectedTab = 0
+    @State private var selectedTab: Int
+
+    init(family: Family, initialTab: FamilyDetailTab = .overview) {
+        self.family = family
+        _selectedTab = State(initialValue: initialTab.rawValue)
+    }
 
     var tabs = ["Overview", "Contacts", "Goals", "FNA", "CFCR", "Notes", "Moments"]
 

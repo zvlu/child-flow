@@ -323,27 +323,8 @@ struct DashboardTaskRow: View {
         }
     }
 
-    @ViewBuilder
-    var destinationView: some View {
-        switch task.destination {
-        case .familyServices:
-            FamilyServicesView()
-        case .health:
-            HealthView()
-        case .healthCategory(let category):
-            // Create a standalone category detail using a shared HealthViewModel
-            HealthCategoryLaunchView(category: category)
-        case .documents:
-            DocumentsView()
-        case .attendance:
-            AttendanceView()
-        case .messages:
-            MessagingView()
-        }
-    }
-
     var body: some View {
-        NavigationLink(destination: destinationView) {
+        NavigationLink(destination: TaskDestinationView(destination: task.destination)) {
             HStack(spacing: 10) {
                 Circle()
                     .fill(urgencyColor.opacity(0.2))
@@ -419,20 +400,8 @@ struct TodayAgendaCard: View {
 struct AgendaEventRow: View {
     let event: AgendaEvent
 
-    @ViewBuilder
-    var destinationView: some View {
-        switch event.destination {
-        case .familyServices:               FamilyServicesView()
-        case .health:                       HealthView()
-        case .healthCategory(let cat):      HealthCategoryLaunchView(category: cat)
-        case .documents:                    DocumentsView()
-        case .attendance:                   AttendanceView()
-        case .messages:                     MessagingView()
-        }
-    }
-
     var body: some View {
-        NavigationLink(destination: destinationView) {
+        NavigationLink(destination: TaskDestinationView(destination: event.destination)) {
             HStack(spacing: 12) {
                 VStack(spacing: 2) {
                     Text(event.timeLabel)
@@ -619,6 +588,10 @@ struct DashboardTask: Identifiable {
 
     enum TaskDestination {
         case familyServices
+        /// Deep link to a specific family's detail screen, opened on the tab
+        /// where the task lives (FNA, CFCR, contacts, …). `name` is matched
+        /// against the family name, case-insensitively.
+        case family(name: String, tab: FamilyDetailTab)
         case health
         case healthCategory(HealthCategory)
         case documents
@@ -636,6 +609,26 @@ struct AgendaEvent: Identifiable {
     var destination: DashboardTask.TaskDestination = .familyServices
 }
 
+// MARK: - Task Destination Resolver
+// Single place that maps a TaskDestination to its screen; used by both the
+// pending-task rows and the agenda rows.
+
+struct TaskDestinationView: View {
+    let destination: DashboardTask.TaskDestination
+
+    var body: some View {
+        switch destination {
+        case .familyServices:                FamilyServicesView()
+        case .family(let name, let tab):     FamilyLaunchView(familyName: name, tab: tab)
+        case .health:                        HealthView()
+        case .healthCategory(let category):  HealthCategoryLaunchView(category: category)
+        case .documents:                     DocumentsView()
+        case .attendance:                    AttendanceView()
+        case .messages:                      MessagingView()
+        }
+    }
+}
+
 // MARK: - Health Category Launch View
 // Self-contained wrapper so task rows can push directly to a health category
 
@@ -646,6 +639,44 @@ struct HealthCategoryLaunchView: View {
     var body: some View {
         HealthCategoryDetailView(category: category, viewModel: viewModel)
             .task { await viewModel.load() }
+    }
+}
+
+// MARK: - Family Launch View
+// Resolves a family by name and pushes straight to the relevant detail tab,
+// so a task like "Complete FNA — Rodriguez family" lands on that family's FNA.
+// Falls back to the family list if the name can't be matched.
+
+struct FamilyLaunchView: View {
+    let familyName: String
+    let tab: FamilyDetailTab
+
+    @State private var family: Family?
+    @State private var isLoading = true
+
+    var body: some View {
+        Group {
+            if let family {
+                FamilyDetailView(family: family, initialTab: tab)
+            } else if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                FamilyServicesView()
+            }
+        }
+        .task {
+            var families: [Family]
+            do {
+                families = try await APIClient.shared.getFamilies()
+            } catch {
+                families = MockData.families
+            }
+            family = families.first {
+                $0.name.localizedCaseInsensitiveContains(familyName)
+            }
+            isLoading = false
+        }
     }
 }
 
@@ -716,18 +747,20 @@ class DashboardViewModel: ObservableObject {
             CaseloadChild(id: "c6", firstName: "Noah",    lastName: "Patel",     attendanceStatus: .present),
         ]
 
+        // Each task deep-links to the screen where it gets done. Names match
+        // MockData families/children so the links resolve in demo mode too.
         pendingTasks = [
-            DashboardTask(id: "t1", title: "Sign Sofia Martinez's IEP",           dueLabel: "Due today",  urgency: .today,    destination: .familyServices),
-            DashboardTask(id: "t2", title: "Complete FNA — Torres family",         dueLabel: "Due Jun 12", urgency: .upcoming, destination: .familyServices),
-            DashboardTask(id: "t3", title: "Schedule Jason Chen dental screening", dueLabel: "Overdue",    urgency: .overdue,  destination: .healthCategory(.dental)),
-            DashboardTask(id: "t4", title: "Upload Aaliyah's immunization record", dueLabel: "Due Jun 15", urgency: .upcoming, destination: .documents),
-            DashboardTask(id: "t5", title: "Review Marcus Williams CFCR",          dueLabel: "Due Jun 18", urgency: .upcoming, destination: .familyServices),
+            DashboardTask(id: "t1", title: "Sign Sofia Johnson's IEP",             dueLabel: "Due today",  urgency: .today,    destination: .family(name: "Johnson", tab: .overview)),
+            DashboardTask(id: "t2", title: "Complete FNA — Rodriguez family",       dueLabel: "Due Jun 12", urgency: .upcoming, destination: .family(name: "Rodriguez", tab: .fna)),
+            DashboardTask(id: "t3", title: "Schedule Jason Chen dental screening",  dueLabel: "Overdue",    urgency: .overdue,  destination: .healthCategory(.dental)),
+            DashboardTask(id: "t4", title: "Upload Aaliyah's immunization record",  dueLabel: "Due Jun 15", urgency: .upcoming, destination: .healthCategory(.immunizations)),
+            DashboardTask(id: "t5", title: "Review Marcus Williams CFCR",           dueLabel: "Due Jun 18", urgency: .upcoming, destination: .family(name: "Williams", tab: .cfcr)),
         ]
 
         todayAgenda = [
-            AgendaEvent(id: "e1", timeLabel: "9:30",  title: "Home Visit — Garcia Family",  subtitle: "Maria & Sofia Garcia",   color: .cfPrimary,   destination: .familyServices),
-            AgendaEvent(id: "e2", timeLabel: "11:00", title: "Staff Team Meeting",           subtitle: "Room 102 · All staff",   color: .cfChildren,  destination: .messages),
-            AgendaEvent(id: "e3", timeLabel: "2:00",  title: "Parent Conference — Williams", subtitle: "Marcus Williams family", color: .cfGoals,      destination: .familyServices),
+            AgendaEvent(id: "e1", timeLabel: "9:30",  title: "Home Visit — Johnson Family",  subtitle: "Maria & Sofia Johnson",  color: .cfPrimary,   destination: .family(name: "Johnson", tab: .contacts)),
+            AgendaEvent(id: "e2", timeLabel: "11:00", title: "Staff Team Meeting",            subtitle: "Room 102 · All staff",   color: .cfChildren,  destination: .messages),
+            AgendaEvent(id: "e3", timeLabel: "2:00",  title: "Parent Conference — Williams",  subtitle: "Marcus Williams family", color: .cfGoals,     destination: .family(name: "Williams", tab: .contacts)),
         ]
     }
 }
