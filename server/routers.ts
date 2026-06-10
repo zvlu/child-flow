@@ -28,7 +28,13 @@ import { CommunicationService } from "./services/communication";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(opts => {
+      if (!opts.ctx.user) return null;
+      // Never expose the password hash (or let new sensitive columns leak by
+      // default) — return an explicit allowlist of fields.
+      const { id, openId, name, email, role, lastSignedIn } = opts.ctx.user;
+      return { id, openId, name, email, role, lastSignedIn };
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
