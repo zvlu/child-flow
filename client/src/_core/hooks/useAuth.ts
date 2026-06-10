@@ -1,32 +1,34 @@
-import { useMemo } from "react";
+import { trpc } from "@/lib/trpc";
 
 /**
- * MOCK AUTH HOOK FOR TESTING
- * This version bypasses actual authentication to allow direct testing of the UI.
+ * Authentication state derived from the server session.
+ *
+ * Reflects the real session established via the OAuth cookie flow
+ * (see server/_core/oauth.ts). `auth.me` is a public procedure that returns the
+ * current user or `null` when there is no valid session — so an unauthenticated
+ * visitor resolves cleanly to `isAuthenticated: false` rather than an error.
  */
 export function useAuth() {
-  const state = useMemo(() => {
-    const mockUser = {
-      id: "test-user-id",
-      name: "Test Administrator",
-      email: "admin@childflow.org",
-      role: "admin"
-    };
-    
-    return {
-      user: mockUser,
-      loading: false,
-      error: null,
-      isAuthenticated: true, // Always authenticated for testing
-    };
-  }, []);
+  const meQuery = trpc.auth.me.useQuery(undefined, {
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+  const logoutMutation = trpc.auth.logout.useMutation();
+
+  const user = meQuery.data ?? null;
 
   return {
-    ...state,
-    refresh: () => Promise.resolve(),
-    logout: () => {
-      window.location.href = "/";
-      return Promise.resolve();
+    user,
+    loading: meQuery.isLoading,
+    error: meQuery.error ?? null,
+    isAuthenticated: !!user,
+    refresh: () => meQuery.refetch().then(() => undefined),
+    logout: async () => {
+      try {
+        await logoutMutation.mutateAsync();
+      } finally {
+        window.location.href = "/";
+      }
     },
   };
 }
