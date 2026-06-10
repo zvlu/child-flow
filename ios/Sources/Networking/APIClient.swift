@@ -359,9 +359,20 @@ actor APIClient {
     private func validate(_ response: URLResponse) throws {
         guard let http = response as? HTTPURLResponse else { return }
         guard (200..<300).contains(http.statusCode) else {
+            if http.statusCode == 401 {
+                // Token rejected/expired server-side. Broadcast so app state can
+                // clear the dead session and return to sign-in.
+                NotificationCenter.default.post(name: .cfSessionExpired, object: nil)
+                throw APIError.unauthorized
+            }
             throw APIError.httpError(http.statusCode)
         }
     }
+}
+
+extension Notification.Name {
+    /// Posted when the server rejects the session token (HTTP 401).
+    static let cfSessionExpired = Notification.Name("cfSessionExpired")
 }
 
 struct EmptyResponse: Decodable {}

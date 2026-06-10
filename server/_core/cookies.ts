@@ -42,7 +42,12 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
+    // Strict: the browser never attaches the session cookie to cross-site
+    // requests (CSRF hardening for a PHI-bearing API). The SPA's own
+    // same-origin API calls are unaffected. NOTE: this intentionally breaks
+    // sign-in when the app is embedded in a cross-origin iframe (e.g. a
+    // hosted preview pane) — open the app in its own tab instead.
+    sameSite: "strict",
     secure: isSecureRequest(req),
   };
 }

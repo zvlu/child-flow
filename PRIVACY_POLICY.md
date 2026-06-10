@@ -47,6 +47,9 @@ We implement technical and administrative safeguards, including:
 - **Secure credential storage:** on mobile devices, the session token is stored
   in the hardware-protected iOS Keychain (device-only, excluded from backups),
   with optional Face ID / Touch ID to unlock an existing session.
+- **Session timeouts:** browser sessions expire after 30 minutes of inactivity.
+  Mobile sign-ins expire after 12 hours, and the app locks itself after
+  15 minutes in the background, requiring biometric or password re-entry.
 - **Data at rest:** records are held in access-controlled databases. At-rest
   encryption is configured at the infrastructure level for each deployment and
   is the responsibility of the hosting program.

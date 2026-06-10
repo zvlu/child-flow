@@ -1,5 +1,7 @@
+import { COOKIE_NAME, WEB_SESSION_IDLE_TTL_MS } from "@shared/const";
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
+import { getSessionCookieOptions } from "./cookies";
 import { ENV } from "./env";
 import { sdk } from "./sdk";
 
@@ -36,6 +38,22 @@ export async function createContext(
 
   try {
     user = await sdk.authenticateRequest(opts.req);
+
+    // Sliding idle timeout for browser sessions: every authenticated
+    // cookie-based request re-issues the cookie with a fresh
+    // WEB_SESSION_IDLE_TTL_MS window, so the session only expires after that
+    // long with no activity. Mobile clients authenticate with a Bearer token
+    // (fixed TTL) and are skipped.
+    if (user && !opts.req.headers.authorization) {
+      const refreshed = await sdk.createSessionToken(user.openId, {
+        name: user.name ?? "",
+        expiresInMs: WEB_SESSION_IDLE_TTL_MS,
+      });
+      opts.res.cookie(COOKIE_NAME, refreshed, {
+        ...getSessionCookieOptions(opts.req),
+        maxAge: WEB_SESSION_IDLE_TTL_MS,
+      });
+    }
   } catch (error) {
     // Authentication is optional for public procedures.
     user = null;

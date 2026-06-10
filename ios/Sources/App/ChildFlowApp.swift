@@ -4,6 +4,7 @@ import UIKit
 @main
 struct ChildFlowApp: App {
     @StateObject private var appState = AppState()
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let teal = UIColor(red: 0.000, green: 0.427, blue: 0.467, alpha: 1)
@@ -32,6 +33,13 @@ struct ChildFlowApp: App {
                 }
             }
             .environmentObject(appState)
+            .onChange(of: scenePhase) { _, phase in
+                switch phase {
+                case .background: appState.noteBackgrounded()
+                case .active: appState.relockIfNeeded()
+                default: break
+                }
+            }
         }
     }
 }

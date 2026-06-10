@@ -22,6 +22,7 @@ struct PrivacyPolicyView: View {
                         "Access control: every request requires authentication. Administrative actions (managing staff, bulk record changes) are restricted to admin accounts.",
                         "Audit logging: access to and changes of child and health records are recorded with the acting user and time.",
                         "Sign-in: email and password, with optional Face ID / Touch ID to unlock an existing session on this device.",
+                        "Session limits: the app locks after 15 minutes in the background, sign-ins expire after 12 hours, and web sessions time out after 30 minutes of inactivity.",
                     ]
                 )
 
