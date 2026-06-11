@@ -258,6 +258,47 @@ export type CommunicationLog = typeof communicationLogs.$inferSelect;
 export type InsertCommunicationLog = typeof communicationLogs.$inferInsert;
 
 /**
+ * Two-way in-app conversation between program staff and one family.
+ * Staff see all conversations in their organization; parent accounts see only
+ * the conversation(s) for their own familyId. Per-side read cursors drive the
+ * viewer-relative unread counts.
+ */
+export const conversations = mysqlTable("conversations", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id),
+  /** users.id of whoever started the thread. */
+  createdBy: int("createdBy"),
+  /** Last time any staff member viewed this thread (ms precision — read
+   *  cursors are compared against message sentAt within the same second). */
+  staffLastReadAt: timestamp("staffLastReadAt", { fsp: 3 }),
+  /** Last time the family viewed this thread. */
+  familyLastReadAt: timestamp("familyLastReadAt", { fsp: 3 }),
+  isActive: int("isActive").default(1),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Conversation = typeof conversations.$inferSelect;
+export type InsertConversation = typeof conversations.$inferInsert;
+
+/** One message inside a conversation. */
+export const chatMessages = mysqlTable("chat_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  conversationId: int("conversationId").notNull().references(() => conversations.id),
+  /** users.id of the sender (staff or parent account). */
+  senderUserId: int("senderUserId").notNull(),
+  senderRole: mysqlEnum("senderRole", ["staff", "family"]).notNull(),
+  body: text("body").notNull(),
+  /** Millisecond precision; set by the application on insert. */
+  sentAt: timestamp("sentAt", { fsp: 3 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = typeof chatMessages.$inferInsert;
+
+/**
  * Education table for tracking individualized curriculum and assessments.
  */
 export const educationRecords = mysqlTable("education_records", {

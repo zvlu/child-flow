@@ -128,6 +128,9 @@ struct ProgramAlert: Codable, Identifiable {
     let title: String
     let description: String
     let type: String
+    /// Optional hint for the destination screen (e.g. a health status filter
+    /// like "Overdue" or "Due Soon"). Sent by the server; nil in older payloads.
+    var filter: String? = nil
 
     var icon: String {
         switch type {

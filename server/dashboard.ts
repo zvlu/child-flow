@@ -1,9 +1,11 @@
-import { and, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
 import {
   attendance,
+  chatMessages,
   children,
   communicationLogs,
+  conversations,
   digitalDocuments,
   organizations,
   type User,
@@ -97,6 +99,27 @@ export function registerDashboardRoutes(app: Express) {
       );
     const failedCount = stuckMessages.filter(m => m.status === "failed").length;
 
+    // --- Unread parent messages (in-app conversations) ---
+    let unreadFromParents = 0;
+    const threads = await db
+      .select()
+      .from(conversations)
+      .where(and(eq(conversations.organizationId, org.id), eq(conversations.isActive, 1)));
+    for (const t of threads) {
+      const [latestFromFamily] = await db
+        .select({ sentAt: chatMessages.sentAt })
+        .from(chatMessages)
+        .where(and(eq(chatMessages.conversationId, t.id), eq(chatMessages.senderRole, "family")))
+        .orderBy(desc(chatMessages.sentAt), desc(chatMessages.id))
+        .limit(1);
+      if (
+        latestFromFamily &&
+        (t.staffLastReadAt == null || latestFromFamily.sentAt > t.staffLastReadAt)
+      ) {
+        unreadFromParents++;
+      }
+    }
+
     // --- Documents awaiting signature or expired ---
     const pendingDocs = await db
       .select({ id: digitalDocuments.id, status: digitalDocuments.status })
@@ -117,7 +140,14 @@ export function registerDashboardRoutes(app: Express) {
     const complianceScore = Math.max(0, 100 - signedRatioBase * 5);
 
     // --- Assemble alerts (most actionable first) ---
-    const alerts: Array<{ id: string; title: string; description: string; type: string }> = [];
+    const alerts: Array<{
+      id: string;
+      title: string;
+      description: string;
+      type: string;
+      /** Optional destination hint, e.g. a health status filter. */
+      filter?: string;
+    }> = [];
 
     if (lowAttendance.length > 0) {
       const names = lowAttendance.slice(0, 3).map(c => `${c.name} (${c.rate}%)`).join(", ");
@@ -139,6 +169,16 @@ export function registerDashboardRoutes(app: Express) {
         title: `${healthAlerts.length} Health Record${healthAlerts.length === 1 ? "" : "s"} Due This Month`,
         description: `${summary}${overdueCount > 0 ? ` — ${overdueCount} overdue` : ""}. Tap to review and schedule.`,
         type: "health",
+        filter: overdueCount > 0 ? "Overdue" : "Due Soon",
+      });
+    }
+
+    if (unreadFromParents > 0) {
+      alerts.push({
+        id: "alert-unread-parent-messages",
+        title: `${unreadFromParents} New Parent Message${unreadFromParents === 1 ? "" : "s"}`,
+        description: "Families are waiting on a reply. Tap to open your inbox.",
+        type: "message",
       });
     }
 

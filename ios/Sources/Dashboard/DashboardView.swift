@@ -622,7 +622,9 @@ struct AlertLinkRow: View {
     private var destination: some View {
         switch alert.type {
         case "attendance": AttendancePlansView()
-        case "health":     HealthView()
+        // Server sends the status filter that matters most ("Overdue" before
+        // "Due Soon"), so the alert lands on the records needing action.
+        case "health":     HealthView(initialStatusFilter: alert.filter)
         case "compliance": ComplianceView()
         case "message":    MessagingView()
         case "document":   DocumentsView()

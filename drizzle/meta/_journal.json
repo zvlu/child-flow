@@ -36,6 +36,20 @@
       "when": 1781118086991,
       "tag": "0004_left_tempest",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1781121472511,
+      "tag": "0005_peaceful_garia",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1781188384624,
+      "tag": "0006_magical_zodiak",
+      "breakpoints": true
     }
   ]
 }
