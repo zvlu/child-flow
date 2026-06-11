@@ -26,6 +26,7 @@ struct MainTabView: View {
 
 struct AppMenuSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var appState: AppState
 
     var body: some View {
         NavigationStack {
@@ -122,14 +123,17 @@ struct AppMenuSheet: View {
                             bgColor: .cfAttendanceBg,
                             destination: AnyView(ClockInView())
                         )
-                        ModuleCard(
-                            label: "All Timesheets",
-                            subtitle: "Review & approve staff hours",
-                            icon: "person.text.rectangle.fill",
-                            color: .cfChildren,
-                            bgColor: .cfChildrenBg,
-                            destination: AnyView(TimesheetView())
-                        )
+                        // Reviewing/approving staff hours is admin-only.
+                        if appState.isAdmin {
+                            ModuleCard(
+                                label: "All Timesheets",
+                                subtitle: "Review & approve staff hours",
+                                icon: "person.text.rectangle.fill",
+                                color: .cfChildren,
+                                bgColor: .cfChildrenBg,
+                                destination: AnyView(TimesheetView())
+                            )
+                        }
                     }
 
                     // Program Operations

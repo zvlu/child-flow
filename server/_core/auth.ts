@@ -30,6 +30,25 @@ function clientIp(req: Request): string | undefined {
 }
 
 export function registerAuthRoutes(app: Express) {
+  /**
+   * Who am I? Lets the mobile apps know the signed-in user's role so they can
+   * show or hide admin-only functions (the server still enforces every
+   * permission independently).
+   */
+  app.get("/api/auth/me", async (req: Request, res: Response) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      res.json({
+        id: String(user.id),
+        fullName: user.name ?? "",
+        email: user.email ?? "",
+        role: user.role,
+      });
+    } catch {
+      res.status(401).json({ error: "Please sign in again" });
+    }
+  });
+
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     const email =
       typeof req.body?.email === "string"

@@ -67,6 +67,11 @@ actor APIClient {
         return response.token
     }
 
+    /// The signed-in user (including their role, for gating admin-only UI).
+    func getMe() async throws -> User {
+        try await get("auth/me")
+    }
+
     // MARK: - Dashboard
     func getDashboardStats() async throws -> DashboardData {
         try await get("dashboard/stats")

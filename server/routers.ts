@@ -1,4 +1,5 @@
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, NOT_ADMIN_ERR_MSG } from "@shared/const";
+import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, staffProcedure, adminProcedure } from "./_core/trpc";
@@ -411,7 +412,8 @@ export const appRouter = router({
       .query(async ({ input: organizationId }) => {
         return mod.getInvoices(organizationId);
       }),
-    createInvoice: staffProcedure
+    // Financial mutations are administrative (segregation of duties).
+    createInvoice: adminProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -423,7 +425,8 @@ export const appRouter = router({
           description: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "create", resourceType: "invoice", detail: `family:${input.familyId}` });
         return mod.createInvoice({ ...input, dueDate: new Date(input.dueDate) });
       }),
     payments: staffProcedure
@@ -431,7 +434,7 @@ export const appRouter = router({
       .query(async ({ input: organizationId }) => {
         return mod.getPayments(organizationId);
       }),
-    recordPayment: staffProcedure
+    recordPayment: adminProcedure
       .input(
         z.object({
           invoiceId: z.number(),
@@ -440,7 +443,8 @@ export const appRouter = router({
           paymentMethod: z.enum(["credit_card", "ach", "check", "cash"]),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "create", resourceType: "payment", resourceId: input.invoiceId });
         return mod.recordPayment(input);
       }),
   }),
@@ -478,7 +482,18 @@ export const appRouter = router({
       }),
     updatePlanStatus: staffProcedure
       .input(z.object({ id: z.number(), status: z.enum(["draft", "approved", "served"]) }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        // CACFP plan APPROVAL is an administrative sign-off; staff may still
+        // draft plans and mark them served day-to-day.
+        if (input.status === "approved" && ctx.user.role !== "admin") {
+          await auditAccess(ctx, {
+            action: "update",
+            resourceType: "rbac",
+            resourceId: "meals.updatePlanStatus",
+            detail: `role=${ctx.user.role} required=admin for approval`,
+          });
+          throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+        }
         return mod.updateMealPlanStatus(input.id, input.status);
       }),
     cacfpReports: staffProcedure
@@ -509,7 +524,8 @@ export const appRouter = router({
       .query(async ({ input: organizationId }) => {
         return mod.getCertifications(organizationId);
       }),
-    createCertification: staffProcedure
+    // Certification (HR training) records are administrative.
+    createCertification: adminProcedure
       .input(
         z.object({
           staffId: z.number(),
@@ -739,7 +755,8 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return await getPirData(input.organizationId, input.year);
       }),
-    setPirValue: staffProcedure
+    // PIR is federal reporting data — edits are administrative.
+    setPirValue: adminProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -749,7 +766,12 @@ export const appRouter = router({
           value: z.string(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, {
+          action: "update",
+          resourceType: "pir_data",
+          resourceId: `${input.year}/${input.section}/${input.questionId}`,
+        });
         return mod.upsertPirValue(input.organizationId, input.year, input.section, input.questionId, input.value);
       }),
   }),
