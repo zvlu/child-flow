@@ -11,7 +11,8 @@ struct ChildrenView: View {
                 Section {
                     Picker("Organize", selection: $viewModel.grouping) {
                         Text("By Room").tag(ChildrenViewModel.Grouping.byRoom)
-                        Text("All Children").tag(ChildrenViewModel.Grouping.all)
+                        Text("By Family").tag(ChildrenViewModel.Grouping.byFamily)
+                        Text("All").tag(ChildrenViewModel.Grouping.all)
                     }
                     .pickerStyle(.segmented)
                     .listRowBackground(Color.clear)
@@ -48,6 +49,27 @@ struct ChildrenView: View {
                             } header: {
                                 RoomSectionHeader(room: room, visibleCount: kids.count)
                             }
+                        }
+                    }
+                } else if viewModel.grouping == .byFamily {
+                    // Parent + their children (siblings) as one unit.
+                    ForEach(viewModel.familyGroups) { group in
+                        Section {
+                            ForEach(group.children) { child in
+                                childRow(child)
+                            }
+                        } header: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.2.fill")
+                                Text(group.parentName)
+                                Text("· \(group.children.count) \(group.children.count == 1 ? "child" : "children")")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                if !group.parentPhone.isEmpty {
+                                    Label(group.parentPhone, systemImage: "phone.fill")
+                                }
+                            }
+                            .font(.caption)
                         }
                     }
                 } else {
@@ -264,13 +286,51 @@ struct ChildProfileTab: View {
 
 struct ChildHealthTab: View {
     let child: Child
+    @State private var records: [HealthRecord] = []
+    @State private var isLoading = true
+
+    private func statusColor(_ status: String) -> Color {
+        switch status {
+        case "Overdue":  return .cfHealth
+        case "Due Soon": return .orange
+        default:         return .cfAttendance
+        }
+    }
+
     var body: some View {
         List {
-            Section("Health Status") {
-                LabeledContent("Physical Exam", value: child.healthStatus)
-                LabeledContent("Dental Exam", value: "Current")
-                LabeledContent("Vision", value: "Current")
-                LabeledContent("Hearing", value: "Due Soon")
+            if isLoading {
+                HStack { Spacer(); ProgressView(); Spacer() }
+            } else if records.isEmpty {
+                Section {
+                    Text("No health records on file yet.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                Section("Health Records") {
+                    ForEach(records) { record in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(record.category.capitalized)
+                                    .font(.subheadline.weight(.medium))
+                                if let due = record.dueDate {
+                                    Text("Due \(due.formatted(.dateTime.month(.abbreviated).day().year()))")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Text(record.status)
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(statusColor(record.status))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(statusColor(record.status).opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
             }
             if !child.allergies.isEmpty {
                 Section("Allergies") {
@@ -279,6 +339,12 @@ struct ChildHealthTab: View {
                     }
                 }
             }
+        }
+        .task {
+            // The child's own records, freshly loaded — not placeholder values.
+            let all = (try? await APIClient.shared.getHealthRecords()) ?? []
+            records = all.filter { $0.childId == child.id }
+            isLoading = false
         }
     }
 }
@@ -306,9 +372,17 @@ struct ChildFamilyTab: View {
     }
 }
 
+/// One family's children shown together: the parent contact plus siblings.
+struct FamilyGroup: Identifiable {
+    let id: String
+    let parentName: String
+    let parentPhone: String
+    let children: [Child]
+}
+
 @MainActor
 class ChildrenViewModel: ObservableObject {
-    enum Grouping { case byRoom, all }
+    enum Grouping { case byRoom, byFamily, all }
 
     @Published var children: [Child] = []
     @Published var classrooms: [ClassroomSummary] = []
@@ -334,6 +408,26 @@ class ChildrenViewModel: ObservableObject {
     /// Children in a room by name; "" means unassigned.
     func children(inRoom roomName: String) -> [Child] {
         filteredChildren.filter { $0.classroom == roomName }
+    }
+
+    /// Siblings grouped under their parent, sorted by family name.
+    var familyGroups: [FamilyGroup] {
+        var byKey: [String: [Child]] = [:]
+        for child in filteredChildren {
+            // familyId when the server provides it; parent name as a demo-data fallback.
+            let key = child.familyId ?? "name:\(child.parentName)"
+            byKey[key, default: []].append(child)
+        }
+        return byKey
+            .map { key, kids in
+                FamilyGroup(
+                    id: key,
+                    parentName: kids.first?.parentName.isEmpty == false ? kids.first!.parentName : "Family",
+                    parentPhone: kids.first?.parentPhone ?? "",
+                    children: kids
+                )
+            }
+            .sorted { $0.parentName < $1.parentName }
     }
 
     /// Move a child to a room (nil = unassign), then refresh so capacity

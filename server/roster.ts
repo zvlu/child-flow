@@ -4,6 +4,7 @@ import {
   attendance,
   children,
   families,
+  healthRecords,
   organizations,
   type User,
 } from "../drizzle/schema";
@@ -96,6 +97,7 @@ export function registerRosterRoutes(app: Express) {
         const family = c.familyId != null ? familyById.get(c.familyId) : undefined;
         return {
           id: String(c.id),
+          familyId: c.familyId != null ? String(c.familyId) : null,
           firstName: c.firstName,
           lastName: c.lastName,
           dateOfBirth: c.dateOfBirth ? dateOnly(c.dateOfBirth) : "",
@@ -146,6 +148,55 @@ export function registerRosterRoutes(app: Express) {
           assistantName: r.assistantName ?? "",
           color: r.color ?? "#3b82f6",
         }))
+    );
+  });
+
+  /**
+   * Health records for the staff iOS app — every record tied to its child.
+   * Category/status vocabulary matches what the app's Health module renders.
+   */
+  app.get("/api/health", async (req: Request, res: Response) => {
+    const user = await requireStaff(req);
+    if (!user) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const [org] = await db.select().from(organizations).limit(1);
+    if (!org) {
+      res.json([]);
+      return;
+    }
+
+    const categoryMap: Record<string, string> = { immunization: "immunizations" };
+    const statusMap: Record<string, string> = {
+      up_to_date: "Current",
+      due_soon: "Due Soon",
+      overdue: "Overdue",
+      exempt: "Current",
+      not_required: "Current",
+    };
+
+    const rows = await db
+      .select({ record: healthRecords, child: children })
+      .from(healthRecords)
+      .innerJoin(children, eq(healthRecords.childId, children.id))
+      .where(eq(healthRecords.organizationId, org.id));
+
+    res.json(
+      rows.map(({ record, child }) => ({
+        id: String(record.id),
+        childId: String(child.id),
+        childName: `${child.firstName} ${child.lastName}`,
+        category: categoryMap[record.type] ?? record.type,
+        status: statusMap[record.status ?? "up_to_date"] ?? "Current",
+        dueDate: record.expiryDate?.toISOString() ?? null,
+        completedDate: record.recordDate.toISOString(),
+      }))
     );
   });
 

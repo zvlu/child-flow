@@ -15,6 +15,8 @@ struct User: Codable, Identifiable {
 // MARK: - Child
 struct Child: Codable, Identifiable {
     let id: String
+    /// Groups siblings; nil in older payloads/mocks.
+    var familyId: String? = nil
     let firstName: String
     let lastName: String
     let dateOfBirth: String
