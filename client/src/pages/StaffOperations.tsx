@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Clock, LogIn, LogOut, AlertCircle, CheckCircle2, Plus, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
+import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
 
 function formatTime(value: string | Date | null | undefined) {
@@ -30,6 +31,7 @@ const emptyCertForm = {
 };
 
 export function StaffOperations() {
+  const isAdmin = useIsAdmin();
   const [showCertModal, setShowCertModal] = useState(false);
   const [certForm, setCertForm] = useState(emptyCertForm);
 
@@ -214,13 +216,15 @@ export function StaffOperations() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-slate-900">Certifications & Training</h2>
-            <button
-              onClick={() => setShowCertModal(true)}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl transition-colors font-medium flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Certification
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setShowCertModal(true)}
+                className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl transition-colors font-medium flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Certification
+              </button>
+            )}
           </div>
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             {certsLoading ? (

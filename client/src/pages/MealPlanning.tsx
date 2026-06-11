@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Apple, Plus, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
+import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
 
 const MEAL_TYPE_ORDER = ["breakfast", "snack", "lunch", "afternoon_snack"] as const;
@@ -64,6 +65,7 @@ export function MealPlanning() {
     { enabled: effectivePlanId != null }
   );
 
+  const isAdmin = useIsAdmin();
   const updateStatus = trpc.meals.updatePlanStatus.useMutation({
     onSuccess: () => {
       utils.meals.plans.invalidate(ORGANIZATION_ID);
@@ -196,7 +198,7 @@ export function MealPlanning() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-slate-900">Weekly Menu</h2>
               <div className="flex gap-2">
-                {selectedPlan.status === "draft" && (
+                {isAdmin && selectedPlan.status === "draft" && (
                   <button
                     onClick={() => updateStatus.mutate({ id: selectedPlan.id, status: "approved" })}
                     disabled={updateStatus.isPending}

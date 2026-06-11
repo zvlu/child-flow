@@ -2,6 +2,7 @@ import { useState } from "react";
 import { DollarSign, Plus, Eye, Download, Filter, CreditCard, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
+import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
 
 const statusColors = {
@@ -47,6 +48,7 @@ export function Billing() {
   const [description, setDescription] = useState("");
 
   // Record payment state
+  const isAdmin = useIsAdmin();
   const [paymentInvoiceId, setPaymentInvoiceId] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("credit_card");
 
@@ -132,10 +134,12 @@ export function Billing() {
               <DollarSign className="w-8 h-8 text-teal-600" />
               <h1 className="text-4xl font-bold text-slate-900">Billing & Payments</h1>
             </div>
-            <button onClick={() => setShowModal(true)} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
-              <Plus className="w-5 h-5" />
-              New Invoice
-            </button>
+            {isAdmin && (
+              <button onClick={() => setShowModal(true)} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
+                <Plus className="w-5 h-5" />
+                New Invoice
+              </button>
+            )}
           </div>
         </div>
 
@@ -216,7 +220,7 @@ export function Billing() {
                     <td className="px-6 py-4 text-sm">
                       <div className="flex items-center gap-2">
                         <button title={invoice.description || "View invoice"} className="p-2 hover:bg-slate-200 rounded-lg transition-colors"><Eye className="w-4 h-4 text-slate-600" /></button>
-                        {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+                        {isAdmin && invoice.status !== "paid" && invoice.status !== "cancelled" && (
                           <button
                             title="Record payment"
                             onClick={() => { setPaymentInvoiceId(invoice.id); setPaymentMethod("credit_card"); }}
