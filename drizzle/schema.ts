@@ -299,6 +299,51 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = typeof chatMessages.$inferInsert;
 
 /**
+ * Parent-reported absences ("my child is not coming today").
+ * Reported from the family app; a family advocate (staff) reviews each one.
+ * Approval writes an "excused" attendance row for that child and date and
+ * sends the family a notification.
+ */
+export const absenceReports = mysqlTable("absence_reports", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id),
+  childId: int("childId").notNull().references(() => children.id),
+  /** The day the child will be (or was) absent. */
+  absenceDate: timestamp("absenceDate").notNull(),
+  reason: mysqlEnum("reason", ["sick", "appointment", "family_emergency", "transportation", "travel", "other"]).notNull(),
+  note: text("note"),
+  status: mysqlEnum("status", ["pending", "approved", "denied"]).default("pending").notNull(),
+  /** users.id of the parent who reported. */
+  reportedBy: int("reportedBy"),
+  /** users.id of the staff member who reviewed. */
+  reviewedBy: int("reviewedBy"),
+  reviewedAt: timestamp("reviewedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AbsenceReport = typeof absenceReports.$inferSelect;
+export type InsertAbsenceReport = typeof absenceReports.$inferInsert;
+
+/**
+ * Family goals with simple progress tracking, shown as progress graphs in the
+ * family app. Staff update progress during home visits / case management.
+ */
+export const familyGoals = mysqlTable("family_goals", {
+  id: int("id").autoincrement().primaryKey(),
+  familyId: int("familyId").notNull().references(() => families.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  /** 0–100. */
+  progress: int("progress").default(0).notNull(),
+  status: mysqlEnum("status", ["active", "completed", "paused"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FamilyGoalRow = typeof familyGoals.$inferSelect;
+export type InsertFamilyGoalRow = typeof familyGoals.$inferInsert;
+
+/**
  * Education table for tracking individualized curriculum and assessments.
  */
 export const educationRecords = mysqlTable("education_records", {

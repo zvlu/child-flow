@@ -628,12 +628,13 @@ struct AlertLinkRow: View {
         case "compliance": ComplianceView()
         case "message":    MessagingView()
         case "document":   DocumentsView()
+        case "absence":    AbsenceReportsView()
         default:           EmptyView()
         }
     }
 
     private var isNavigable: Bool {
-        ["attendance", "health", "compliance", "message", "document"].contains(alert.type)
+        ["attendance", "health", "compliance", "message", "document", "absence"].contains(alert.type)
     }
 
     var body: some View {

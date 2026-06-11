@@ -13,7 +13,22 @@ actor APIClient {
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.keyDecodingStrategy = .convertFromSnakeCase
-        d.dateDecodingStrategy = .iso8601
+        // Server timestamps are ISO8601 WITH fractional seconds ("….000Z"),
+        // which the plain .iso8601 strategy rejects. Accept both forms.
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        d.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            if let date = fractional.date(from: value) ?? plain.date(from: value) {
+                return date
+            }
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unrecognized date format: \(value)"
+            )
+        }
         return d
     }()
 
@@ -336,6 +351,45 @@ actor APIClient {
 
     func getFamilyEvents() async throws -> [FamilyEvent] {
         try await get("family/events")
+    }
+
+    func getFamilyNotifications() async throws -> [ParentNotification] {
+        try await get("family/notifications")
+    }
+
+    func getSchoolStatus() async throws -> SchoolStatus {
+        try await get("family/school-status")
+    }
+
+    func getFamilyProgress() async throws -> FamilyProgress {
+        try await get("family/progress")
+    }
+
+    // MARK: - Absence Reports
+    func reportAbsence(childId: String, date: Date, reason: String, note: String) async throws -> AbsenceReport {
+        struct Req: Encodable {
+            let childId: String
+            let date: String
+            let reason: String
+            let note: String
+        }
+        let iso = ISO8601DateFormatter().string(from: date)
+        return try await post("family/absences", body: Req(childId: childId, date: iso, reason: reason, note: note))
+    }
+
+    func getFamilyAbsences() async throws -> [AbsenceReport] {
+        try await get("family/absences")
+    }
+
+    /// Staff: absence reports awaiting review.
+    func getAbsenceReports() async throws -> [AbsenceReport] {
+        try await get("absences")
+    }
+
+    /// Staff: approve or deny a parent-reported absence.
+    func reviewAbsence(id: String, approve: Bool) async throws {
+        struct Req: Encodable { let approve: Bool }
+        let _: SuccessResponse = try await post("absences/\(id)/review", body: Req(approve: approve))
     }
 
     // MARK: - Private helpers

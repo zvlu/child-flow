@@ -19,6 +19,8 @@
 		4DAF73296036F00B4A27FCDB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78076EFEBACB38517E2D33D8 /* SettingsView.swift */; };
 		4EE4E2734488E6CB2DBD2936 /* DocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E1747D66A6B33A02847E703 /* DocumentsView.swift */; };
 		4F47FF563E260B44AB7CCC13 /* NutritionFormsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FF6A0E599CC1CDFCD9BB848 /* NutritionFormsView.swift */; };
+		5797004A421DCF3703D1AD46 /* AbsenceReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8B1AC18F3BDCBCAEE1EBB24 /* AbsenceReportsView.swift */; };
+		58B3C7BB4708D572053FF3C2 /* FamilyProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2138C7B22EB0486AF53EB5F1 /* FamilyProgressView.swift */; };
 		5CCAF479502C488493D6D69B /* MessagingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18EB22F3C3C8A119E343B8ED /* MessagingView.swift */; };
 		5E34A23295A8944FAF860502 /* FamilyEngagementEventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60B88EEA80AFFB65EE8A6609 /* FamilyEngagementEventView.swift */; };
 		5F9C761671C6A857C99C23B4 /* AttendanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E498101305B734F4E4121BD /* AttendanceView.swift */; };
@@ -71,6 +73,7 @@
 		1DA21453442C4FC79AF59DA9 /* ChildFlow.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ChildFlow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1E498101305B734F4E4121BD /* AttendanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttendanceView.swift; sourceTree = "<group>"; };
 		20C5FB47E0F76579CC813F80 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		2138C7B22EB0486AF53EB5F1 /* FamilyProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyProgressView.swift; sourceTree = "<group>"; };
 		2933386CACAF53C8F1122291 /* AttendancePlansView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttendancePlansView.swift; sourceTree = "<group>"; };
 		2C5075C2841E9D5DEBBA3959 /* FamilyAppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyAppState.swift; sourceTree = "<group>"; };
 		357777D8991A2BEA9B834FBA /* TimesheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimesheetView.swift; sourceTree = "<group>"; };
@@ -102,6 +105,7 @@
 		CBAB0D9A422204C1E8F62EE9 /* FamilyOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyOnboardingView.swift; sourceTree = "<group>"; };
 		D25D8DA0C0025A9D50725D2D /* StaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffView.swift; sourceTree = "<group>"; };
 		D85394B54D5D9CB4ECA7066B /* EnrollmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrollmentView.swift; sourceTree = "<group>"; };
+		D8B1AC18F3BDCBCAEE1EBB24 /* AbsenceReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AbsenceReportsView.swift; sourceTree = "<group>"; };
 		DAC964E983E5CA986BA59AB3 /* PrivacyPolicyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPolicyView.swift; sourceTree = "<group>"; };
 		DCC522EA3120CF5EF4B8FD32 /* ChildFlowTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ChildFlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E46D6558A7BC26F95662D4CE /* HealthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthView.swift; sourceTree = "<group>"; };
@@ -211,6 +215,7 @@
 		64AE7256E69603BCEEC2DC55 /* Attendance */ = {
 			isa = PBXGroup;
 			children = (
+				D8B1AC18F3BDCBCAEE1EBB24 /* AbsenceReportsView.swift */,
 				1E498101305B734F4E4121BD /* AttendanceView.swift */,
 			);
 			path = Attendance;
@@ -251,6 +256,7 @@
 				D2995F22EBA295A5BC9D4F4B /* Home */,
 				A5A05EF1556DBD001B8395C2 /* Messages */,
 				23AE4D0140F4588A3996B647 /* Onboarding */,
+				E61241DB803989D9402D6A51 /* Progress */,
 			);
 			path = FamilySources;
 			sourceTree = "<group>";
@@ -349,6 +355,14 @@
 			);
 			name = Models;
 			path = Models;
+			sourceTree = "<group>";
+		};
+		E61241DB803989D9402D6A51 /* Progress */ = {
+			isa = PBXGroup;
+			children = (
+				2138C7B22EB0486AF53EB5F1 /* FamilyProgressView.swift */,
+			);
+			path = Progress;
 			sourceTree = "<group>";
 		};
 		F8667802C2DC89409FEBABB9 /* Tests */ = {
@@ -474,6 +488,7 @@
 				295C055E35A2FFA0A324CBCA /* FamilyMessagesView.swift in Sources */,
 				3335914233EFED881E4E831B /* FamilyOnboardingView.swift in Sources */,
 				7D1EB4F31B42828345B8A263 /* FamilyProfileView.swift in Sources */,
+				58B3C7BB4708D572053FF3C2 /* FamilyProgressView.swift in Sources */,
 				8458644517B9B74B430EC7D9 /* FamilyTabView.swift in Sources */,
 				D9D7BB33D61DB07D9F70BB01 /* KeychainHelper.swift in Sources */,
 				02F4B074096C205D89149F80 /* Models.swift in Sources */,
@@ -493,6 +508,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A8E566D9E10FE130B28CD192 /* APIClient.swift in Sources */,
+				5797004A421DCF3703D1AD46 /* AbsenceReportsView.swift in Sources */,
 				713351DF2079F55649363930 /* AppState.swift in Sources */,
 				0744B223E994702BB1E132F4 /* ApplicationVerificationView.swift in Sources */,
 				9886581C26CEAD115B55EFF6 /* AttendancePlansView.swift in Sources */,

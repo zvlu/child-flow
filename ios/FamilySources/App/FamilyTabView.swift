@@ -13,6 +13,11 @@ struct FamilyTabView: View {
                     Label("Messages", systemImage: "bubble.left.and.bubble.right.fill")
                 }
 
+            FamilyProgressView()
+                .tabItem {
+                    Label("Progress", systemImage: "chart.bar.fill")
+                }
+
             FamilyProfileView()
                 .tabItem {
                     Label("My Profile", systemImage: "person.fill")

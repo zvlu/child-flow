@@ -73,6 +73,23 @@ async function main() {
     }
   }
 
+  // Demo family goals so the parent app's progress graphs have data.
+  if (family) {
+    const [goals] = await conn.execute("SELECT id FROM family_goals WHERE familyId = ?", [family.id]);
+    if ((goals as unknown[]).length === 0) {
+      await conn.execute(
+        `INSERT INTO family_goals (familyId, title, progress, status) VALUES
+         (?, 'Complete GED program', 60, 'active'),
+         (?, 'Secure stable housing', 35, 'active'),
+         (?, 'Attend parenting workshops', 80, 'active')`,
+        [family.id, family.id, family.id]
+      );
+      console.log(`✓ demo family goals created (family ${family.id})`);
+    } else {
+      console.log("✓ family goals already present");
+    }
+  }
+
   console.log(`\nDemo password (all accounts): ${password}`);
   await conn.end();
 }

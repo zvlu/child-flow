@@ -250,6 +250,7 @@ struct CFAlertRow: View {
         case "compliance":  return .cfCompliance
         case "message":     return .cfChildren
         case "document":    return .cfFamily
+        case "absence":     return .cfAttendance
         default:            return .cfPrimary
         }
     }
@@ -261,6 +262,7 @@ struct CFAlertRow: View {
         case "compliance":  return .cfComplianceBg
         case "message":     return .cfChildrenBg
         case "document":    return .cfFamilyBg
+        case "absence":     return .cfAttendanceBg
         default:            return .cfPrimaryLight
         }
     }

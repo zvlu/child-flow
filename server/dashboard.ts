@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
 import {
+  absenceReports,
   attendance,
   chatMessages,
   children,
@@ -170,6 +171,20 @@ export function registerDashboardRoutes(app: Express) {
         description: `${summary}${overdueCount > 0 ? ` — ${overdueCount} overdue` : ""}. Tap to review and schedule.`,
         type: "health",
         filter: overdueCount > 0 ? "Overdue" : "Due Soon",
+      });
+    }
+
+    // --- Parent-reported absences awaiting advocate review ---
+    const pendingAbsences = await db
+      .select({ id: absenceReports.id })
+      .from(absenceReports)
+      .where(and(eq(absenceReports.organizationId, org.id), eq(absenceReports.status, "pending")));
+    if (pendingAbsences.length > 0) {
+      alerts.push({
+        id: "alert-absences",
+        title: `${pendingAbsences.length} Absence Report${pendingAbsences.length === 1 ? "" : "s"} to Review`,
+        description: "Families reported their children out. Approve to mark the day excused.",
+        type: "absence",
       });
     }
 
