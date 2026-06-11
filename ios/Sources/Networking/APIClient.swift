@@ -66,6 +66,17 @@ actor APIClient {
         try await get("children/\(id)")
     }
 
+    // MARK: - Classrooms
+    func getClassrooms() async throws -> [ClassroomSummary] {
+        try await get("classrooms")
+    }
+
+    /// Move a child to a classroom; nil unassigns them.
+    func assignChild(childId: String, classroomId: String?) async throws {
+        struct Req: Encodable { let classroomId: String? }
+        let _: SuccessResponse = try await post("children/\(childId)/assign", body: Req(classroomId: classroomId))
+    }
+
     // MARK: - Attendance
     func getAttendance(date: Date, classroom: String?) async throws -> AttendanceData {
         let dateStr = ISO8601DateFormatter().string(from: date)
@@ -376,6 +387,8 @@ extension Notification.Name {
 }
 
 struct EmptyResponse: Decodable {}
+
+struct SuccessResponse: Decodable { let success: Bool }
 
 enum APIError: LocalizedError {
     case httpError(Int)

@@ -88,6 +88,24 @@ export async function getClassroomRoster(classroomId: number) {
     .then(rows => rows.map(r => r.child));
 }
 
+/**
+ * Move a child to a classroom (or unassign with null). Ends any active
+ * assignment first, so a child is only ever in one room at a time.
+ */
+export async function assignChildToClassroom(childId: number, classroomId: number | null) {
+  const db = await requireDb();
+  await db
+    .update(childClassroomAssignments)
+    .set({ isActive: 0, endDate: new Date() })
+    .where(and(
+      eq(childClassroomAssignments.childId, childId),
+      eq(childClassroomAssignments.isActive, 1),
+    ));
+  if (classroomId != null) {
+    await db.insert(childClassroomAssignments).values({ childId, classroomId });
+  }
+}
+
 export async function getChildClassroomMap(organizationId: number) {
   const db = await requireDb();
   const rows = await db

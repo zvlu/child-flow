@@ -33,6 +33,20 @@ struct Child: Codable, Identifiable {
     var initials: String { "\(firstName.prefix(1))\(lastName.prefix(1))" }
 }
 
+/// A classroom with live enrollment, used to organize children by room.
+struct ClassroomSummary: Codable, Identifiable {
+    let id: String
+    let name: String
+    let ageGroup: String
+    let capacity: Int
+    let enrolledCount: Int
+    let teacherName: String
+    let assistantName: String
+    let color: String
+
+    var isFull: Bool { capacity > 0 && enrolledCount >= capacity }
+}
+
 // MARK: - Attendance
 struct AttendanceRecord: Codable, Identifiable {
     let id: String

@@ -227,6 +227,19 @@ export const appRouter = router({
       .query(async ({ input: classroomId }) => {
         return mod.getClassroomRoster(classroomId);
       }),
+    // Move a child between rooms (null classroomId = unassign).
+    assignChild: staffProcedure
+      .input(z.object({ childId: z.number(), classroomId: z.number().nullable() }))
+      .mutation(async ({ input, ctx }) => {
+        await mod.assignChildToClassroom(input.childId, input.classroomId);
+        await auditAccess(ctx, {
+          action: "update",
+          resourceType: "child",
+          resourceId: input.childId,
+          detail: input.classroomId != null ? `assigned to classroom ${input.classroomId}` : "unassigned from classroom",
+        });
+        return { success: true };
+      }),
   }),
 
   attendance: router({

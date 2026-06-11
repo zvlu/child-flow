@@ -8,6 +8,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerDashboardRoutes } from "../dashboard";
 import { registerFamilyRoutes } from "../family";
 import { registerMessagingRoutes } from "../messaging";
+import { registerRosterRoutes } from "../roster";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -45,6 +46,8 @@ async function startServer() {
   registerDashboardRoutes(app);
   // Two-way staff <-> family messaging under /api/messaging/*
   registerMessagingRoutes(app);
+  // Children + classroom rosters under /api/children, /api/classrooms
+  registerRosterRoutes(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API

@@ -7,9 +7,52 @@ struct ChildrenView: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(viewModel.filteredChildren) { child in
-                    NavigationLink(destination: ChildDetailView(child: child)) {
-                        ChildRow(child: child)
+                // Grouping toggle lives in the list so it scrolls naturally.
+                Section {
+                    Picker("Organize", selection: $viewModel.grouping) {
+                        Text("By Room").tag(ChildrenViewModel.Grouping.byRoom)
+                        Text("All Children").tag(ChildrenViewModel.Grouping.all)
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                }
+
+                if viewModel.grouping == .byRoom {
+                    // Unassigned children come first — they're the ones that
+                    // need action, so they must be impossible to miss.
+                    let unassigned = viewModel.children(inRoom: "")
+                    if !unassigned.isEmpty {
+                        Section {
+                            ForEach(unassigned) { child in
+                                childRow(child)
+                            }
+                        } header: {
+                            Label("Needs Room Assignment (\(unassigned.count))", systemImage: "exclamationmark.triangle.fill")
+                                .foregroundColor(.cfAccent)
+                        }
+                    }
+
+                    ForEach(viewModel.classrooms) { room in
+                        let kids = viewModel.children(inRoom: room.name)
+                        if !(viewModel.isSearching && kids.isEmpty) {
+                            Section {
+                                ForEach(kids) { child in
+                                    childRow(child)
+                                }
+                                if kids.isEmpty {
+                                    Text("No children assigned")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            } header: {
+                                RoomSectionHeader(room: room, visibleCount: kids.count)
+                            }
+                        }
+                    }
+                } else {
+                    ForEach(viewModel.filteredChildren) { child in
+                        childRow(child)
                     }
                 }
             }
@@ -54,10 +97,76 @@ struct ChildrenView: View {
             }
         }
     }
+
+    /// Row + navigation + long-press "Move to room" menu.
+    @ViewBuilder
+    private func childRow(_ child: Child) -> some View {
+        NavigationLink(destination: ChildDetailView(child: child)) {
+            ChildRow(child: child, showRoom: viewModel.grouping == .all)
+        }
+        .contextMenu {
+            Menu {
+                ForEach(viewModel.classrooms.filter { $0.name != child.classroom }) { room in
+                    Button {
+                        Task { await viewModel.move(child, toRoom: room) }
+                    } label: {
+                        Label(
+                            room.isFull ? "\(room.name) (full)" : "\(room.name) · \(room.enrolledCount)/\(room.capacity)",
+                            systemImage: "door.left.hand.open"
+                        )
+                    }
+                    .disabled(room.isFull)
+                }
+            } label: {
+                Label("Move to Room", systemImage: "arrow.right.square")
+            }
+            if !child.classroom.isEmpty {
+                Button(role: .destructive) {
+                    Task { await viewModel.move(child, toRoom: nil) }
+                } label: {
+                    Label("Remove from \(child.classroom)", systemImage: "minus.circle")
+                }
+            }
+        }
+    }
+}
+
+/// Room name, live capacity (X/Y), and teacher — at a glance.
+struct RoomSectionHeader: View {
+    let room: ClassroomSummary
+    let visibleCount: Int
+
+    var capacityColor: Color {
+        if room.isFull { return .cfHealth }
+        if room.capacity > 0 && Double(room.enrolledCount) / Double(room.capacity) >= 0.85 { return .orange }
+        return .cfAttendance
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(Color(hex: room.color))
+                .frame(width: 10, height: 10)
+            Text(room.name)
+            Text("\(room.enrolledCount)/\(room.capacity)")
+                .foregroundColor(capacityColor)
+                .fontWeight(.semibold)
+            if !room.ageGroup.isEmpty {
+                Text("· \(room.ageGroup)")
+            }
+            Spacer()
+            if !room.teacherName.isEmpty {
+                Label(room.teacherName, systemImage: "person.fill")
+                    .labelStyle(.titleAndIcon)
+            }
+        }
+        .font(.caption)
+    }
 }
 
 struct ChildRow: View {
     let child: Child
+    var showRoom: Bool = true
 
     var body: some View {
         HStack(spacing: 12) {
@@ -72,9 +181,15 @@ struct ChildRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(child.fullName)
                     .font(.subheadline.weight(.medium))
-                Text(child.classroom)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if showRoom {
+                    Text(child.classroom.isEmpty ? "No room assigned" : child.classroom)
+                        .font(.caption)
+                        .foregroundColor(child.classroom.isEmpty ? .cfAccent : .secondary)
+                } else if !child.teacher.isEmpty {
+                    Text(child.teacher)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             Spacer()
             HealthStatusBadge(status: child.healthStatus)
@@ -193,30 +308,92 @@ struct ChildFamilyTab: View {
 
 @MainActor
 class ChildrenViewModel: ObservableObject {
+    enum Grouping { case byRoom, all }
+
     @Published var children: [Child] = []
+    @Published var classrooms: [ClassroomSummary] = []
+    @Published var grouping: Grouping = .byRoom
     @Published var searchText = ""
     @Published var statusFilter: String? = nil
     @Published var isLoading = false
 
+    var isSearching: Bool { !searchText.isEmpty }
+
     var filteredChildren: [Child] {
-        children.filter { child in
-            let matchesSearch = searchText.isEmpty ||
-                child.fullName.localizedCaseInsensitiveContains(searchText)
-            let matchesStatus = statusFilter == nil ||
-                child.enrollmentStatus.lowercased() == statusFilter
-            return matchesSearch && matchesStatus
+        children
+            .filter { child in
+                let matchesSearch = searchText.isEmpty ||
+                    child.fullName.localizedCaseInsensitiveContains(searchText)
+                let matchesStatus = statusFilter == nil ||
+                    child.enrollmentStatus.lowercased() == statusFilter
+                return matchesSearch && matchesStatus
+            }
+            .sorted { ($0.lastName, $0.firstName) < ($1.lastName, $1.firstName) }
+    }
+
+    /// Children in a room by name; "" means unassigned.
+    func children(inRoom roomName: String) -> [Child] {
+        filteredChildren.filter { $0.classroom == roomName }
+    }
+
+    /// Move a child to a room (nil = unassign), then refresh so capacity
+    /// counts and section membership update everywhere at once.
+    func move(_ child: Child, toRoom room: ClassroomSummary?) async {
+        do {
+            try await APIClient.shared.assignChild(childId: child.id, classroomId: room?.id)
+            await load()
+        } catch {
+            // Demo mode (no server): update locally so the interaction still works.
+            #if DEBUG
+            children = children.map {
+                guard $0.id == child.id else { return $0 }
+                return Child(
+                    id: $0.id, firstName: $0.firstName, lastName: $0.lastName,
+                    dateOfBirth: $0.dateOfBirth, gender: $0.gender,
+                    primaryLanguage: $0.primaryLanguage,
+                    classroom: room?.name ?? "", teacher: room?.teacherName ?? "",
+                    enrollmentStatus: $0.enrollmentStatus, healthStatus: $0.healthStatus,
+                    attendanceRate: $0.attendanceRate,
+                    parentName: $0.parentName, parentPhone: $0.parentPhone,
+                    allergies: $0.allergies
+                )
+            }
+            rebuildMockClassroomCounts()
+            #endif
         }
     }
 
     func load() async {
         isLoading = true
         do {
-            children = try await APIClient.shared.getChildren()
+            async let kids = APIClient.shared.getChildren()
+            async let rooms = APIClient.shared.getClassrooms()
+            children = try await kids
+            classrooms = try await rooms
         } catch {
             #if DEBUG
             children = MockData.children
+            rebuildMockClassroomCounts()
             #endif
         }
         isLoading = false
+    }
+
+    /// Demo fallback: derive room summaries from the mock children.
+    private func rebuildMockClassroomCounts() {
+        let roomNames = Set(children.map(\.classroom).filter { !$0.isEmpty })
+        classrooms = roomNames.sorted().enumerated().map { index, name in
+            let kids = children.filter { $0.classroom == name }
+            return ClassroomSummary(
+                id: "mock-\(index)",
+                name: name,
+                ageGroup: "",
+                capacity: 18,
+                enrolledCount: kids.count,
+                teacherName: kids.first?.teacher ?? "",
+                assistantName: "",
+                color: "#3b82f6"
+            )
+        }
     }
 }
