@@ -186,6 +186,40 @@ struct RoomSectionHeader: View {
     }
 }
 
+/// A single color-coded safety flag chip.
+struct ChildFlagChip: View {
+    let flag: ChildFlag
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: flag.icon).font(.system(size: 9, weight: .bold))
+            Text(flag.label).font(.cfCaption2)
+        }
+        .foregroundColor(flag.color)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(flag.bgColor)
+        .clipShape(Capsule())
+    }
+}
+
+/// A compact row of flag chips, capped with a "+N" overflow.
+struct FlagChipRow: View {
+    let flags: [ChildFlag]
+    var limit: Int = 3
+    var body: some View {
+        if !flags.isEmpty {
+            HStack(spacing: 4) {
+                ForEach(flags.prefix(limit)) { ChildFlagChip(flag: $0) }
+                if flags.count > limit {
+                    Text("+\(flags.count - limit)")
+                        .font(.cfCaption2)
+                        .foregroundColor(.cfTextSecondary)
+                }
+            }
+        }
+    }
+}
+
 struct ChildRow: View {
     let child: Child
     var showRoom: Bool = true
@@ -212,6 +246,7 @@ struct ChildRow: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+                FlagChipRow(flags: child.flags).padding(.top, 1)
             }
             Spacer()
             HealthStatusBadge(status: child.healthStatus)
@@ -241,6 +276,15 @@ struct ChildDetailView: View {
                 Text(child.classroom)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
+                if !child.flags.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(child.flags) { ChildFlagChip(flag: $0) }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .padding(.top, 2)
+                }
             }
             .padding()
 

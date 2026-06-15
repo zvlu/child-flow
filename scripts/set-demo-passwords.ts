@@ -90,6 +90,27 @@ async function main() {
     }
   }
 
+  // Demo color-coded safety flags on the first few children (idempotent).
+  const [flagCountRows] = await conn.execute("SELECT COUNT(*) AS n FROM child_flags");
+  if ((flagCountRows as Array<{ n: number }>)[0].n === 0) {
+    const [kids] = await conn.execute("SELECT id FROM children ORDER BY id LIMIT 4");
+    const ids = (kids as Array<{ id: number }>).map(k => k.id);
+    if (ids.length >= 4) {
+      await conn.execute(
+        `INSERT INTO child_flags (childId, type, label, detail) VALUES
+         (?, 'allergy', 'Peanuts', 'Severe — EpiPen in front office'),
+         (?, 'dietary', 'Vegetarian', NULL),
+         (?, 'allergy', 'Dairy', 'Lactose intolerant'),
+         (?, 'disability', 'IEP', 'Speech therapy 2x/week'),
+         (?, 'special', 'Custody note', 'See family advocate before release')`,
+        [ids[0], ids[0], ids[1], ids[2], ids[3]]
+      );
+      console.log("✓ demo child safety flags created");
+    }
+  } else {
+    console.log("✓ child flags already present");
+  }
+
   console.log(`\nDemo password (all accounts): ${password}`);
   await conn.end();
 }

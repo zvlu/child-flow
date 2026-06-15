@@ -5,7 +5,7 @@
  */
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import {
-  families, children, staff, classrooms, childClassroomAssignments,
+  families, children, staff, classrooms, childClassroomAssignments, childFlags,
   attendance, healthRecords, studentNotes, calendarEvents, documents,
   bulkActionLogs, aiInsights, invoices, payments, activityLogs,
   parentNotifications, digitalDocuments, mealPlans, mealItems, cacfpReports,
@@ -86,6 +86,22 @@ export async function getClassroomRoster(classroomId: number) {
       eq(childClassroomAssignments.isActive, 1),
     ))
     .then(rows => rows.map(r => r.child));
+}
+
+/** Color-coded safety flags for all children in an org (allergy/dietary/…). */
+export async function getChildFlags(organizationId: number) {
+  const db = await requireDb();
+  return db
+    .select({
+      id: childFlags.id,
+      childId: childFlags.childId,
+      type: childFlags.type,
+      label: childFlags.label,
+      detail: childFlags.detail,
+    })
+    .from(childFlags)
+    .innerJoin(children, eq(childFlags.childId, children.id))
+    .where(eq(children.organizationId, organizationId));
 }
 
 /**

@@ -114,6 +114,12 @@ export const appRouter = router({
       .query(async ({ input: organizationId }) => {
         return mod.getChildClassroomMap(organizationId);
       }),
+    // Color-coded safety flags for every child in the org.
+    flags: staffProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId }) => {
+        return mod.getChildFlags(organizationId);
+      }),
   }),
 
   families: router({

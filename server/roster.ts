@@ -1,7 +1,9 @@
 import { and, desc, eq, gte } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
+import { inArray } from "drizzle-orm";
 import {
   attendance,
+  childFlags,
   children,
   families,
   familyGoals,
@@ -92,6 +94,15 @@ export function registerRosterRoutes(app: Express) {
       return "Up to date";
     };
 
+    const kidIds = kids.map(k => k.id);
+    const flagRows = kidIds.length
+      ? await db.select().from(childFlags).where(inArray(childFlags.childId, kidIds))
+      : [];
+    const flagsForChild = (childId: number) =>
+      flagRows
+        .filter(f => f.childId === childId)
+        .map(f => ({ id: String(f.id), type: f.type, label: f.label }));
+
     res.json(
       kids.map(c => {
         const assignment = roomByChild.get(c.id);
@@ -114,6 +125,7 @@ export function registerRosterRoutes(app: Express) {
           parentName: family?.primaryContactName ?? "",
           parentPhone: family?.primaryContactPhone ?? "",
           allergies: [] as string[],
+          flags: flagsForChild(c.id),
         };
       })
     );

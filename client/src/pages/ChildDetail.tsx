@@ -20,6 +20,7 @@ import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { FlagChips } from "@/components/FlagChips";
 
 interface ChildDetailProps { id: string; }
 
@@ -80,6 +81,8 @@ export default function ChildDetail({ id }: ChildDetailProps) {
     { organizationId: ORGANIZATION_ID, childId },
     { enabled: !isNaN(childId) }
   );
+  const { data: allFlags } = trpc.children.flags.useQuery(ORGANIZATION_ID);
+  const childFlagList = (allFlags ?? []).filter((f: any) => f.childId === childId);
   const { data: documents, isLoading: isDocumentsLoading } = trpc.documents.list.useQuery(
     { organizationId: ORGANIZATION_ID, childId },
     { enabled: !isNaN(childId) }
@@ -252,6 +255,9 @@ export default function ChildDetail({ id }: ChildDetailProps) {
               {childStatusBadge(child.status)}
               <span className="text-sm text-slate-500 font-medium">{age} &bull; {classroomName} &bull; {teacherName}</span>
             </div>
+            {childFlagList.length > 0 && (
+              <div className="mt-2"><FlagChips flags={childFlagList} /></div>
+            )}
           </div>
         </div>
         <Button

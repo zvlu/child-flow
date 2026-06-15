@@ -15,6 +15,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
+import { FlagChips } from "@/components/FlagChips";
 
 const healthBadge = (status: string) => {
   if (status === "current") return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Current</Badge>;
@@ -56,6 +57,7 @@ export default function Children() {
 
   const { data: children, isLoading } = trpc.children.list.useQuery(ORGANIZATION_ID);
   const { data: classroomMap } = trpc.children.classroomMap.useQuery(ORGANIZATION_ID);
+  const { data: childFlags } = trpc.children.flags.useQuery(ORGANIZATION_ID);
   const { data: families } = trpc.families.list.useQuery(ORGANIZATION_ID);
   const { data: healthRecords } = trpc.health.list.useQuery({ organizationId: ORGANIZATION_ID });
 
@@ -96,6 +98,15 @@ export default function Children() {
     (families ?? []).forEach((f: any) => f.primaryContactPhone && m.set(f.id, f.primaryContactPhone));
     return m;
   }, [families]);
+
+  const flagsByChild = useMemo(() => {
+    const m = new Map<number, any[]>();
+    (childFlags ?? []).forEach((f: any) => {
+      if (!m.has(f.childId)) m.set(f.childId, []);
+      m.get(f.childId)!.push(f);
+    });
+    return m;
+  }, [childFlags]);
 
   // Health status per child: any overdue -> overdue, any due_soon -> due_soon, else current
   const healthStatusByChild = useMemo(() => {
@@ -301,6 +312,7 @@ export default function Children() {
                               <p className="text-xs text-muted-foreground truncate">
                                 {classroomByChild.get(child.id) ?? "No room"} · {formatAge(child.dateOfBirth)}
                               </p>
+                              <div className="mt-1"><FlagChips flags={flagsByChild.get(child.id) ?? []} limit={2} /></div>
                             </div>
                           </div>
                         </Link>
@@ -348,6 +360,7 @@ export default function Children() {
                           <div>
                             <p className="font-semibold text-sm text-foreground">{child.firstName} {child.lastName}</p>
                             <p className="text-xs text-muted-foreground">DOB: {formatDate(child.dateOfBirth)}</p>
+                            <div className="mt-1"><FlagChips flags={flagsByChild.get(child.id) ?? []} limit={3} /></div>
                           </div>
                         </div>
                       </td>

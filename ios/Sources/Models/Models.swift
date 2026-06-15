@@ -30,9 +30,43 @@ struct Child: Codable, Identifiable {
     let parentName: String
     let parentPhone: String
     let allergies: [String]
+    /// Color-coded safety flags (allergy / dietary / disability / special).
+    var flags: [ChildFlag] = []
 
     var fullName: String { "\(firstName) \(lastName)" }
     var initials: String { "\(firstName.prefix(1))\(lastName.prefix(1))" }
+}
+
+/// A color-coded safety flag shown on a child wherever they appear.
+struct ChildFlag: Codable, Identifiable {
+    let id: String
+    let type: String   // allergy | dietary | disability | special
+    let label: String
+
+    var color: Color {
+        switch type {
+        case "allergy":    return .cfFlagAllergy
+        case "dietary":    return .cfFlagDietary
+        case "disability": return .cfFlagDisability
+        default:           return .cfFlagSpecial
+        }
+    }
+    var bgColor: Color {
+        switch type {
+        case "allergy":    return .cfFlagAllergyBg
+        case "dietary":    return .cfFlagDietaryBg
+        case "disability": return .cfFlagDisabilityBg
+        default:           return .cfFlagSpecialBg
+        }
+    }
+    var icon: String {
+        switch type {
+        case "allergy":    return "exclamationmark.triangle.fill"
+        case "dietary":    return "fork.knife"
+        case "disability": return "figure.roll"
+        default:           return "star.fill"
+        }
+    }
 }
 
 /// A classroom with live enrollment, used to organize children by room.

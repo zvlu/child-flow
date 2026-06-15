@@ -109,6 +109,24 @@ export type Child = typeof children.$inferSelect;
 export type InsertChild = typeof children.$inferInsert;
 
 /**
+ * Color-coded safety flags surfaced on a child everywhere they appear, so
+ * staff see allergies / dietary / disability / special needs at a glance.
+ */
+export const childFlags = mysqlTable("child_flags", {
+  id: int("id").autoincrement().primaryKey(),
+  childId: int("childId").notNull().references(() => children.id),
+  type: mysqlEnum("type", ["allergy", "dietary", "disability", "special"]).notNull(),
+  /** Short label shown on the chip, e.g. "Peanuts", "Vegetarian", "IEP". */
+  label: varchar("label", { length: 100 }).notNull(),
+  /** Optional detail for the child's profile (not shown on the chip). */
+  detail: text("detail"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ChildFlag = typeof childFlags.$inferSelect;
+export type InsertChildFlag = typeof childFlags.$inferInsert;
+
+/**
  * Staff table for storing staff member information.
  */
 export const staff = mysqlTable("staff", {
