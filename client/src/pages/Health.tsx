@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,10 +65,18 @@ const ageString = (dob: unknown) => {
 const formatDate = (d: unknown) =>
   d ? new Date(d as string | Date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "—";
 
+const VALID_HEALTH_FILTERS = ["all", "current", "due_soon", "overdue"];
+
 export default function Health() {
   const [, navigate] = useLocation();
+  const search0 = useSearch();
+  // Deep-link support: /health?status=overdue lands pre-filtered.
+  const initialFilter = (() => {
+    const s = new URLSearchParams(search0).get("status") ?? "all";
+    return VALID_HEALTH_FILTERS.includes(s) ? s : "all";
+  })();
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(initialFilter);
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({
     childId: "",

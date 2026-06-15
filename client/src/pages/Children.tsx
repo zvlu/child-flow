@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,8 +49,10 @@ function formatDate(x: string | Date | null | undefined): string {
 
 export default function Children() {
   const [search, setSearch] = useState("");
-  const [classroomFilter, setClassroomFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  // Deep-link support: /children?status=active&classroom=Butterflies pre-filters.
+  const searchParams = new URLSearchParams(useSearch());
+  const [classroomFilter, setClassroomFilter] = useState(searchParams.get("classroom") ?? "all");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "all");
   const [viewMode, setViewMode] = useState<"list" | "family">("list");
 
   const utils = trpc.useUtils();

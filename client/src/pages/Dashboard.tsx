@@ -85,7 +85,7 @@ export default function Dashboard() {
         title: "Total Enrolled",
         value: stats ? String(stats.activeChildren) : "—",
         subtext: stats ? `${stats.totalChildren} total on record` : "Loading...",
-        href: "/children",
+        href: "/children?status=active",
         borderClass: "border-l-primary",
         iconBgClass: "bg-primary/10",
         iconClass: "text-primary",
@@ -173,7 +173,7 @@ export default function Dashboard() {
 
   // ---- Alerts: health follow-ups + actionable AI insights ----
   const alerts = useMemo(() => {
-    const items: { id: string; message: string; severity: "high" | "medium" | "low"; time: string }[] = [];
+    const items: { id: string; message: string; severity: "high" | "medium" | "low"; time: string; href: string }[] = [];
     for (const fu of followUps ?? []) {
       items.push({
         id: `health-${fu.recordId}`,
@@ -183,6 +183,8 @@ export default function Dashboard() {
           fu.severity === "overdue"
             ? `Overdue by ${Math.abs(fu.daysUntilDue)} days`
             : `Due in ${fu.daysUntilDue} days`,
+        // Land directly on Health pre-filtered to the slice that needs action.
+        href: fu.severity === "overdue" ? "/health?status=overdue" : "/health?status=due_soon",
       });
     }
     for (const ins of insights ?? []) {
@@ -192,6 +194,7 @@ export default function Dashboard() {
         message: ins.title,
         severity: ins.priority === "critical" || ins.priority === "high" ? "high" : ins.priority === "medium" ? "medium" : "low",
         time: new Date(ins.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        href: "/action-queue",
       });
     }
     const rank = { high: 0, medium: 1, low: 2 } as const;
@@ -441,7 +444,7 @@ export default function Dashboard() {
               <p className="text-sm text-muted-foreground py-4 text-center">No open action items. Nice work!</p>
             ) : (
               alerts.slice(0, 5).map((alert) => (
-                <Link key={alert.id} href="/action-queue">
+                <Link key={alert.id} href={alert.href}>
                   <a className={`flex items-start gap-3 p-3 rounded-lg border text-sm transition-shadow hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${severityColors[alert.severity]}`}>
                     <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
