@@ -362,12 +362,55 @@ struct ChildAttendanceTab: View {
 
 struct ChildFamilyTab: View {
     let child: Child
+    @State private var family: Family?
+    @State private var isLoading = true
+
     var body: some View {
         List {
             Section("Primary Contact") {
-                LabeledContent("Name", value: child.parentName)
-                LabeledContent("Phone", value: child.parentPhone)
+                LabeledContent("Name", value: child.parentName.isEmpty ? "—" : child.parentName)
+                if !child.parentPhone.isEmpty {
+                    LabeledContent("Phone", value: child.parentPhone)
+                }
             }
+
+            Section {
+                if let family {
+                    // Tap through to the full family hub (siblings, contacts,
+                    // goals, case notes, FNA, CFCR…).
+                    NavigationLink(destination: FamilyDetailView(family: family)) {
+                        Label("Open Family Record", systemImage: "house.fill")
+                            .foregroundColor(.cfPrimary)
+                    }
+                    NavigationLink(destination: FamilyDetailView(family: family, initialTab: .notes)) {
+                        Label("Case Notes", systemImage: "note.text")
+                    }
+                    NavigationLink(destination: FamilyDetailView(family: family, initialTab: .goals)) {
+                        Label("Family Goals", systemImage: "target")
+                    }
+                } else if isLoading {
+                    HStack { Spacer(); ProgressView(); Spacer() }
+                } else {
+                    Text("No linked family record.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } header: {
+                Text("Family Record")
+            } footer: {
+                if let family, family.childrenCount > 1 {
+                    Text("\(family.childrenCount) children in this family.")
+                }
+            }
+        }
+        .task {
+            let families = (try? await APIClient.shared.getFamilies()) ?? MockData.families
+            family = families.first { f in
+                if let fid = child.familyId, !fid.isEmpty { return f.id == fid }
+                // Demo fallback when the child carries no familyId.
+                return f.name == child.parentName || f.name.contains(child.lastName)
+            }
+            isLoading = false
         }
     }
 }

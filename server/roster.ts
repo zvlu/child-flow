@@ -1,9 +1,11 @@
-import { and, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gte } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
 import {
   attendance,
   children,
   families,
+  familyGoals,
+  familyServices,
   healthRecords,
   organizations,
   type User,
@@ -148,6 +150,60 @@ export function registerRosterRoutes(app: Express) {
           assistantName: r.assistantName ?? "",
           color: r.color ?? "#3b82f6",
         }))
+    );
+  });
+
+  /** Families for the staff iOS app (Family Services hub + child→family links). */
+  app.get("/api/families", async (req: Request, res: Response) => {
+    const user = await requireStaff(req);
+    if (!user) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const [org] = await db.select().from(organizations).limit(1);
+    if (!org) {
+      res.json([]);
+      return;
+    }
+
+    const familyRows = await db.select().from(families).where(eq(families.organizationId, org.id));
+    const kids = await db
+      .select({ id: children.id, familyId: children.familyId })
+      .from(children)
+      .where(eq(children.organizationId, org.id));
+    const services = await db
+      .select()
+      .from(familyServices)
+      .where(eq(familyServices.organizationId, org.id))
+      .orderBy(desc(familyServices.serviceDate));
+    const goals = await db.select().from(familyGoals);
+
+    const longDate = (d: Date) =>
+      d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
+    res.json(
+      familyRows.map(f => {
+        const lastService = services.find(s => s.familyId === f.id);
+        const nextVisit = services
+          .filter(s => s.familyId === f.id && s.followUpDate && s.followUpDate > new Date())
+          .sort((a, b) => a.followUpDate!.getTime() - b.followUpDate!.getTime())[0];
+        return {
+          id: String(f.id),
+          name: f.primaryContactName,
+          phone: f.primaryContactPhone ?? "",
+          email: f.primaryContactEmail ?? "",
+          address: [f.address, f.city, f.state].filter(Boolean).join(", "),
+          childrenCount: kids.filter(k => k.familyId === f.id).length,
+          lastContact: lastService ? longDate(lastService.serviceDate) : "No contact yet",
+          nextHomeVisit: nextVisit?.followUpDate ? longDate(nextVisit.followUpDate) : "Not scheduled",
+          goals: goals.filter(g => g.familyId === f.id).map(g => g.title),
+        };
+      })
     );
   });
 
