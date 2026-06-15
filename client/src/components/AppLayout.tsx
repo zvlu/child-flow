@@ -160,12 +160,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const initials = user?.name
     ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
-    : "CF";
+    : "S";
 
   return (
     <div className="flex h-screen bg-background overflow-hidden flex-col">
       {/* Top Navigation Bar - Matching ChildPlus Style */}
-      <header className="h-14 bg-[#5b4a8c] text-white flex items-center px-3 md:px-4 gap-2 flex-shrink-0 shadow-md z-20">
+      <header className="h-14 bg-[#2E4034] text-white flex items-center px-3 md:px-4 gap-2 flex-shrink-0 shadow-md z-20">
         <Button
           variant="ghost"
           size="icon"
@@ -485,7 +485,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </header>
 
           {/* Page content */}
-          <main className="flex-1 overflow-y-auto bg-[#f8fafc]">
+          <main className="flex-1 overflow-y-auto bg-[#FBF6EE]">
             {children}
           </main>
         </div>

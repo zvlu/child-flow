@@ -29,48 +29,58 @@ extension Color {
 
 // MARK: - Brand Colors
 extension Color {
-    // Primary — Modern teal: trust + growth
-    static let cfPrimary      = Color(hex: "006D77")
-    static let cfPrimaryLight = Color(hex: "E0F4F5")  // soft teal tint for backgrounds
-    static let cfPrimaryDark  = Color(hex: "004D56")  // deeper teal for dark mode / pressed
+    // Primary — Sage green: calm, natural growth
+    static let cfPrimary      = Color(hex: "4F7C5D")
+    static let cfPrimaryLight = Color(hex: "E7F0E9")  // soft sage tint for backgrounds
+    static let cfPrimaryDark  = Color(hex: "3C5E47")  // deeper sage for pressed states
 
-    // Accent — Warm coral: energy, CTAs, health
-    static let cfAccent       = Color(hex: "FF6B5E")
-    static let cfAccentLight  = Color(hex: "FFF0EF")  // soft coral tint
+    // Accent — Soft peach: warmth, CTAs (deep enough for white text)
+    static let cfAccent       = Color(hex: "C96E47")
+    static let cfAccentLight  = Color(hex: "FCEDE6")  // soft peach tint
 
-    // Semantic module colors
-    static let cfChildren     = Color(hex: "3B82F6")  // Blue — people, children
-    static let cfChildrenBg   = Color(hex: "EFF6FF")
+    // Semantic module colors — kept distinct for wayfinding, warmed for cream
+    static let cfChildren     = Color(hex: "3F7CB8")  // Blue — people, children
+    static let cfChildrenBg   = Color(hex: "E8F1FA")
 
-    static let cfAttendance   = Color(hex: "10B981")  // Green — success, growth
-    static let cfAttendanceBg = Color(hex: "ECFDF5")
+    static let cfAttendance   = Color(hex: "4E9E6A")  // Green — success, growth
+    static let cfAttendanceBg = Color(hex: "E9F4EC")
 
-    static let cfHealth       = Color(hex: "FF6B5E")  // Coral — health, urgency
-    static let cfHealthBg     = Color(hex: "FFF0EF")
+    static let cfHealth       = Color(hex: "D65745")  // Warm red — health, urgency
+    static let cfHealthBg     = Color(hex: "FBEAE7")
 
-    static let cfCompliance   = Color(hex: "8B5CF6")  // Purple — achievements, compliance
-    static let cfComplianceBg = Color(hex: "F5F3FF")
+    static let cfCompliance   = Color(hex: "8A6BC4")  // Purple — compliance
+    static let cfComplianceBg = Color(hex: "F1ECFA")
 
-    static let cfFamily       = Color(hex: "F59E0B")  // Amber — family warmth
-    static let cfFamilyBg     = Color(hex: "FFFBEB")
+    static let cfFamily       = Color(hex: "D98A2B")  // Amber — family warmth
+    static let cfFamilyBg     = Color(hex: "FBF0DD")
 
-    static let cfGoals        = Color(hex: "06B6D4")  // Cyan — progress, goals
-    static let cfGoalsBg      = Color(hex: "ECFEFF")
+    static let cfGoals        = Color(hex: "2F8F8F")  // Teal — progress, goals
+    static let cfGoalsBg      = Color(hex: "E3F2F1")
 
-    // Neutrals
-    static let cfBackground   = Color(hex: "F8FAFC")  // App background
+    // Neutrals — warm cream
+    static let cfBackground   = Color(hex: "FBF6EE")  // App background (cream)
     static let cfSurface      = Color.white            // Card surface
-    static let cfBorder       = Color(hex: "E2E8F0")  // Dividers
+    static let cfBorder       = Color(hex: "EAE0D2")  // Warm dividers
 
-    // Text
-    static let cfTextPrimary  = Color(hex: "1E293B")  // Deep slate — high contrast
-    static let cfTextSecondary = Color(hex: "64748B") // Muted gray — labels
+    // Text — warm charcoal
+    static let cfTextPrimary  = Color(hex: "2E2A26")  // Warm charcoal — high contrast
+    static let cfTextSecondary = Color(hex: "6E6358") // Warm taupe — labels
 
     // Status
-    static let cfSuccess      = Color(hex: "10B981")
-    static let cfWarning      = Color(hex: "F59E0B")
-    static let cfError        = Color(hex: "EF4444")
-    static let cfInfo         = Color(hex: "3B82F6")
+    static let cfSuccess      = Color(hex: "4E9E6A")
+    static let cfWarning      = Color(hex: "D98A2B")
+    static let cfError        = Color(hex: "D65745")
+    static let cfInfo         = Color(hex: "3F7CB8")
+
+    // Color-coded child flags — allergy / dietary / disability / special need
+    static let cfFlagAllergy      = Color(hex: "C0392B")
+    static let cfFlagAllergyBg    = Color(hex: "FBEAEA")
+    static let cfFlagDietary      = Color(hex: "B5740F")
+    static let cfFlagDietaryBg    = Color(hex: "FBF0DD")
+    static let cfFlagDisability   = Color(hex: "4A4F9E")
+    static let cfFlagDisabilityBg = Color(hex: "ECECF8")
+    static let cfFlagSpecial      = Color(hex: "1F6FB2")
+    static let cfFlagSpecialBg    = Color(hex: "E8F1FA")
 }
 
 // MARK: - Typography Scale

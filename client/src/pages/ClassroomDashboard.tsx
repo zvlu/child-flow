@@ -312,14 +312,14 @@ export default function ClassroomDashboard() {
 
   if (isLoading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[400px] bg-[#f8fafc]">
+      <div className="p-6 flex items-center justify-center min-h-[400px] bg-[#FBF6EE]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 bg-[#f8fafc] min-h-full">
+    <div className="p-6 space-y-6 bg-[#FBF6EE] min-h-full">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -401,7 +401,7 @@ export default function ClassroomDashboard() {
             const capacity = classroom.capacity ?? 0;
             const fillRatio = capacity > 0 ? classroom.enrolledCount / capacity : 0;
             const isFull = capacity > 0 && classroom.enrolledCount >= capacity;
-            const barColor = isFull ? "bg-red-500" : fillRatio >= 0.85 ? "bg-amber-500" : "bg-emerald-500";
+            const barColor = isFull ? "bg-red-500" : fillRatio >= 0.85 ? "bg-amber-500" : "bg-[#4E9E6A]";
 
             return (
               <div key={classroom.id} className="space-y-4">

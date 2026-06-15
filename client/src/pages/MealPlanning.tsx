@@ -136,10 +136,10 @@ export function MealPlanning() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <Apple className="w-8 h-8 text-teal-600" />
+              <Apple className="w-8 h-8 text-[#4F7C5D]" />
               <h1 className="text-4xl font-bold text-slate-900">CACFP Meal Planning</h1>
             </div>
-            <button onClick={() => setShowModal(true)} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
+            <button onClick={() => setShowModal(true)} className="bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
               <Plus className="w-5 h-5" />
               New Meal Plan
             </button>
@@ -176,7 +176,7 @@ export function MealPlanning() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             {allPlans.map((plan) => (
-              <div key={plan.id} onClick={() => setSelectedPlanId(plan.id)} className={`rounded-2xl shadow-sm border-2 p-6 cursor-pointer transition-all ${effectivePlanId === plan.id ? "border-teal-500 bg-teal-50" : "border-slate-200 bg-white hover:border-teal-300"}`}>
+              <div key={plan.id} onClick={() => setSelectedPlanId(plan.id)} className={`rounded-2xl shadow-sm border-2 p-6 cursor-pointer transition-all ${effectivePlanId === plan.id ? "border-[#5E8C6A] bg-[#F1F6F2]" : "border-slate-200 bg-white hover:border-[#A7C4AD]"}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-slate-900">{formatWeek(plan.weekStartDate)}</h3>
@@ -319,7 +319,7 @@ export function MealPlanning() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Classroom</label>
-                    <select value={newClassroomId} onChange={(e) => setNewClassroomId(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    <select value={newClassroomId} onChange={(e) => setNewClassroomId(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
                       <option value="">Select classroom...</option>
                       {(classrooms ?? []).map((c) => (
                         <option key={c.id} value={c.id}>{c.name}</option>
@@ -328,18 +328,18 @@ export function MealPlanning() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Week Starting</label>
-                    <input type="date" value={newWeekStart} onChange={(e) => setNewWeekStart(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    <input type="date" value={newWeekStart} onChange={(e) => setNewWeekStart(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]" />
                   </div>
                 </div>
                 {selectedPlan && planItems.length > 0 && (
                   <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <input type="checkbox" checked={copyFromSelected} onChange={(e) => setCopyFromSelected(e.target.checked)} className="rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
+                    <input type="checkbox" checked={copyFromSelected} onChange={(e) => setCopyFromSelected(e.target.checked)} className="rounded border-slate-300 text-[#4F7C5D] focus:ring-[#5E8C6A]" />
                     Copy menu items from selected plan ({formatWeek(selectedPlan.weekStartDate)}, {selectedPlan.classroomName})
                   </label>
                 )}
                 <div className="flex gap-3 pt-4">
                   <button onClick={() => setShowModal(false)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
-                  <button onClick={handleCreatePlan} disabled={createPlan.isPending} className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium">
+                  <button onClick={handleCreatePlan} disabled={createPlan.isPending} className="flex-1 bg-[#4F7C5D] hover:bg-[#3C5E47] disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium">
                     {createPlan.isPending ? "Creating..." : "Create Plan"}
                   </button>
                 </div>

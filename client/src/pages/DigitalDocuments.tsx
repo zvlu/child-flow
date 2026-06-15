@@ -28,10 +28,10 @@ export function DigitalDocuments() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <FileText className="w-8 h-8 text-teal-600" />
+              <FileText className="w-8 h-8 text-[#4F7C5D]" />
               <h1 className="text-4xl font-bold text-slate-900">Digital Documents</h1>
             </div>
-            <button onClick={() => setShowUploadModal(true)} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
+            <button onClick={() => setShowUploadModal(true)} className="bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
               <Upload className="w-5 h-5" />
               Upload Document
             </button>
@@ -56,7 +56,7 @@ export function DigitalDocuments() {
 
         {/* Filter */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500">
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
             <option value="all">All Documents</option>
             <option value="signed">Signed</option>
             <option value="pending">Pending</option>
@@ -118,7 +118,7 @@ export function DigitalDocuments() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Document Type</label>
-                  <select className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500">
+                  <select className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
                     <option>Enrollment Form</option>
                     <option>Health Consent</option>
                     <option>Waiver</option>
@@ -127,7 +127,7 @@ export function DigitalDocuments() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Family</label>
-                  <select className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500">
+                  <select className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
                     <option>Select family...</option>
                     <option>Johnson Family</option>
                     <option>Chen Family</option>
@@ -135,14 +135,14 @@ export function DigitalDocuments() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Upload File</label>
-                  <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-teal-500 transition-colors cursor-pointer">
+                  <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-[#5E8C6A] transition-colors cursor-pointer">
                     <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                     <p className="text-sm text-slate-600">Drag and drop or click to upload</p>
                   </div>
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button onClick={() => setShowUploadModal(false)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
-                  <button className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl transition-colors font-medium">Upload</button>
+                  <button className="flex-1 bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl transition-colors font-medium">Upload</button>
                 </div>
               </div>
             </div>

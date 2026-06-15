@@ -215,7 +215,7 @@ export default function PerformancePanel() {
   );
 
   return (
-    <div className="h-full flex flex-col bg-[#f8fafc] overflow-hidden">
+    <div className="h-full flex flex-col bg-[#FBF6EE] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-8 py-4 bg-white border-b border-slate-100 flex-shrink-0">
         <div className="flex items-center gap-3">

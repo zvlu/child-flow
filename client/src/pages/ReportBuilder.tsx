@@ -36,10 +36,10 @@ export function ReportBuilder() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <BarChart3 className="w-8 h-8 text-teal-600" />
+              <BarChart3 className="w-8 h-8 text-[#4F7C5D]" />
               <h1 className="text-4xl font-bold text-slate-900">Report Builder</h1>
             </div>
-            <button onClick={() => setShowBuilder(true)} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
+            <button onClick={() => setShowBuilder(true)} className="bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
               <Plus className="w-5 h-5" />
               New Report
             </button>
@@ -52,7 +52,7 @@ export function ReportBuilder() {
             <h2 className="text-2xl font-bold text-slate-900 mb-4">Quick Templates</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
               {reportTypes.map((type) => (
-                <button key={type.id} onClick={() => { setNewReport({ ...newReport, type: type.id }); setShowBuilder(true); }} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-teal-300 transition-all text-left">
+                <button key={type.id} onClick={() => { setNewReport({ ...newReport, type: type.id }); setShowBuilder(true); }} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-[#A7C4AD] transition-all text-left">
                   <h3 className="font-semibold text-slate-900 mb-1">{type.label}</h3>
                   <p className="text-sm text-slate-600">{type.description}</p>
                 </button>
@@ -104,13 +104,13 @@ export function ReportBuilder() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Report Name</label>
-                  <input type="text" value={newReport.name} onChange={(e) => setNewReport({ ...newReport, name: e.target.value })} placeholder="e.g., Monthly Enrollment Summary" className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                  <input type="text" value={newReport.name} onChange={(e) => setNewReport({ ...newReport, name: e.target.value })} placeholder="e.g., Monthly Enrollment Summary" className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Report Type</label>
-                    <select value={newReport.type} onChange={(e) => setNewReport({ ...newReport, type: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    <select value={newReport.type} onChange={(e) => setNewReport({ ...newReport, type: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
                       {reportTypes.map((type) => (
                         <option key={type.id} value={type.id}>{type.label}</option>
                       ))}
@@ -118,7 +118,7 @@ export function ReportBuilder() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Frequency</label>
-                    <select value={newReport.frequency} onChange={(e) => setNewReport({ ...newReport, frequency: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    <select value={newReport.frequency} onChange={(e) => setNewReport({ ...newReport, frequency: e.target.value })} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
                       <option value="daily">Daily</option>
                       <option value="weekly">Weekly</option>
                       <option value="monthly">Monthly</option>
@@ -141,7 +141,7 @@ export function ReportBuilder() {
 
                 <div className="flex gap-3 pt-4">
                   <button onClick={() => setShowBuilder(false)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
-                  <button onClick={handleCreateReport} className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl transition-colors font-medium">Create Report</button>
+                  <button onClick={handleCreateReport} className="flex-1 bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl transition-colors font-medium">Create Report</button>
                 </div>
               </div>
             </div>

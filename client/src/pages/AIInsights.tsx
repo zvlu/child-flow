@@ -124,7 +124,7 @@ export function AIInsights() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Sparkles className="w-8 h-8 text-teal-600" />
+            <Sparkles className="w-8 h-8 text-[#4F7C5D]" />
             <h1 className="text-4xl font-bold text-slate-900">AI Insights</h1>
           </div>
           <p className="text-slate-600">
@@ -142,7 +142,7 @@ export function AIInsights() {
                   {filteredInsights.length}
                 </p>
               </div>
-              <Sparkles className="w-10 h-10 text-teal-100" />
+              <Sparkles className="w-10 h-10 text-[#E7F0E9]" />
             </div>
           </div>
 
@@ -181,7 +181,7 @@ export function AIInsights() {
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
               >
                 <option value="all">All Priorities</option>
                 <option value="critical">Critical</option>
@@ -198,7 +198,7 @@ export function AIInsights() {
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
               >
                 <option value="all">All Types</option>
                 {insightTypes.map((type) => (
@@ -285,14 +285,14 @@ export function AIInsights() {
         </div>
 
         {/* Info Box */}
-        <div className="mt-8 bg-teal-50 border border-teal-200 rounded-2xl p-6">
+        <div className="mt-8 bg-[#F1F6F2] border border-[#CFE0D3] rounded-2xl p-6">
           <div className="flex gap-4">
-            <Sparkles className="w-6 h-6 text-teal-600 flex-shrink-0 mt-1" />
+            <Sparkles className="w-6 h-6 text-[#4F7C5D] flex-shrink-0 mt-1" />
             <div>
-              <h3 className="font-semibold text-teal-900 mb-1">
+              <h3 className="font-semibold text-[#24382B] mb-1">
                 How AI Insights Work
               </h3>
-              <p className="text-sm text-teal-800">
+              <p className="text-sm text-[#2E4838]">
                 Child-flow uses AI to analyze your program data and generate
                 actionable insights. Our system monitors compliance deadlines,
                 health requirements, developmental milestones, and behavioral

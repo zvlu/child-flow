@@ -21,7 +21,7 @@ const quickActions = [
   { label: "Health Records", href: "/health", icon: Heart, color: "bg-red-50 text-red-700 hover:bg-red-100 border-red-200" },
   { label: "Family Services", href: "/family-services", icon: Home, color: "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200" },
   { label: "Run Report", href: "/reports", icon: Activity, color: "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200" },
-  { label: "Compliance", href: "/compliance", icon: ShieldCheck, color: "bg-teal-50 text-teal-700 hover:bg-teal-100 border-teal-200" },
+  { label: "Compliance", href: "/compliance", icon: ShieldCheck, color: "bg-[#F1F6F2] text-[#3C5E47] hover:bg-[#E7F0E9] border-[#CFE0D3]" },
 ];
 
 const severityColors: Record<string, string> = {

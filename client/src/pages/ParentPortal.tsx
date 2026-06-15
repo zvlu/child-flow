@@ -58,8 +58,8 @@ export function ParentPortal() {
               const Icon = getActivityIcon(activity.type);
               return (
                 <div key={activity.id} className="flex items-start gap-4 pb-4 border-b border-slate-200 last:border-0">
-                  <div className="bg-teal-100 rounded-xl p-3 flex-shrink-0">
-                    <Icon className="w-6 h-6 text-teal-600" />
+                  <div className="bg-[#E7F0E9] rounded-xl p-3 flex-shrink-0">
+                    <Icon className="w-6 h-6 text-[#4F7C5D]" />
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-slate-600">{activity.time}</p>
@@ -106,17 +106,17 @@ export function ParentPortal() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
           <h3 className="text-lg font-bold text-slate-900 mb-4">Message Teacher</h3>
           <div className="space-y-3">
-            <textarea placeholder="Send a message to your child's teacher..." className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none" rows={3} />
-            <button className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-xl transition-colors font-medium">Send Message</button>
+            <textarea placeholder="Send a message to your child's teacher..." className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] resize-none" rows={3} />
+            <button className="bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-6 py-2 rounded-xl transition-colors font-medium">Send Message</button>
           </div>
         </div>
 
         {/* Gallery Link */}
-        <div className="mt-6 bg-gradient-to-r from-teal-50 to-blue-50 rounded-2xl border border-teal-200 p-6 text-center">
-          <Camera className="w-8 h-8 text-teal-600 mx-auto mb-2" />
+        <div className="mt-6 bg-gradient-to-r from-[#F1F6F2] to-blue-50 rounded-2xl border border-[#CFE0D3] p-6 text-center">
+          <Camera className="w-8 h-8 text-[#4F7C5D] mx-auto mb-2" />
           <h3 className="text-lg font-bold text-slate-900 mb-2">Photo Gallery</h3>
           <p className="text-slate-600 mb-4">View photos and videos from today's activities</p>
-          <button className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-xl transition-colors font-medium">View Gallery</button>
+          <button className="bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-6 py-2 rounded-xl transition-colors font-medium">View Gallery</button>
         </div>
       </div>
     </div>

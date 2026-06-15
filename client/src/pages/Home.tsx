@@ -4,10 +4,10 @@ import { Link } from "wouter";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-green-100 flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#F1F6F2] to-green-100 flex flex-col items-center justify-center px-4">
       <div className="text-center max-w-2xl">
         <div className="mb-6 inline-flex items-center justify-center h-20 w-20 rounded-2xl bg-primary text-white text-4xl font-bold shadow-lg">
-          CF
+          S
         </div>
         <h1 className="text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">Sprout</h1>
         <p className="text-xl text-gray-600 mb-8 font-medium">Modern Head Start Management System</p>
