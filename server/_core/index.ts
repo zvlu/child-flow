@@ -10,6 +10,7 @@ import { registerFamilyRoutes } from "../family";
 import { registerMessagingRoutes } from "../messaging";
 import { registerRosterRoutes } from "../roster";
 import { registerAbsenceRoutes } from "../absences";
+import { registerAttendanceRoutes } from "../attendance";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -51,6 +52,8 @@ async function startServer() {
   registerRosterRoutes(app);
   // Parent-reported absences + advocate review under /api/family/absences, /api/absences
   registerAbsenceRoutes(app);
+  // Teacher attendance + quick notes under /api/attendance, /api/children/:id/notes
+  registerAttendanceRoutes(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API

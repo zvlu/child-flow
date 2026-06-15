@@ -110,6 +110,12 @@ actor APIClient {
         let _: EmptyResponse = try await post("attendance/bulk", body: SaveBody(records: records))
     }
 
+    /// Quick note on a child (teacher one-screen flow).
+    func addQuickNote(childId: String, content: String) async throws {
+        struct Req: Encodable { let content: String }
+        let _: SuccessResponse = try await post("children/\(childId)/notes", body: Req(content: content))
+    }
+
     // MARK: - Health
     func getHealthRecords() async throws -> [HealthRecord] {
         try await get("health")
