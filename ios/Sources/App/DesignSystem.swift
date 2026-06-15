@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - ChildFlow Design System
+// MARK: - Sprout Design System
 // Primary:   Teal   #006D77  — trust, growth, professional edtech
 // Accent:    Coral  #FF6B5E  — energy, warmth, CTAs
 // Semantic module colors follow the 60-30-10 rule:

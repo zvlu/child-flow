@@ -58,7 +58,7 @@ struct PrivacyPolicyView: View {
                     Text("Contact our Privacy Officer:")
                         .foregroundColor(.secondary)
                     Link("privacy@childflow.org", destination: URL(string: "mailto:privacy@childflow.org")!)
-                    Text("ChildFlow\n47 Lovell Ave\nWindsor, CT 06096")
+                    Text("Sprout\n47 Lovell Ave\nWindsor, CT 06096")
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -74,7 +74,7 @@ struct PrivacyPolicyView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Privacy & Security")
                 .font(.title2.bold())
-            Text("How ChildFlow handles the data of the children, families, and staff you serve.")
+            Text("How Sprout handles the data of the children, families, and staff you serve.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }

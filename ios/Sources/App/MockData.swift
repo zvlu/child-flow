@@ -739,7 +739,7 @@ enum MockData {
             ],
             postEventChecklist: [
                 EventChecklistItem(id: "ec12", title: "Record attendance count", isComplete: false, notes: ""),
-                EventChecklistItem(id: "ec13", title: "Document event in ChildFlow", isComplete: false, notes: ""),
+                EventChecklistItem(id: "ec13", title: "Document event in Sprout", isComplete: false, notes: ""),
                 EventChecklistItem(id: "ec14", title: "Collect feedback forms", isComplete: false, notes: "")
             ],
             expectedAttendance: 45,
@@ -811,7 +811,7 @@ enum MockData {
             ],
             postEventChecklist: [
                 EventChecklistItem(id: "eh10", title: "Record attendance (38 families attended)", isComplete: true, notes: ""),
-                EventChecklistItem(id: "eh11", title: "Document event in ChildFlow", isComplete: true, notes: ""),
+                EventChecklistItem(id: "eh11", title: "Document event in Sprout", isComplete: true, notes: ""),
                 EventChecklistItem(id: "eh12", title: "Follow up with families needing dental referrals (6 families)", isComplete: false, notes: "In progress")
             ],
             expectedAttendance: 30,

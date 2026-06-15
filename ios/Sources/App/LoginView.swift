@@ -36,7 +36,7 @@ struct LoginView: View {
                     Image(systemName: "figure.2.and.child.holdinghands")
                         .font(.system(size: 60))
                         .foregroundColor(.accentColor)
-                    Text("ChildFlow")
+                    Text("Sprout")
                         .font(.largeTitle.bold())
                     Text("Head Start Management")
                         .font(.subheadline)
@@ -187,7 +187,7 @@ struct LoginView: View {
         let context = LAContext()
         context.evaluatePolicy(
             .deviceOwnerAuthenticationWithBiometrics,
-            localizedReason: "Sign in to ChildFlow"
+            localizedReason: "Sign in to Sprout"
         ) { success, error in
             Task { @MainActor in
                 guard success else {

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Central API client for all ChildFlow backend requests.
+/// Central API client for all Sprout backend requests.
 /// Configure `baseURL` to point at your deployed server.
 actor APIClient {
     static let shared = APIClient()

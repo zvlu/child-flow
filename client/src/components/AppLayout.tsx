@@ -179,7 +179,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
             <Baby className="h-4 w-4 text-white" />
           </div>
-          <span className="font-bold text-base tracking-tight">ChildFlow</span>
+          <span className="font-bold text-base tracking-tight">Sprout</span>
         </div>
         
         <nav className="hidden md:flex flex-1 items-center h-full min-w-0 overflow-x-auto no-scrollbar">
@@ -420,7 +420,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           {/* Page Header (Breadcrumb style) */}
           <header className="h-10 border-b border-border bg-white flex items-center px-3 md:px-6 gap-3 md:gap-4 flex-shrink-0">
             <div className="flex-1 flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">ChildFlow</span>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Sprout</span>
               <ChevronRight className="h-3 w-3 text-slate-300" />
               <h2 className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">
                 {allSideNavItems.find((i) => isNavItemActive(i.path))?.label || "Dashboard"}

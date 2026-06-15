@@ -9,7 +9,7 @@ export default function Home() {
         <div className="mb-6 inline-flex items-center justify-center h-20 w-20 rounded-2xl bg-primary text-white text-4xl font-bold shadow-lg">
           CF
         </div>
-        <h1 className="text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">ChildFlow</h1>
+        <h1 className="text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">Sprout</h1>
         <p className="text-xl text-gray-600 mb-8 font-medium">Modern Head Start Management System</p>
         <p className="text-gray-600 mb-10 text-lg leading-relaxed">
           The superior alternative to ChildPlus. Streamlined attendance, health records, 
