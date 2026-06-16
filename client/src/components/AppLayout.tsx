@@ -186,7 +186,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           {topNavPrimaryItems.map((item) => {
             const isActive = isTopNavActive(item.path);
             return (
-              <Link key={item.label} href={item.path}>
+              <Link key={item.label} href={item.path} asChild>
                 <a 
                   className={cn(
                     "px-3 md:px-4 h-full flex items-center text-xs font-semibold transition-colors whitespace-nowrap border-b-2 border-transparent",
@@ -220,7 +220,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   const isActive = isTopNavActive(item.path);
                   return (
                     <DropdownMenuItem key={item.path} asChild>
-                      <Link href={item.path}>
+                      <Link href={item.path} asChild>
                         <a className={cn("flex items-center gap-2", isActive && "font-semibold")}>
                           <Icon className="h-4 w-4" />
                           {item.label}
@@ -315,7 +315,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       const isActive = isNavItemActive(item.path);
                       return (
                         <li key={item.path}>
-                          <Link href={item.path}>
+                          <Link href={item.path} asChild>
                             <a
                               onClick={() => setMobileNavOpen(false)}
                               className={cn(
@@ -359,7 +359,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                           const isActive = isNavItemActive(item.path);
                           return (
                             <li key={item.path}>
-                              <Link href={item.path}>
+                              <Link href={item.path} asChild>
                                 <a
                                   onClick={() => setMobileNavOpen(false)}
                                   className={cn(
@@ -454,7 +454,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   ) : (
                     healthFollowUps.slice(0, 6).map((alert) => (
                       <DropdownMenuItem key={alert.recordId} asChild>
-                        <Link href="/health">
+                        <Link href="/health" asChild>
                           <a className="flex flex-col items-start gap-0.5 py-2">
                             <span className={cn(
                               "text-[11px] font-semibold uppercase tracking-wide",
@@ -470,12 +470,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/health">
+                    <Link href="/health" asChild>
                       <a className="text-sm font-medium">Open Health Records</a>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/action-queue">
+                    <Link href="/action-queue" asChild>
                       <a className="text-sm font-medium">Open Action Queue</a>
                     </Link>
                   </DropdownMenuItem>

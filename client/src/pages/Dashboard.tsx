@@ -289,7 +289,7 @@ export default function Dashboard() {
           const TrendIcon = card.trendIcon;
 
           return (
-            <Link key={card.title} href={card.href}>
+            <Link key={card.title} href={card.href} asChild>
               <a className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
                 <motion.div
                   whileHover={reduced ? undefined : { y: -4, scale: 1.01 }}
@@ -330,7 +330,7 @@ export default function Dashboard() {
             {quickActions.map((action) => {
               const Icon = action.icon;
               return (
-                <Link key={action.href} href={action.href}>
+                <Link key={action.href} href={action.href} asChild>
                   <a className="block">
                     <motion.div
                       className={`flex flex-col items-center gap-2 p-3 rounded-xl border cursor-pointer ${action.color}`}
@@ -459,7 +459,7 @@ export default function Dashboard() {
               <p className="text-sm text-muted-foreground py-4 text-center">No open action items. Nice work!</p>
             ) : (
               alerts.slice(0, 5).map((alert) => (
-                <Link key={alert.id} href={alert.href}>
+                <Link key={alert.id} href={alert.href} asChild>
                   <a className={`flex items-start gap-3 p-3 rounded-lg border text-sm transition-shadow hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${severityColors[alert.severity]}`}>
                     <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">

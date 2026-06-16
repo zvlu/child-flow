@@ -811,7 +811,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                 <div className="py-4 text-center text-sm text-slate-400 font-bold">Loading siblings...</div>
               ) : siblings && siblings.filter((s: any) => s.id !== childId).length > 0 ? (
                 siblings.filter((s: any) => s.id !== childId).map((sibling: any) => (
-                  <Link key={sibling.id} href={`/children/${sibling.id}`}>
+                  <Link key={sibling.id} href={`/children/${sibling.id}`} asChild>
                     <a className="flex items-center justify-between p-3 rounded-2xl bg-white border border-primary/10 hover:border-primary/30 hover:shadow-sm transition-all group">
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold">
