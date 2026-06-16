@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Central API client for all ChildFlow backend requests.
 /// Configure `baseURL` to point at your deployed server.
@@ -20,16 +21,38 @@ actor APIClient {
     // MARK: - Auth
     func setToken(_ token: String) {
         authToken = token
-        UserDefaults.standard.set(token, forKey: "auth_token")
+        let data = Data(token.utf8)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: "auth_token",
+            kSecValueData as String: data
+        ]
+        SecItemDelete(query as CFDictionary)
+        SecItemAdd(query as CFDictionary, nil)
     }
 
     func clearToken() {
         authToken = nil
-        UserDefaults.standard.removeObject(forKey: "auth_token")
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: "auth_token"
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 
     func loadStoredToken() {
-        authToken = UserDefaults.standard.string(forKey: "auth_token")
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: "auth_token",
+            kSecReturnData as String: kCFBooleanTrue!,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        if SecItemCopyMatching(query as CFDictionary, &item) == noErr {
+            if let data = item as? Data {
+                authToken = String(data: data, encoding: .utf8)
+            }
+        }
     }
 
     // MARK: - Auth Endpoints

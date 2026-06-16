@@ -749,3 +749,19 @@ export const reportResults = mysqlTable("reportResults", {
 
 export type ReportResult = typeof reportResults.$inferSelect;
 export type InsertReportResult = typeof reportResults.$inferInsert;
+
+// ==================== AUDIT LOGS ====================
+export const auditLogs = mysqlTable("audit_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").references(() => users.id),
+  organizationId: int("organizationId").references(() => organizations.id),
+  action: varchar("action", { length: 255 }).notNull(), // e.g., "child.create", "healthRecord.access"
+  entityType: varchar("entityType", { length: 255 }), // e.g., "child", "healthRecord"
+  entityId: int("entityId"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  details: json("details"), // Store additional context like old/new values
+});
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
