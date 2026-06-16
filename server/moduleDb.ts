@@ -237,6 +237,12 @@ export async function createCalendarEvent(data: InsertCalendarEvent) {
   return { id: result.insertId };
 }
 
+export async function updateCalendarEvent(id: number, data: Partial<InsertCalendarEvent>) {
+  const db = await requireDb();
+  await db.update(calendarEvents).set(data).where(eq(calendarEvents.id, id));
+  return { success: true };
+}
+
 export async function deleteCalendarEvent(id: number) {
   const db = await requireDb();
   await db.delete(calendarEvents).where(eq(calendarEvents.id, id));

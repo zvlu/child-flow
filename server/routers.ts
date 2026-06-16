@@ -344,6 +344,21 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return mod.createCalendarEvent(input);
       }),
+    update: staffProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          title: z.string().min(1).optional(),
+          description: z.string().optional(),
+          eventType: z.enum(["holiday", "school_event", "parent_event", "staff_training", "deadline", "other"]).optional(),
+          startDate: z.date().optional(),
+          location: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        return mod.updateCalendarEvent(id, data);
+      }),
     delete: staffProcedure
       .input(z.number())
       .mutation(async ({ input: id }) => {
