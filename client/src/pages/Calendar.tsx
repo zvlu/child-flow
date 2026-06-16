@@ -13,6 +13,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { trpc } from "@/lib/trpc";
+import { ORGANIZATION_ID } from "@/const";
 
 interface CalendarEvent {
   id: number;
@@ -26,56 +33,7 @@ interface CalendarEvent {
   color: string;
 }
 
-const mockEvents: CalendarEvent[] = [
-  {
-    id: 1,
-    title: "Labor Day - No School",
-    description: "Holiday - Center Closed",
-    eventType: "holiday",
-    startDate: new Date(2025, 8, 1),
-    allDay: true,
-    color: "#ef4444",
-  },
-  {
-    id: 2,
-    title: "Fall Parent Conference",
-    description: "Individual parent-teacher conferences",
-    eventType: "parent_event",
-    startDate: new Date(2025, 8, 15),
-    endDate: new Date(2025, 8, 17),
-    location: "Classrooms",
-    allDay: false,
-    color: "#f59e0b",
-  },
-  {
-    id: 3,
-    title: "Staff Training Day",
-    description: "Professional development training",
-    eventType: "staff_training",
-    startDate: new Date(2025, 8, 20),
-    allDay: true,
-    color: "#8b5cf6",
-  },
-  {
-    id: 4,
-    title: "PIR Submission Deadline",
-    description: "Federal reporting deadline",
-    eventType: "deadline",
-    startDate: new Date(2025, 9, 1),
-    allDay: true,
-    color: "#dc2626",
-  },
-  {
-    id: 5,
-    title: "Fall Festival",
-    description: "Family fun day with games and activities",
-    eventType: "school_event",
-    startDate: new Date(2025, 9, 10),
-    location: "Playground",
-    allDay: false,
-    color: "#10b981",
-  },
-];
+const EVENT_TYPES = ["holiday", "school_event", "parent_event", "staff_training", "deadline", "other"] as const;
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const months = [
@@ -83,9 +41,60 @@ const months = [
   "July", "August", "September", "October", "November", "December"
 ];
 
+const emptyForm = { title: "", eventType: "school_event", date: "", location: "", description: "" };
+
 export default function Calendar() {
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 8, 1)); // September 2025
-  const [events, setEvents] = useState<CalendarEvent[]>(mockEvents);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const utils = trpc.useUtils();
+
+  const { data: rawEvents = [] } = trpc.calendar.list.useQuery(ORGANIZATION_ID);
+  const events: CalendarEvent[] = (rawEvents as any[]).map((e) => ({
+    id: e.id,
+    title: e.title,
+    description: e.description ?? "",
+    eventType: e.eventType ?? "other",
+    startDate: new Date(e.startDate),
+    endDate: e.endDate ? new Date(e.endDate) : undefined,
+    location: e.location ?? undefined,
+    allDay: e.allDay === 1,
+    color: e.color ?? "#3b82f6",
+  }));
+
+  const [showNew, setShowNew] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+
+  const createEvent = trpc.calendar.create.useMutation({
+    onSuccess: () => {
+      utils.calendar.list.invalidate(ORGANIZATION_ID);
+      toast.success("Event created");
+      setShowNew(false);
+      setForm(emptyForm);
+    },
+    onError: (err) => toast.error(err.message || "Couldn't create event"),
+  });
+
+  const deleteEvent = trpc.calendar.delete.useMutation({
+    onSuccess: () => {
+      utils.calendar.list.invalidate(ORGANIZATION_ID);
+      toast.success("Event deleted");
+    },
+    onError: (err) => toast.error(err.message || "Couldn't delete event"),
+  });
+
+  const submitEvent = () => {
+    if (!form.title.trim() || !form.date) {
+      toast.error("Title and date are required");
+      return;
+    }
+    createEvent.mutate({
+      organizationId: ORGANIZATION_ID,
+      title: form.title.trim(),
+      eventType: form.eventType as (typeof EVENT_TYPES)[number],
+      startDate: new Date(`${form.date}T09:00:00`),
+      location: form.location.trim() || undefined,
+      description: form.description.trim() || undefined,
+    });
+  };
 
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -160,7 +169,10 @@ export default function Calendar() {
             <p className="text-sm text-slate-500 font-medium">Track school events, holidays, and important dates</p>
           </div>
         </div>
-        <Button className="rounded-full gap-2 shadow-md hover:shadow-lg transition-all font-bold">
+        <Button
+          onClick={() => { setForm(emptyForm); setShowNew(true); }}
+          className="rounded-full gap-2 shadow-md hover:shadow-lg transition-all font-bold"
+        >
           <Plus className="h-4 w-4" /> New Event
         </Button>
       </div>
@@ -295,7 +307,10 @@ export default function Calendar() {
                           <DropdownMenuItem className="rounded-lg font-bold gap-2">
                             <Edit className="h-4 w-4" /> Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="rounded-lg font-bold gap-2 text-red-600">
+                          <DropdownMenuItem
+                            className="rounded-lg font-bold gap-2 text-red-600"
+                            onClick={() => deleteEvent.mutate(event.id)}
+                          >
                             <Trash2 className="h-4 w-4" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -358,6 +373,72 @@ export default function Calendar() {
           </Card>
         </div>
       </div>
+
+      {/* New Event dialog */}
+      <Dialog open={showNew} onOpenChange={setShowNew}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>New Event</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="ev-title">Title</Label>
+              <Input
+                id="ev-title"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="e.g. Fall Festival"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Type</Label>
+                <Select value={form.eventType} onValueChange={(v) => setForm({ ...form, eventType: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {EVENT_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>{getEventTypeLabel(t)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ev-date">Date</Label>
+                <Input
+                  id="ev-date"
+                  type="date"
+                  value={form.date}
+                  onChange={(e) => setForm({ ...form, date: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ev-loc">Location <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input
+                id="ev-loc"
+                value={form.location}
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
+                placeholder="e.g. Playground"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ev-desc">Description <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Textarea
+                id="ev-desc"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
+            <Button onClick={submitEvent} disabled={createEvent.isPending}>
+              {createEvent.isPending ? "Creating…" : "Create Event"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
