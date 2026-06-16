@@ -109,6 +109,24 @@ export type Child = typeof children.$inferSelect;
 export type InsertChild = typeof children.$inferInsert;
 
 /**
+ * Color-coded safety flags surfaced on a child everywhere they appear, so
+ * staff see allergies / dietary / disability / special needs at a glance.
+ */
+export const childFlags = mysqlTable("child_flags", {
+  id: int("id").autoincrement().primaryKey(),
+  childId: int("childId").notNull().references(() => children.id),
+  type: mysqlEnum("type", ["allergy", "dietary", "disability", "special"]).notNull(),
+  /** Short label shown on the chip, e.g. "Peanuts", "Vegetarian", "IEP". */
+  label: varchar("label", { length: 100 }).notNull(),
+  /** Optional detail for the child's profile (not shown on the chip). */
+  detail: text("detail"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ChildFlag = typeof childFlags.$inferSelect;
+export type InsertChildFlag = typeof childFlags.$inferInsert;
+
+/**
  * Staff table for storing staff member information.
  */
 export const staff = mysqlTable("staff", {
@@ -256,6 +274,92 @@ export const communicationLogs = mysqlTable("communication_logs", {
 
 export type CommunicationLog = typeof communicationLogs.$inferSelect;
 export type InsertCommunicationLog = typeof communicationLogs.$inferInsert;
+
+/**
+ * Two-way in-app conversation between program staff and one family.
+ * Staff see all conversations in their organization; parent accounts see only
+ * the conversation(s) for their own familyId. Per-side read cursors drive the
+ * viewer-relative unread counts.
+ */
+export const conversations = mysqlTable("conversations", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id),
+  /** users.id of whoever started the thread. */
+  createdBy: int("createdBy"),
+  /** Last time any staff member viewed this thread (ms precision — read
+   *  cursors are compared against message sentAt within the same second). */
+  staffLastReadAt: timestamp("staffLastReadAt", { fsp: 3 }),
+  /** Last time the family viewed this thread. */
+  familyLastReadAt: timestamp("familyLastReadAt", { fsp: 3 }),
+  isActive: int("isActive").default(1),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Conversation = typeof conversations.$inferSelect;
+export type InsertConversation = typeof conversations.$inferInsert;
+
+/** One message inside a conversation. */
+export const chatMessages = mysqlTable("chat_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  conversationId: int("conversationId").notNull().references(() => conversations.id),
+  /** users.id of the sender (staff or parent account). */
+  senderUserId: int("senderUserId").notNull(),
+  senderRole: mysqlEnum("senderRole", ["staff", "family"]).notNull(),
+  body: text("body").notNull(),
+  /** Millisecond precision; set by the application on insert. */
+  sentAt: timestamp("sentAt", { fsp: 3 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = typeof chatMessages.$inferInsert;
+
+/**
+ * Parent-reported absences ("my child is not coming today").
+ * Reported from the family app; a family advocate (staff) reviews each one.
+ * Approval writes an "excused" attendance row for that child and date and
+ * sends the family a notification.
+ */
+export const absenceReports = mysqlTable("absence_reports", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id),
+  childId: int("childId").notNull().references(() => children.id),
+  /** The day the child will be (or was) absent. */
+  absenceDate: timestamp("absenceDate").notNull(),
+  reason: mysqlEnum("reason", ["sick", "appointment", "family_emergency", "transportation", "travel", "other"]).notNull(),
+  note: text("note"),
+  status: mysqlEnum("status", ["pending", "approved", "denied"]).default("pending").notNull(),
+  /** users.id of the parent who reported. */
+  reportedBy: int("reportedBy"),
+  /** users.id of the staff member who reviewed. */
+  reviewedBy: int("reviewedBy"),
+  reviewedAt: timestamp("reviewedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AbsenceReport = typeof absenceReports.$inferSelect;
+export type InsertAbsenceReport = typeof absenceReports.$inferInsert;
+
+/**
+ * Family goals with simple progress tracking, shown as progress graphs in the
+ * family app. Staff update progress during home visits / case management.
+ */
+export const familyGoals = mysqlTable("family_goals", {
+  id: int("id").autoincrement().primaryKey(),
+  familyId: int("familyId").notNull().references(() => families.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  /** 0–100. */
+  progress: int("progress").default(0).notNull(),
+  status: mysqlEnum("status", ["active", "completed", "paused"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FamilyGoalRow = typeof familyGoals.$inferSelect;
+export type InsertFamilyGoalRow = typeof familyGoals.$inferInsert;
 
 /**
  * Education table for tracking individualized curriculum and assessments.

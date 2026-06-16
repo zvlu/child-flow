@@ -103,7 +103,7 @@ export function BulkActionCenter() {
                   {actions.length}
                 </p>
               </div>
-              <BarChart3 className="w-12 h-12 text-teal-100" />
+              <BarChart3 className="w-12 h-12 text-[#E7F0E9]" />
             </div>
           </div>
 
@@ -145,7 +145,7 @@ export function BulkActionCenter() {
                     setSelectedAction(action.id);
                     setShowModal(true);
                   }}
-                  className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-teal-300 transition-all text-left"
+                  className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-[#A7C4AD] transition-all text-left"
                 >
                   <div className={`${action.color} w-12 h-12 rounded-xl flex items-center justify-center mb-3`}>
                     <Icon className="w-6 h-6" />
@@ -239,7 +239,7 @@ export function BulkActionCenter() {
                   <select
                     value={selectedClassroom}
                     onChange={(e) => setSelectedClassroom(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
                   >
                     <option value="">Choose a classroom...</option>
                     {classrooms.map((classroom) => (
@@ -260,7 +260,7 @@ export function BulkActionCenter() {
                         (status) => (
                           <button
                             key={status}
-                            className="p-3 border border-slate-300 rounded-xl hover:border-teal-500 hover:bg-teal-50 transition-colors text-sm font-medium"
+                            className="p-3 border border-slate-300 rounded-xl hover:border-[#5E8C6A] hover:bg-[#F1F6F2] transition-colors text-sm font-medium"
                           >
                             {status}
                           </button>
@@ -275,7 +275,7 @@ export function BulkActionCenter() {
                     <label className="block text-sm font-medium text-slate-700 mb-2">
                       Health Screening Type
                     </label>
-                    <select className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    <select className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
                       <option>Immunization</option>
                       <option>Dental</option>
                       <option>Physical</option>
@@ -292,7 +292,7 @@ export function BulkActionCenter() {
                     </label>
                     <textarea
                       placeholder="Enter note to apply to all children in this classroom..."
-                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] resize-none"
                       rows={4}
                     />
                   </div>
@@ -311,7 +311,7 @@ export function BulkActionCenter() {
                   >
                     Cancel
                   </button>
-                  <button className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl transition-colors font-medium">
+                  <button className="flex-1 bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl transition-colors font-medium">
                     Apply to Classroom
                   </button>
                 </div>

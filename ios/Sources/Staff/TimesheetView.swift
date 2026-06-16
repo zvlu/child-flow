@@ -3,9 +3,31 @@ import SwiftUI
 // MARK: - Timesheet View (Admin)
 
 struct TimesheetView: View {
+    @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = TimesheetViewModel()
 
     var body: some View {
+        // Defense in depth: this screen approves staff hours, so it refuses to
+        // render for non-admins even if reached through an ungated path.
+        if !appState.isAdmin {
+            VStack(spacing: 10) {
+                Image(systemName: "lock.fill")
+                    .font(.largeTitle)
+                    .foregroundColor(.secondary)
+                Text("Administrator access required")
+                    .font(.headline)
+                Text("Timesheet review and approval is limited to program administrators.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding()
+        } else {
+            timesheetContent
+        }
+    }
+
+    private var timesheetContent: some View {
         NavigationStack {
             ZStack {
                 Color.cfBackground.ignoresSafeArea()

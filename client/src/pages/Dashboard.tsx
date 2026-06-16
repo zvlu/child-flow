@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Link } from "wouter";
+import { motion, useReducedMotion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ const quickActions = [
   { label: "Health Records", href: "/health", icon: Heart, color: "bg-red-50 text-red-700 hover:bg-red-100 border-red-200" },
   { label: "Family Services", href: "/family-services", icon: Home, color: "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200" },
   { label: "Run Report", href: "/reports", icon: Activity, color: "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200" },
-  { label: "Compliance", href: "/compliance", icon: ShieldCheck, color: "bg-teal-50 text-teal-700 hover:bg-teal-100 border-teal-200" },
+  { label: "Compliance", href: "/compliance", icon: ShieldCheck, color: "bg-[#F1F6F2] text-[#3C5E47] hover:bg-[#E7F0E9] border-[#CFE0D3]" },
 ];
 
 const severityColors: Record<string, string> = {
@@ -66,6 +67,7 @@ export default function Dashboard() {
     return { rangeStart: start, rangeEnd: end };
   }, []);
 
+  const reduced = useReducedMotion() ?? false;
   const { data: stats, isLoading: statsLoading } = trpc.dashboard.stats.useQuery(ORGANIZATION_ID);
   const { data: followUps } = trpc.health.followUps.useQuery({ organizationId: ORGANIZATION_ID });
   const { data: insights } = trpc.aiInsights.list.useQuery({ organizationId: ORGANIZATION_ID });
@@ -85,7 +87,7 @@ export default function Dashboard() {
         title: "Total Enrolled",
         value: stats ? String(stats.activeChildren) : "—",
         subtext: stats ? `${stats.totalChildren} total on record` : "Loading...",
-        href: "/children",
+        href: "/children?status=active",
         borderClass: "border-l-primary",
         iconBgClass: "bg-primary/10",
         iconClass: "text-primary",
@@ -173,7 +175,7 @@ export default function Dashboard() {
 
   // ---- Alerts: health follow-ups + actionable AI insights ----
   const alerts = useMemo(() => {
-    const items: { id: string; message: string; severity: "high" | "medium" | "low"; time: string }[] = [];
+    const items: { id: string; message: string; severity: "high" | "medium" | "low"; time: string; href: string }[] = [];
     for (const fu of followUps ?? []) {
       items.push({
         id: `health-${fu.recordId}`,
@@ -183,6 +185,8 @@ export default function Dashboard() {
           fu.severity === "overdue"
             ? `Overdue by ${Math.abs(fu.daysUntilDue)} days`
             : `Due in ${fu.daysUntilDue} days`,
+        // Land directly on Health pre-filtered to the slice that needs action.
+        href: fu.severity === "overdue" ? "/health?status=overdue" : "/health?status=due_soon",
       });
     }
     for (const ins of insights ?? []) {
@@ -192,6 +196,7 @@ export default function Dashboard() {
         message: ins.title,
         severity: ins.priority === "critical" || ins.priority === "high" ? "high" : ins.priority === "medium" ? "medium" : "low",
         time: new Date(ins.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        href: "/action-queue",
       });
     }
     const rank = { high: 0, medium: 1, low: 2 } as const;
@@ -284,9 +289,14 @@ export default function Dashboard() {
           const TrendIcon = card.trendIcon;
 
           return (
-            <Link key={card.title} href={card.href}>
+            <Link key={card.title} href={card.href} asChild>
               <a className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
-                <Card className={`border-l-4 ${card.borderClass} transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 cursor-pointer`}>
+                <motion.div
+                  whileHover={reduced ? undefined : { y: -4, scale: 1.01 }}
+                  whileTap={reduced ? undefined : { scale: 0.99 }}
+                  transition={{ type: "spring", stiffness: 320, damping: 22 }}
+                >
+                <Card className={`border-l-4 ${card.borderClass} transition-shadow duration-150 hover:shadow-lg cursor-pointer`}>
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between">
                       <div>
@@ -303,6 +313,7 @@ export default function Dashboard() {
                     </div>
                   </CardContent>
                 </Card>
+                </motion.div>
               </a>
             </Link>
           );
@@ -319,10 +330,17 @@ export default function Dashboard() {
             {quickActions.map((action) => {
               const Icon = action.icon;
               return (
-                <Link key={action.href} href={action.href}>
-                  <a className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all duration-150 cursor-pointer ${action.color}`}>
-                    <Icon className="h-6 w-6" />
-                    <span className="text-xs font-medium text-center leading-tight">{action.label}</span>
+                <Link key={action.href} href={action.href} asChild>
+                  <a className="block">
+                    <motion.div
+                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border cursor-pointer ${action.color}`}
+                      whileHover={reduced ? undefined : { y: -3, scale: 1.04 }}
+                      whileTap={reduced ? undefined : { scale: 0.96 }}
+                      transition={{ type: "spring", stiffness: 320, damping: 20 }}
+                    >
+                      <Icon className="h-6 w-6" />
+                      <span className="text-xs font-medium text-center leading-tight">{action.label}</span>
+                    </motion.div>
                   </a>
                 </Link>
               );
@@ -441,7 +459,7 @@ export default function Dashboard() {
               <p className="text-sm text-muted-foreground py-4 text-center">No open action items. Nice work!</p>
             ) : (
               alerts.slice(0, 5).map((alert) => (
-                <Link key={alert.id} href="/action-queue">
+                <Link key={alert.id} href={alert.href} asChild>
                   <a className={`flex items-start gap-3 p-3 rounded-lg border text-sm transition-shadow hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${severityColors[alert.severity]}`}>
                     <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">

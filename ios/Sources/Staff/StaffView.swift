@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Staff Directory
 
 struct StaffView: View {
+    @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = StaffViewModel()
     @State private var showAddStaff = false
 
@@ -24,9 +25,13 @@ struct StaffView: View {
         .navigationTitle("Staff")
         .searchable(text: $viewModel.searchText, prompt: "Search staff")
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { showAddStaff = true } label: {
-                    Image(systemName: "person.badge.plus")
+            // Managing staff accounts is admin-only (the server enforces this
+            // on staff.create too).
+            if appState.isAdmin {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { showAddStaff = true } label: {
+                        Image(systemName: "person.badge.plus")
+                    }
                 }
             }
         }
@@ -108,6 +113,7 @@ struct StaffRow: View {
 struct StaffDetailView: View {
     let member: StaffMember
     @ObservedObject var viewModel: StaffViewModel
+    @EnvironmentObject var appState: AppState
     @State private var showLogTraining = false
     @State private var showEditClassroom = false
 
@@ -223,9 +229,12 @@ struct StaffDetailView: View {
                     Label("Send Message", systemImage: "bubble.left.fill")
                         .foregroundColor(.cfPrimary)
                 }
-                NavigationLink(destination: TimesheetView()) {
-                    Label("View Timesheet", systemImage: "clock.fill")
-                        .foregroundColor(.cfChildren)
+                // Timesheet review is admin-only.
+                if appState.isAdmin {
+                    NavigationLink(destination: TimesheetView()) {
+                        Label("View Timesheet", systemImage: "clock.fill")
+                            .foregroundColor(.cfChildren)
+                    }
                 }
             }
         }

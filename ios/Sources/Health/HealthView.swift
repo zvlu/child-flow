@@ -3,9 +3,17 @@ import SwiftUI
 // MARK: - Health Records Hub
 
 struct HealthView: View {
-    @StateObject private var viewModel = HealthViewModel()
+    @StateObject private var viewModel: HealthViewModel
     @State private var showMenu = false
     @State private var showAddRecord = false
+
+    /// Pass a status ("Overdue" / "Due Soon" / "Current") to open with that
+    /// filter pill pre-selected — used by dashboard alert deep links.
+    init(initialStatusFilter: String? = nil) {
+        let vm = HealthViewModel()
+        vm.statusFilter = initialStatusFilter
+        _viewModel = StateObject(wrappedValue: vm)
+    }
 
     var body: some View {
         NavigationStack {

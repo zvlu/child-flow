@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
+import { FlagChips } from "@/components/FlagChips";
 
 const healthBadge = (status: string) => {
   if (status === "current") return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Current</Badge>;
@@ -48,13 +49,17 @@ function formatDate(x: string | Date | null | undefined): string {
 
 export default function Children() {
   const [search, setSearch] = useState("");
-  const [classroomFilter, setClassroomFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  // Deep-link support: /children?status=active&classroom=Butterflies pre-filters.
+  const searchParams = new URLSearchParams(useSearch());
+  const [classroomFilter, setClassroomFilter] = useState(searchParams.get("classroom") ?? "all");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "all");
+  const [viewMode, setViewMode] = useState<"list" | "family">("list");
 
   const utils = trpc.useUtils();
 
   const { data: children, isLoading } = trpc.children.list.useQuery(ORGANIZATION_ID);
   const { data: classroomMap } = trpc.children.classroomMap.useQuery(ORGANIZATION_ID);
+  const { data: childFlags } = trpc.children.flags.useQuery(ORGANIZATION_ID);
   const { data: families } = trpc.families.list.useQuery(ORGANIZATION_ID);
   const { data: healthRecords } = trpc.health.list.useQuery({ organizationId: ORGANIZATION_ID });
 
@@ -89,6 +94,21 @@ export default function Children() {
     (families ?? []).forEach((f: any) => m.set(f.id, f.primaryContactName));
     return m;
   }, [families]);
+
+  const familyPhoneById = useMemo(() => {
+    const m = new Map<number, string>();
+    (families ?? []).forEach((f: any) => f.primaryContactPhone && m.set(f.id, f.primaryContactPhone));
+    return m;
+  }, [families]);
+
+  const flagsByChild = useMemo(() => {
+    const m = new Map<number, any[]>();
+    (childFlags ?? []).forEach((f: any) => {
+      if (!m.has(f.childId)) m.set(f.childId, []);
+      m.get(f.childId)!.push(f);
+    });
+    return m;
+  }, [childFlags]);
 
   // Health status per child: any overdue -> overdue, any due_soon -> due_soon, else current
   const healthStatusByChild = useMemo(() => {
@@ -239,7 +259,77 @@ export default function Children() {
         </CardContent>
       </Card>
 
+      {/* View toggle: flat list or grouped by family */}
+      <div className="flex gap-2">
+        <Button size="sm" variant={viewMode === "list" ? "default" : "outline"} onClick={() => setViewMode("list")}>
+          List
+        </Button>
+        <Button size="sm" variant={viewMode === "family" ? "default" : "outline"} onClick={() => setViewMode("family")}>
+          By Family
+        </Button>
+      </div>
+
+      {/* Grouped by family: parent contact with their children (siblings) together */}
+      {viewMode === "family" && (
+        <div className="space-y-4">
+          {(() => {
+            const groups = new Map<string, any[]>();
+            for (const child of filtered) {
+              const key = child.familyId != null ? String(child.familyId) : "none";
+              if (!groups.has(key)) groups.set(key, []);
+              groups.get(key)!.push(child);
+            }
+            const entries = Array.from(groups.entries()).sort((a, b) => {
+              const nameA = a[0] === "none" ? "zzz" : (familyContactById.get(Number(a[0])) ?? "");
+              const nameB = b[0] === "none" ? "zzz" : (familyContactById.get(Number(b[0])) ?? "");
+              return nameA.localeCompare(nameB);
+            });
+            if (entries.length === 0) {
+              return <Card><CardContent className="py-12 text-center text-muted-foreground">No children match your filters.</CardContent></Card>;
+            }
+            return entries.map(([key, kids]) => {
+              const contact = key === "none" ? "No family on record" : (familyContactById.get(Number(key)) ?? "Family");
+              const phone = key === "none" ? null : familyPhoneById.get(Number(key));
+              return (
+                <Card key={key}>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="font-bold text-foreground">{contact}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {kids.length} {kids.length === 1 ? "child" : "children"}
+                          {phone ? ` · ${phone}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {kids.map((child: any) => (
+                        <Link key={child.id} href={`/children/${child.id}`}>
+                          <div className="flex items-center gap-3 p-3 rounded-xl border border-border hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer">
+                            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                              {child.firstName?.[0]}{child.lastName?.[0]}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm truncate">{child.firstName} {child.lastName}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {classroomByChild.get(child.id) ?? "No room"} · {formatAge(child.dateOfBirth)}
+                              </p>
+                              <div className="mt-1"><FlagChips flags={flagsByChild.get(child.id) ?? []} limit={2} /></div>
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            });
+          })()}
+        </div>
+      )}
+
       {/* Children Table */}
+      {viewMode === "list" && (
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -272,6 +362,7 @@ export default function Children() {
                           <div>
                             <p className="font-semibold text-sm text-foreground">{child.firstName} {child.lastName}</p>
                             <p className="text-xs text-muted-foreground">DOB: {formatDate(child.dateOfBirth)}</p>
+                            <div className="mt-1"><FlagChips flags={flagsByChild.get(child.id) ?? []} limit={3} /></div>
                           </div>
                         </div>
                       </td>
@@ -347,6 +438,7 @@ export default function Children() {
           </div>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

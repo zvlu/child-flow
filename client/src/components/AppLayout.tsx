@@ -160,12 +160,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const initials = user?.name
     ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
-    : "CF";
+    : "S";
 
   return (
     <div className="flex h-screen bg-background overflow-hidden flex-col">
       {/* Top Navigation Bar - Matching ChildPlus Style */}
-      <header className="h-14 bg-[#5b4a8c] text-white flex items-center px-3 md:px-4 gap-2 flex-shrink-0 shadow-md z-20">
+      <header className="h-14 bg-[#2E4034] text-white flex items-center px-3 md:px-4 gap-2 flex-shrink-0 shadow-md z-20">
         <Button
           variant="ghost"
           size="icon"
@@ -179,14 +179,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
             <Baby className="h-4 w-4 text-white" />
           </div>
-          <span className="font-bold text-base tracking-tight">ChildFlow</span>
+          <span className="font-bold text-base tracking-tight">Sprout</span>
         </div>
         
         <nav className="hidden md:flex flex-1 items-center h-full min-w-0 overflow-x-auto no-scrollbar">
           {topNavPrimaryItems.map((item) => {
             const isActive = isTopNavActive(item.path);
             return (
-              <Link key={item.label} href={item.path}>
+              <Link key={item.label} href={item.path} asChild>
                 <a 
                   className={cn(
                     "px-3 md:px-4 h-full flex items-center text-xs font-semibold transition-colors whitespace-nowrap border-b-2 border-transparent",
@@ -220,7 +220,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   const isActive = isTopNavActive(item.path);
                   return (
                     <DropdownMenuItem key={item.path} asChild>
-                      <Link href={item.path}>
+                      <Link href={item.path} asChild>
                         <a className={cn("flex items-center gap-2", isActive && "font-semibold")}>
                           <Icon className="h-4 w-4" />
                           {item.label}
@@ -315,7 +315,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       const isActive = isNavItemActive(item.path);
                       return (
                         <li key={item.path}>
-                          <Link href={item.path}>
+                          <Link href={item.path} asChild>
                             <a
                               onClick={() => setMobileNavOpen(false)}
                               className={cn(
@@ -359,7 +359,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                           const isActive = isNavItemActive(item.path);
                           return (
                             <li key={item.path}>
-                              <Link href={item.path}>
+                              <Link href={item.path} asChild>
                                 <a
                                   onClick={() => setMobileNavOpen(false)}
                                   className={cn(
@@ -420,7 +420,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           {/* Page Header (Breadcrumb style) */}
           <header className="h-10 border-b border-border bg-white flex items-center px-3 md:px-6 gap-3 md:gap-4 flex-shrink-0">
             <div className="flex-1 flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">ChildFlow</span>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Sprout</span>
               <ChevronRight className="h-3 w-3 text-slate-300" />
               <h2 className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">
                 {allSideNavItems.find((i) => isNavItemActive(i.path))?.label || "Dashboard"}
@@ -454,7 +454,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   ) : (
                     healthFollowUps.slice(0, 6).map((alert) => (
                       <DropdownMenuItem key={alert.recordId} asChild>
-                        <Link href="/health">
+                        <Link href="/health" asChild>
                           <a className="flex flex-col items-start gap-0.5 py-2">
                             <span className={cn(
                               "text-[11px] font-semibold uppercase tracking-wide",
@@ -470,12 +470,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/health">
+                    <Link href="/health" asChild>
                       <a className="text-sm font-medium">Open Health Records</a>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/action-queue">
+                    <Link href="/action-queue" asChild>
                       <a className="text-sm font-medium">Open Action Queue</a>
                     </Link>
                   </DropdownMenuItem>
@@ -485,7 +485,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </header>
 
           {/* Page content */}
-          <main className="flex-1 overflow-y-auto bg-[#f8fafc]">
+          <main className="flex-1 overflow-y-auto bg-[#FBF6EE]">
             {children}
           </main>
         </div>

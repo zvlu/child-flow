@@ -20,6 +20,7 @@ import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { FlagChips } from "@/components/FlagChips";
 
 interface ChildDetailProps { id: string; }
 
@@ -80,6 +81,8 @@ export default function ChildDetail({ id }: ChildDetailProps) {
     { organizationId: ORGANIZATION_ID, childId },
     { enabled: !isNaN(childId) }
   );
+  const { data: allFlags } = trpc.children.flags.useQuery(ORGANIZATION_ID);
+  const childFlagList = (allFlags ?? []).filter((f: any) => f.childId === childId);
   const { data: documents, isLoading: isDocumentsLoading } = trpc.documents.list.useQuery(
     { organizationId: ORGANIZATION_ID, childId },
     { enabled: !isNaN(childId) }
@@ -201,7 +204,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
 
   if (isChildLoading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[50vh] bg-[#f8fafc]">
+      <div className="p-6 flex items-center justify-center min-h-[50vh] bg-[#FBF6EE]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -209,7 +212,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
 
   if (!child) {
     return (
-      <div className="p-6 bg-[#f8fafc] min-h-full">
+      <div className="p-6 bg-[#FBF6EE] min-h-full">
         <div className="text-center py-20">
           <Baby className="h-14 w-14 mx-auto mb-4 text-slate-300" />
           <h2 className="text-xl font-bold text-slate-800">Child not found</h2>
@@ -235,7 +238,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
   });
 
   return (
-    <div className="p-6 space-y-6 bg-[#f8fafc] min-h-full">
+    <div className="p-6 space-y-6 bg-[#FBF6EE] min-h-full">
       <div className="flex items-center gap-4">
         <Link href="/children">
           <Button variant="ghost" size="sm" className="gap-2 rounded-full font-bold">
@@ -252,6 +255,9 @@ export default function ChildDetail({ id }: ChildDetailProps) {
               {childStatusBadge(child.status)}
               <span className="text-sm text-slate-500 font-medium">{age} &bull; {classroomName} &bull; {teacherName}</span>
             </div>
+            {childFlagList.length > 0 && (
+              <div className="mt-2"><FlagChips flags={childFlagList} /></div>
+            )}
           </div>
         </div>
         <Button
@@ -805,7 +811,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                 <div className="py-4 text-center text-sm text-slate-400 font-bold">Loading siblings...</div>
               ) : siblings && siblings.filter((s: any) => s.id !== childId).length > 0 ? (
                 siblings.filter((s: any) => s.id !== childId).map((sibling: any) => (
-                  <Link key={sibling.id} href={`/children/${sibling.id}`}>
+                  <Link key={sibling.id} href={`/children/${sibling.id}`} asChild>
                     <a className="flex items-center justify-between p-3 rounded-2xl bg-white border border-primary/10 hover:border-primary/30 hover:shadow-sm transition-all group">
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold">

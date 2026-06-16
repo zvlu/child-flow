@@ -85,7 +85,7 @@ struct InviteFamiliesView: View {
             Button("Send") { viewModel.sendInvitations() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Families will receive an email with a unique code to set up their ChildFlow account.")
+            Text("Families will receive an email with a unique code to set up their Sprout account.")
         }
         .alert("Invitations Sent", isPresented: $viewModel.showSuccess) {
             Button("OK") {}

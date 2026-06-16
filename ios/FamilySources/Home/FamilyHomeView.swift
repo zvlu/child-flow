@@ -3,11 +3,19 @@ import SwiftUI
 struct FamilyHomeView: View {
     @EnvironmentObject var appState: FamilyAppState
     @StateObject private var viewModel = FamilyHomeViewModel()
+    @State private var showReportAbsence = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
+                    // School open/closed today
+                    if let status = viewModel.schoolStatus {
+                        SchoolStatusBanner(status: status)
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                    }
+
                     // Greeting
                     if let profile = appState.familyProfile {
                         HStack {
@@ -21,16 +29,73 @@ struct FamilyHomeView: View {
                             Spacer()
                         }
                         .padding(.horizontal)
-                        .padding(.top, 8)
                     }
+
+                    // Report an absence — the most common reason a parent
+                    // opens this app on a school morning.
+                    Button {
+                        showReportAbsence = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "calendar.badge.minus")
+                                .font(.system(size: 18, weight: .semibold))
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("My child isn't coming")
+                                    .font(.subheadline.weight(.semibold))
+                                Text("Report an absence — your family advocate will confirm")
+                                    .font(.caption2)
+                                    .opacity(0.85)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(14)
+                        .background(Color.accentColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .padding(.horizontal)
 
                     // Child cards
                     if viewModel.isLoading {
                         ProgressView().padding(.top, 40)
                     } else {
                         ForEach(viewModel.children) { child in
-                            FamilyChildCard(child: child)
+                            FamilyChildCard(
+                                child: child,
+                                today: viewModel.today(for: child.id),
+                                busy: viewModel.busyChildId == child.id,
+                                onCheckIn: { Task { await viewModel.checkIn(child.id) } },
+                                onCheckOut: { Task { await viewModel.checkOut(child.id) } }
+                            )
+                            .padding(.horizontal)
+                        }
+                    }
+
+                    // Recent absence reports + their review status
+                    if !viewModel.absences.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Absence Reports")
+                                .font(.headline)
                                 .padding(.horizontal)
+                            ForEach(viewModel.absences.prefix(3)) { report in
+                                AbsenceReportRow(report: report)
+                                    .padding(.horizontal)
+                            }
+                        }
+                    }
+
+                    // Notifications
+                    if !viewModel.notifications.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Notifications")
+                                .font(.headline)
+                                .padding(.horizontal)
+                            ForEach(viewModel.notifications.prefix(5)) { note in
+                                NotificationRow(notification: note)
+                                    .padding(.horizontal)
+                            }
                         }
                     }
 
@@ -53,6 +118,219 @@ struct FamilyHomeView: View {
             .navigationTitle("Home")
             .refreshable { await viewModel.load() }
             .task { await viewModel.load() }
+            .sheet(isPresented: $showReportAbsence) {
+                ReportAbsenceSheet(children: appState.familyProfile?.children ?? viewModel.profileChildren) {
+                    await viewModel.load()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - School Status Banner
+
+struct SchoolStatusBanner: View {
+    let status: SchoolStatus
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: status.isOpen ? "checkmark.circle.fill" : "xmark.octagon.fill")
+                .font(.system(size: 20))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(status.label)
+                    .font(.subheadline.weight(.semibold))
+                if let title = status.nextClosureTitle, let date = status.nextClosureDate {
+                    Text("Next closure: \(title) · \(date.formatted(.dateTime.month(.abbreviated).day()))")
+                        .font(.caption2)
+                        .opacity(0.8)
+                }
+            }
+            Spacer()
+        }
+        .foregroundColor(status.isOpen ? .green : .red)
+        .padding(12)
+        .background((status.isOpen ? Color.green : Color.red).opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - Absence Report Row
+
+struct AbsenceReportRow: View {
+    let report: AbsenceReport
+
+    var statusColor: Color {
+        switch report.status {
+        case "approved": return .green
+        case "denied":   return .red
+        default:         return .orange
+        }
+    }
+
+    var statusLabel: String {
+        switch report.status {
+        case "approved": return "Approved"
+        case "denied":   return "See advocate"
+        default:         return "Pending review"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "calendar.badge.minus")
+                .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(report.childName) · \(report.date.formatted(.dateTime.month(.abbreviated).day()))")
+                    .font(.subheadline.weight(.medium))
+                Text(report.reasonLabel + (report.note.isEmpty ? "" : " — \(report.note)"))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Text(statusLabel)
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(statusColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(statusColor.opacity(0.12))
+                .clipShape(Capsule())
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - Notification Row
+
+struct NotificationRow: View {
+    let notification: ParentNotification
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "bell.fill")
+                    .foregroundColor(.accentColor)
+                if !notification.isRead {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 8, height: 8)
+                        .offset(x: 4, y: -3)
+                }
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(notification.message)
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(notification.createdAt, style: .relative)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - Report Absence Sheet
+
+struct ReportAbsenceSheet: View {
+    let children: [FamilyChild]
+    let onSubmitted: () async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedChildId: String = ""
+    @State private var date = Date()
+    @State private var reason = "sick"
+    @State private var note = ""
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+
+    private let reasons: [(String, String)] = [
+        ("sick", "Illness"),
+        ("appointment", "Appointment"),
+        ("family_emergency", "Family emergency"),
+        ("transportation", "Transportation"),
+        ("travel", "Travel"),
+        ("other", "Other"),
+    ]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Who is staying home?") {
+                    Picker("Child", selection: $selectedChildId) {
+                        ForEach(children) { child in
+                            Text(child.fullName).tag(child.id)
+                        }
+                    }
+                }
+                Section("When and why") {
+                    DatePicker("Date", selection: $date, in: Date()..., displayedComponents: .date)
+                    Picker("Reason", selection: $reason) {
+                        ForEach(reasons, id: \.0) { value, label in
+                            Text(label).tag(value)
+                        }
+                    }
+                    TextField("Add a note (optional)", text: $note, axis: .vertical)
+                        .lineLimit(2...4)
+                }
+                if let errorMessage {
+                    Section {
+                        Label(errorMessage, systemImage: "exclamationmark.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+                Section {
+                    Button {
+                        submit()
+                    } label: {
+                        if isSubmitting {
+                            ProgressView().frame(maxWidth: .infinity)
+                        } else {
+                            Text("Send to Family Advocate")
+                                .fontWeight(.semibold)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .disabled(isSubmitting || selectedChildId.isEmpty)
+                } footer: {
+                    Text("Your family advocate will review this. Once approved, the day is marked as an excused absence.")
+                }
+            }
+            .navigationTitle("Report Absence")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .onAppear {
+                if selectedChildId.isEmpty { selectedChildId = children.first?.id ?? "" }
+            }
+        }
+    }
+
+    private func submit() {
+        isSubmitting = true
+        errorMessage = nil
+        Task {
+            do {
+                _ = try await APIClient.shared.reportAbsence(
+                    childId: selectedChildId, date: date, reason: reason, note: note
+                )
+                await onSubmitted()
+                await MainActor.run { dismiss() }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    isSubmitting = false
+                }
+            }
         }
     }
 }
@@ -61,7 +339,20 @@ struct FamilyHomeView: View {
 
 struct FamilyChildCard: View {
     let child: FamilyChild
+    var today: FamilyAttendanceToday? = nil
+    var busy: Bool = false
+    var onCheckIn: () -> Void = {}
+    var onCheckOut: () -> Void = {}
     @State private var expanded = true
+
+    private func timeStr(_ d: Date?) -> String {
+        guard let d else { return "" }
+        return d.formatted(.dateTime.hour().minute())
+    }
+
+    private var stateKey: String {
+        "\(today?.checkInTime != nil)-\(today?.checkOutTime != nil)"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -93,6 +384,14 @@ struct FamilyChildCard: View {
             }
 
             if expanded {
+                Divider()
+
+                // Drop-off / pickup — the parent's most frequent action, big and obvious.
+                checkInOutControl
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
+                    .animation(.spring(response: 0.45, dampingFraction: 0.85), value: stateKey)
+
                 Divider()
 
                 // Stats row
@@ -139,6 +438,68 @@ struct FamilyChildCard: View {
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+    }
+
+    @ViewBuilder
+    private var checkInOutControl: some View {
+        let checkedIn = today?.isCheckedIn ?? false
+        let checkedOut = today?.isCheckedOut ?? false
+
+        if checkedOut {
+            // Done for the day — calm confirmation, no further action.
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.seal.fill")
+                    .foregroundColor(.green)
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Picked up \(timeStr(today?.checkOutTime))")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Dropped off \(timeStr(today?.checkInTime))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        } else if checkedIn {
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    Circle().fill(Color.green).frame(width: 8, height: 8)
+                    Text("Checked in \(timeStr(today?.checkInTime))")
+                        .font(.subheadline.weight(.medium))
+                }
+                Spacer()
+                Button(action: onCheckOut) {
+                    Group {
+                        if busy { ProgressView().tint(.white) }
+                        else { Label("Check out", systemImage: "arrow.up.right.square") }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 9)
+                    .background(Color(hex: "C96E47"))
+                    .clipShape(Capsule())
+                }
+                .disabled(busy)
+            }
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        } else {
+            Button(action: onCheckIn) {
+                Group {
+                    if busy { ProgressView().tint(.white) }
+                    else { Label("Check in \(child.firstName)", systemImage: "checkmark.circle.fill") }
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.accentColor)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .disabled(busy)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
     }
 
     private func healthColor(_ status: String) -> Color {
@@ -230,15 +591,53 @@ struct UpcomingEventRow: View {
 class FamilyHomeViewModel: ObservableObject {
     @Published var children: [FamilyChild] = []
     @Published var upcomingEvents: [FamilyEvent] = []
+    @Published var schoolStatus: SchoolStatus?
+    @Published var absences: [AbsenceReport] = []
+    @Published var notifications: [ParentNotification] = []
+    @Published var attendanceToday: [String: FamilyAttendanceToday] = [:]
+    @Published var busyChildId: String? = nil
     @Published var isLoading = false
+
+    /// Children for the report-absence sheet when the profile isn't cached.
+    var profileChildren: [FamilyChild] { children }
+
+    func today(for childId: String) -> FamilyAttendanceToday? { attendanceToday[childId] }
 
     func load() async {
         isLoading = true
-        do {
-            let profile = try await APIClient.shared.getFamilyProfile()
+        // Each section loads independently; one failure shouldn't blank the rest.
+        if let profile = try? await APIClient.shared.getFamilyProfile() {
             children = profile.children
-            upcomingEvents = try await APIClient.shared.getFamilyEvents()
-        } catch {}
+        }
+        upcomingEvents = (try? await APIClient.shared.getFamilyEvents()) ?? upcomingEvents
+        schoolStatus = (try? await APIClient.shared.getSchoolStatus()) ?? schoolStatus
+        absences = (try? await APIClient.shared.getFamilyAbsences()) ?? absences
+        notifications = (try? await APIClient.shared.getFamilyNotifications()) ?? notifications
+        await loadAttendance()
         isLoading = false
+    }
+
+    private func loadAttendance() async {
+        if let rows = try? await APIClient.shared.getFamilyAttendanceToday() {
+            attendanceToday = Dictionary(uniqueKeysWithValues: rows.map { ($0.childId, $0) })
+        }
+    }
+
+    func checkIn(_ childId: String) async {
+        busyChildId = childId
+        defer { busyChildId = nil }
+        do {
+            try await APIClient.shared.checkInChild(childId: childId)
+            await loadAttendance()
+        } catch {}
+    }
+
+    func checkOut(_ childId: String) async {
+        busyChildId = childId
+        defer { busyChildId = nil }
+        do {
+            try await APIClient.shared.checkOutChild(childId: childId)
+            await loadAttendance()
+        } catch {}
     }
 }

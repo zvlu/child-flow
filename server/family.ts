@@ -1,6 +1,6 @@
 import { MOBILE_SESSION_TTL_MS } from "@shared/const";
 import { randomBytes } from "crypto";
-import { and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
 import {
   attendance,
@@ -9,8 +9,10 @@ import {
   children,
   classrooms,
   families,
+  familyGoals,
   familyInvitations,
   organizations,
+  parentNotifications,
   staff,
   users,
   type InsertFamilyInvitation,
@@ -522,5 +524,317 @@ export function registerFamilyRoutes(app: Express) {
           type: e.eventType ?? "other",
         }))
     );
+  });
+
+  /**
+   * Authenticated: notifications for this family (absence decisions,
+   * announcements, …). Returns the latest 30 and marks them read — the
+   * payload still carries each row's pre-fetch isRead so the UI can show
+   * unread indicators once.
+   */
+  app.get("/api/family/notifications", async (req: Request, res: Response) => {
+    const parent = await requireParent(req);
+    if (!parent) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const rows = await db
+      .select()
+      .from(parentNotifications)
+      .where(eq(parentNotifications.familyId, parent.familyId))
+      .orderBy(desc(parentNotifications.createdAt))
+      .limit(30);
+    await db
+      .update(parentNotifications)
+      .set({ isRead: 1 })
+      .where(eq(parentNotifications.familyId, parent.familyId));
+    res.json(
+      rows.map(n => ({
+        id: String(n.id),
+        message: n.message,
+        type: n.type,
+        isRead: n.isRead === 1,
+        createdAt: n.createdAt.toISOString(),
+      }))
+    );
+  });
+
+  /** Authenticated: is school open today? (weekends + holiday closures) */
+  app.get("/api/family/school-status", async (req: Request, res: Response) => {
+    const parent = await requireParent(req);
+    if (!parent) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const [family] = await db
+      .select()
+      .from(families)
+      .where(eq(families.id, parent.familyId))
+      .limit(1);
+    if (!family) {
+      res.status(404).json({ error: "Family not found" });
+      return;
+    }
+
+    const now = new Date();
+    const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(now); endOfDay.setHours(23, 59, 59, 999);
+
+    const holidays = await db
+      .select()
+      .from(calendarEvents)
+      .where(
+        and(
+          eq(calendarEvents.organizationId, family.organizationId),
+          eq(calendarEvents.eventType, "holiday")
+        )
+      );
+    const todayClosure = holidays.find(h => {
+      const hStart = h.startDate;
+      const hEnd = h.endDate ?? h.startDate;
+      return hStart <= endOfDay && hEnd >= startOfDay;
+    });
+    const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+    const nextClosure = holidays
+      .filter(h => h.startDate > endOfDay)
+      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())[0];
+
+    res.json({
+      isOpen: !isWeekend && !todayClosure,
+      label: todayClosure
+        ? `Closed — ${todayClosure.title}`
+        : isWeekend
+          ? "Closed — Weekend"
+          : "School is open today",
+      nextClosureTitle: nextClosure?.title ?? null,
+      nextClosureDate: nextClosure?.startDate.toISOString() ?? null,
+    });
+  });
+
+  /**
+   * Authenticated: progress graphs data — weekly attendance rate per child
+   * over the last 8 weeks, and family goal progress.
+   */
+  app.get("/api/family/progress", async (req: Request, res: Response) => {
+    const parent = await requireParent(req);
+    if (!parent) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+
+    const kids = await db
+      .select()
+      .from(children)
+      .where(eq(children.familyId, parent.familyId));
+    const [family] = await db
+      .select()
+      .from(families)
+      .where(eq(families.id, parent.familyId))
+      .limit(1);
+
+    const WEEKS = 8;
+    const now = new Date();
+    // Start of the current week (Sunday).
+    const currentWeekStart = new Date(now);
+    currentWeekStart.setHours(0, 0, 0, 0);
+    currentWeekStart.setDate(currentWeekStart.getDate() - currentWeekStart.getDay());
+    const windowStart = new Date(currentWeekStart);
+    windowStart.setDate(windowStart.getDate() - 7 * (WEEKS - 1));
+
+    const rows = family
+      ? await db
+          .select({ childId: attendance.childId, date: attendance.date, status: attendance.status })
+          .from(attendance)
+          .where(and(eq(attendance.organizationId, family.organizationId), gte(attendance.date, windowStart)))
+      : [];
+    const isPresent = (s: string | null) => s === "present" || s === "half_day";
+
+    const series = kids.map(c => {
+      const weeks: Array<{ weekStart: string; label: string; rate: number }> = [];
+      for (let w = 0; w < WEEKS; w++) {
+        const ws = new Date(windowStart);
+        ws.setDate(ws.getDate() + 7 * w);
+        const we = new Date(ws);
+        we.setDate(we.getDate() + 7);
+        const inWeek = rows.filter(r => r.childId === c.id && r.date >= ws && r.date < we);
+        const rate = inWeek.length === 0
+          ? -1 // no school days recorded that week
+          : Math.round((inWeek.filter(r => isPresent(r.status)).length / inWeek.length) * 100);
+        weeks.push({
+          weekStart: dateOnly(ws),
+          label: `${ws.getMonth() + 1}/${ws.getDate()}`,
+          rate,
+        });
+      }
+      return {
+        childId: String(c.id),
+        childName: `${c.firstName} ${c.lastName}`,
+        weeks: weeks.filter(w => w.rate >= 0),
+      };
+    });
+
+    const goals = await db
+      .select()
+      .from(familyGoals)
+      .where(eq(familyGoals.familyId, parent.familyId))
+      .orderBy(desc(familyGoals.updatedAt));
+
+    res.json({
+      attendance: series,
+      goals: goals.map(g => ({
+        id: String(g.id),
+        title: g.title,
+        progress: g.progress,
+        status: g.status,
+      })),
+    });
+  });
+
+  // ---- Parent check-in / check-out (drop-off & pickup) ----
+
+  /** Today's check-in/out state for each of the parent's children. */
+  app.get("/api/family/attendance-today", async (req: Request, res: Response) => {
+    const parent = await requireParent(req);
+    if (!parent) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const kids = await db.select().from(children).where(eq(children.familyId, parent.familyId));
+    const now = new Date();
+    const start = new Date(now); start.setHours(0, 0, 0, 0);
+    const end = new Date(now); end.setHours(23, 59, 59, 999);
+    const rows = await db
+      .select()
+      .from(attendance)
+      .where(and(gte(attendance.date, start), lte(attendance.date, end)));
+    const byChild = new Map(rows.map(r => [r.childId, r]));
+
+    res.json(
+      kids.map(c => {
+        const r = byChild.get(c.id);
+        return {
+          childId: String(c.id),
+          childName: `${c.firstName} ${c.lastName}`,
+          status: r?.status ?? "none",
+          checkInTime: r?.checkInTime?.toISOString() ?? null,
+          checkOutTime: r?.checkOutTime?.toISOString() ?? null,
+        };
+      })
+    );
+  });
+
+  // Shared guard: the child must belong to the signed-in parent's family.
+  const requireOwnChild = async (parentFamilyId: number, childId: number) => {
+    const db = await getDb();
+    if (!db) return null;
+    const [child] = await db
+      .select()
+      .from(children)
+      .where(and(eq(children.id, childId), eq(children.familyId, parentFamilyId)))
+      .limit(1);
+    return child ?? null;
+  };
+
+  const upsertTodayAttendance = async (
+    child: typeof children.$inferSelect,
+    patch: { checkIn?: boolean; checkOut?: boolean }
+  ) => {
+    const db = await getDb();
+    if (!db) return;
+    const now = new Date();
+    const start = new Date(now); start.setHours(0, 0, 0, 0);
+    const end = new Date(now); end.setHours(23, 59, 59, 999);
+    const [existing] = await db
+      .select()
+      .from(attendance)
+      .where(and(eq(attendance.childId, child.id), gte(attendance.date, start), lte(attendance.date, end)))
+      .limit(1);
+    if (existing) {
+      await db
+        .update(attendance)
+        .set({
+          status: "present",
+          checkInTime: patch.checkIn ? existing.checkInTime ?? now : existing.checkInTime,
+          checkOutTime: patch.checkOut ? now : existing.checkOutTime,
+        })
+        .where(eq(attendance.id, existing.id));
+    } else {
+      await db.insert(attendance).values({
+        organizationId: child.organizationId,
+        childId: child.id,
+        date: now,
+        status: "present",
+        checkInTime: patch.checkIn ? now : null,
+        checkOutTime: patch.checkOut ? now : null,
+      });
+    }
+  };
+
+  app.post("/api/family/check-in", async (req: Request, res: Response) => {
+    const parent = await requireParent(req);
+    if (!parent) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const child = await requireOwnChild(parent.familyId, Number(req.body?.childId));
+    if (!child) {
+      res.status(403).json({ error: "Child not found in your family" });
+      return;
+    }
+    await upsertTodayAttendance(child, { checkIn: true });
+    await insertAuditLog({
+      userId: parent.id,
+      actorOpenId: parent.openId,
+      action: "update",
+      resourceType: "attendance",
+      resourceId: String(child.id),
+      ipAddress: clientIpFromReq(req),
+      detail: "parent check-in",
+    });
+    res.json({ success: true });
+  });
+
+  app.post("/api/family/check-out", async (req: Request, res: Response) => {
+    const parent = await requireParent(req);
+    if (!parent) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const child = await requireOwnChild(parent.familyId, Number(req.body?.childId));
+    if (!child) {
+      res.status(403).json({ error: "Child not found in your family" });
+      return;
+    }
+    await upsertTodayAttendance(child, { checkOut: true });
+    await insertAuditLog({
+      userId: parent.id,
+      actorOpenId: parent.openId,
+      action: "update",
+      resourceType: "attendance",
+      resourceId: String(child.id),
+      ipAddress: clientIpFromReq(req),
+      detail: "parent check-out",
+    });
+    res.json({ success: true });
   });
 }

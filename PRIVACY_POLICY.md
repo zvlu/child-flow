@@ -1,4 +1,4 @@
-# ChildFlow Privacy Policy
+# Sprout Privacy Policy
 
 **Effective Date:** June 10, 2026
 
@@ -10,7 +10,7 @@
 > agreements, staff training, retention procedures) are in place for your
 > deployment.
 
-ChildFlow is committed to protecting the privacy and security of the children,
+Sprout is committed to protecting the privacy and security of the children,
 families, and staff we serve. This Privacy Policy describes how we collect, use,
 and safeguard personal information in support of HIPAA, FERPA, and Head Start
 Program Performance Standards.
@@ -82,4 +82,4 @@ If you have questions about this Privacy Policy or our data practices, please
 contact our Privacy Officer:
 
 - **Email:** privacy@childflow.org
-- **Address:** ChildFlow, 47 Lovell Ave, Windsor, CT 06096
+- **Address:** Sprout, 47 Lovell Ave, Windsor, CT 06096

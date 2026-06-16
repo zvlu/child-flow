@@ -63,7 +63,7 @@ struct WelcomeView: View {
                     .font(.system(size: 72))
                     .foregroundColor(.accentColor)
 
-                Text("ChildFlow")
+                Text("Sprout")
                     .font(.largeTitle.bold())
 
                 Text("Stay connected with your child's\nHead Start program")

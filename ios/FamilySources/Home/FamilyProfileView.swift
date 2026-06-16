@@ -57,7 +57,7 @@ struct FamilyProfileView: View {
                         Label("Contact Support", systemImage: "envelope")
                     }
                     NavigationLink(destination: FamilyAboutView()) {
-                        Label("About ChildFlow", systemImage: "info.circle")
+                        Label("About Sprout", systemImage: "info.circle")
                     }
                 }
 
@@ -81,7 +81,7 @@ struct FamilyAboutView: View {
     var body: some View {
         List {
             Section {
-                LabeledContent("App", value: "ChildFlow")
+                LabeledContent("App", value: "Sprout")
                 LabeledContent("For", value: "Head Start Families")
                 LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
             }

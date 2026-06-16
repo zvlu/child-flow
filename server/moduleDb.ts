@@ -5,7 +5,7 @@
  */
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import {
-  families, children, staff, classrooms, childClassroomAssignments,
+  families, children, staff, classrooms, childClassroomAssignments, childFlags,
   attendance, healthRecords, studentNotes, calendarEvents, documents,
   bulkActionLogs, aiInsights, invoices, payments, activityLogs,
   parentNotifications, digitalDocuments, mealPlans, mealItems, cacfpReports,
@@ -86,6 +86,40 @@ export async function getClassroomRoster(classroomId: number) {
       eq(childClassroomAssignments.isActive, 1),
     ))
     .then(rows => rows.map(r => r.child));
+}
+
+/** Color-coded safety flags for all children in an org (allergy/dietary/…). */
+export async function getChildFlags(organizationId: number) {
+  const db = await requireDb();
+  return db
+    .select({
+      id: childFlags.id,
+      childId: childFlags.childId,
+      type: childFlags.type,
+      label: childFlags.label,
+      detail: childFlags.detail,
+    })
+    .from(childFlags)
+    .innerJoin(children, eq(childFlags.childId, children.id))
+    .where(eq(children.organizationId, organizationId));
+}
+
+/**
+ * Move a child to a classroom (or unassign with null). Ends any active
+ * assignment first, so a child is only ever in one room at a time.
+ */
+export async function assignChildToClassroom(childId: number, classroomId: number | null) {
+  const db = await requireDb();
+  await db
+    .update(childClassroomAssignments)
+    .set({ isActive: 0, endDate: new Date() })
+    .where(and(
+      eq(childClassroomAssignments.childId, childId),
+      eq(childClassroomAssignments.isActive, 1),
+    ));
+  if (classroomId != null) {
+    await db.insert(childClassroomAssignments).values({ childId, classroomId });
+  }
 }
 
 export async function getChildClassroomMap(organizationId: number) {

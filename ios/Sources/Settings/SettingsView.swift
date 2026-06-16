@@ -45,7 +45,7 @@ struct SettingsView: View {
             }
 
             Section("App") {
-                NavigationLink("About ChildFlow") {
+                NavigationLink("About Sprout") {
                     AboutView()
                 }
                 NavigationLink("Privacy & Security") {
@@ -95,7 +95,7 @@ struct AboutView: View {
     var body: some View {
         List {
             Section {
-                LabeledContent("App", value: "ChildFlow")
+                LabeledContent("App", value: "Sprout")
                 LabeledContent("Purpose", value: "Head Start Management")
             }
             Section("Contact") {

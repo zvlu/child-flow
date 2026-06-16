@@ -265,7 +265,7 @@ struct NewEventSheet: View {
     ]
     let defaultPostChecklist = [
         "Record attendance",
-        "Document in ChildFlow",
+        "Document in Sprout",
         "Send thank-you to families",
         "Complete event evaluation",
         "Note suggestions for next event"

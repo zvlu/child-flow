@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
+import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
 
 const roleLabels: Record<string, string> = {
@@ -88,6 +89,7 @@ export default function Staff() {
   const { data: classrooms } = trpc.classrooms.list.useQuery(ORGANIZATION_ID);
   const { data: certifications, isLoading: certsLoading } = trpc.staffOps.certifications.useQuery(ORGANIZATION_ID);
 
+  const isAdmin = useIsAdmin();
   const createStaff = trpc.staff.create.useMutation({
     onSuccess: () => {
       utils.staff.list.invalidate();
@@ -228,9 +230,11 @@ export default function Staff() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />Export</Button>
-          <Button size="sm" className="gap-2" onClick={() => { setForm(emptyForm); setAddOpen(true); }}>
-            <Plus className="h-4 w-4" />Add Staff
-          </Button>
+          {isAdmin && (
+            <Button size="sm" className="gap-2" onClick={() => { setForm(emptyForm); setAddOpen(true); }}>
+              <Plus className="h-4 w-4" />Add Staff
+            </Button>
+          )}
         </div>
       </div>
 
@@ -303,21 +307,23 @@ export default function Staff() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <h3 className="font-semibold text-foreground">{fullName}</h3>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEdit(member)}>Edit</DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => updateStaff.mutate({ id: member.id, isActive: member.isActive === 1 ? 0 : 1 })}
-                                >
-                                  {member.isActive === 1 ? "Deactivate" : "Activate"}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            {isAdmin && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => openEdit(member)}>Edit</DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => updateStaff.mutate({ id: member.id, isActive: member.isActive === 1 ? 0 : 1 })}
+                                  >
+                                    {member.isActive === 1 ? "Deactivate" : "Activate"}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                           <div className="flex items-center gap-1.5 mt-1">
                             <Badge className={`text-xs ${roleColors[member.role] || "bg-gray-100 text-gray-700"} hover:bg-opacity-100`}>

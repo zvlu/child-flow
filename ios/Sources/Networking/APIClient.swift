@@ -1,6 +1,6 @@
 import Foundation
 
-/// Central API client for all ChildFlow backend requests.
+/// Central API client for all Sprout backend requests.
 /// Configure `baseURL` to point at your deployed server.
 actor APIClient {
     static let shared = APIClient()
@@ -13,7 +13,22 @@ actor APIClient {
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.keyDecodingStrategy = .convertFromSnakeCase
-        d.dateDecodingStrategy = .iso8601
+        // Server timestamps are ISO8601 WITH fractional seconds ("….000Z"),
+        // which the plain .iso8601 strategy rejects. Accept both forms.
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        d.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            if let date = fractional.date(from: value) ?? plain.date(from: value) {
+                return date
+            }
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unrecognized date format: \(value)"
+            )
+        }
         return d
     }()
 
@@ -52,6 +67,11 @@ actor APIClient {
         return response.token
     }
 
+    /// The signed-in user (including their role, for gating admin-only UI).
+    func getMe() async throws -> User {
+        try await get("auth/me")
+    }
+
     // MARK: - Dashboard
     func getDashboardStats() async throws -> DashboardData {
         try await get("dashboard/stats")
@@ -66,6 +86,17 @@ actor APIClient {
         try await get("children/\(id)")
     }
 
+    // MARK: - Classrooms
+    func getClassrooms() async throws -> [ClassroomSummary] {
+        try await get("classrooms")
+    }
+
+    /// Move a child to a classroom; nil unassigns them.
+    func assignChild(childId: String, classroomId: String?) async throws {
+        struct Req: Encodable { let classroomId: String? }
+        let _: SuccessResponse = try await post("children/\(childId)/assign", body: Req(classroomId: classroomId))
+    }
+
     // MARK: - Attendance
     func getAttendance(date: Date, classroom: String?) async throws -> AttendanceData {
         let dateStr = ISO8601DateFormatter().string(from: date)
@@ -77,6 +108,12 @@ actor APIClient {
     func saveAttendance(records: [AttendanceRecord]) async throws {
         struct SaveBody: Encodable { let records: [AttendanceRecord] }
         let _: EmptyResponse = try await post("attendance/bulk", body: SaveBody(records: records))
+    }
+
+    /// Quick note on a child (teacher one-screen flow).
+    func addQuickNote(childId: String, content: String) async throws {
+        struct Req: Encodable { let content: String }
+        let _: SuccessResponse = try await post("children/\(childId)/notes", body: Req(content: content))
     }
 
     // MARK: - Health
@@ -327,6 +364,60 @@ actor APIClient {
         try await get("family/events")
     }
 
+    func getFamilyNotifications() async throws -> [ParentNotification] {
+        try await get("family/notifications")
+    }
+
+    func getSchoolStatus() async throws -> SchoolStatus {
+        try await get("family/school-status")
+    }
+
+    func getFamilyProgress() async throws -> FamilyProgress {
+        try await get("family/progress")
+    }
+
+    // MARK: - Parent check-in / check-out
+    func getFamilyAttendanceToday() async throws -> [FamilyAttendanceToday] {
+        try await get("family/attendance-today")
+    }
+
+    func checkInChild(childId: String) async throws {
+        struct Req: Encodable { let childId: String }
+        let _: SuccessResponse = try await post("family/check-in", body: Req(childId: childId))
+    }
+
+    func checkOutChild(childId: String) async throws {
+        struct Req: Encodable { let childId: String }
+        let _: SuccessResponse = try await post("family/check-out", body: Req(childId: childId))
+    }
+
+    // MARK: - Absence Reports
+    func reportAbsence(childId: String, date: Date, reason: String, note: String) async throws -> AbsenceReport {
+        struct Req: Encodable {
+            let childId: String
+            let date: String
+            let reason: String
+            let note: String
+        }
+        let iso = ISO8601DateFormatter().string(from: date)
+        return try await post("family/absences", body: Req(childId: childId, date: iso, reason: reason, note: note))
+    }
+
+    func getFamilyAbsences() async throws -> [AbsenceReport] {
+        try await get("family/absences")
+    }
+
+    /// Staff: absence reports awaiting review.
+    func getAbsenceReports() async throws -> [AbsenceReport] {
+        try await get("absences")
+    }
+
+    /// Staff: approve or deny a parent-reported absence.
+    func reviewAbsence(id: String, approve: Bool) async throws {
+        struct Req: Encodable { let approve: Bool }
+        let _: SuccessResponse = try await post("absences/\(id)/review", body: Req(approve: approve))
+    }
+
     // MARK: - Private helpers
     private func get<T: Decodable>(_ path: String) async throws -> T {
         let url = baseURL.appendingPathComponent(path)
@@ -376,6 +467,8 @@ extension Notification.Name {
 }
 
 struct EmptyResponse: Decodable {}
+
+struct SuccessResponse: Decodable { let success: Bool }
 
 enum APIError: LocalizedError {
     case httpError(Int)

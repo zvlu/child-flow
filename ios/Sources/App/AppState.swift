@@ -33,18 +33,29 @@ class AppState: ObservableObject {
         }
     }
 
-    /// Restore the session if a token is present in the Keychain.
-    /// Note: `currentUser` is left nil until a profile endpoint is wired up;
-    /// the UI degrades gracefully (see DashboardView / SettingsView).
+    /// True only for administrator accounts; gates admin-only UI like
+    /// timesheet approval. The server enforces every permission regardless.
+    var isAdmin: Bool { currentUser?.role == "admin" }
+
+    /// Restore the session if a token is present in the Keychain, then load
+    /// the user's profile (name + role) so the UI can gate admin functions.
     func checkAuth() async {
         let hasToken = await APIClient.shared.loadStoredToken()
         await MainActor.run { isAuthenticated = hasToken }
+        if hasToken { await loadProfile() }
     }
 
     func login(token: String) {
         Task {
             await APIClient.shared.setToken(token)
             await MainActor.run { isAuthenticated = true }
+            await loadProfile()
+        }
+    }
+
+    private func loadProfile() async {
+        if let me = try? await APIClient.shared.getMe() {
+            await MainActor.run { currentUser = me }
         }
     }
 

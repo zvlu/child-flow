@@ -15,6 +15,8 @@ struct User: Codable, Identifiable {
 // MARK: - Child
 struct Child: Codable, Identifiable {
     let id: String
+    /// Groups siblings; nil in older payloads/mocks.
+    var familyId: String? = nil
     let firstName: String
     let lastName: String
     let dateOfBirth: String
@@ -28,9 +30,70 @@ struct Child: Codable, Identifiable {
     let parentName: String
     let parentPhone: String
     let allergies: [String]
+    /// Color-coded safety flags (allergy / dietary / disability / special).
+    var flags: [ChildFlag] = []
 
     var fullName: String { "\(firstName) \(lastName)" }
     var initials: String { "\(firstName.prefix(1))\(lastName.prefix(1))" }
+}
+
+/// Today's drop-off / pickup state for a child (parent check-in/out).
+struct FamilyAttendanceToday: Codable, Identifiable {
+    let childId: String
+    let childName: String
+    let status: String
+    let checkInTime: Date?
+    let checkOutTime: Date?
+
+    var id: String { childId }
+    var isCheckedIn: Bool { checkInTime != nil }
+    var isCheckedOut: Bool { checkOutTime != nil }
+}
+
+/// A color-coded safety flag shown on a child wherever they appear.
+struct ChildFlag: Codable, Identifiable {
+    let id: String
+    let type: String   // allergy | dietary | disability | special
+    let label: String
+
+    var color: Color {
+        switch type {
+        case "allergy":    return .cfFlagAllergy
+        case "dietary":    return .cfFlagDietary
+        case "disability": return .cfFlagDisability
+        default:           return .cfFlagSpecial
+        }
+    }
+    var bgColor: Color {
+        switch type {
+        case "allergy":    return .cfFlagAllergyBg
+        case "dietary":    return .cfFlagDietaryBg
+        case "disability": return .cfFlagDisabilityBg
+        default:           return .cfFlagSpecialBg
+        }
+    }
+    var icon: String {
+        switch type {
+        case "allergy":    return "exclamationmark.triangle.fill"
+        case "dietary":    return "fork.knife"
+        case "disability": return "figure.roll"
+        default:           return "star.fill"
+        }
+    }
+}
+
+/// A classroom with live enrollment, used to organize children by room.
+struct ClassroomSummary: Codable, Identifiable {
+    let id: String
+    let name: String
+    let ageGroup: String
+    let capacity: Int
+    let enrolledCount: Int
+    let teacherName: String
+    let assistantName: String
+    let color: String
+
+    var isFull: Bool { capacity > 0 && enrolledCount >= capacity }
 }
 
 // MARK: - Attendance
@@ -128,12 +191,18 @@ struct ProgramAlert: Codable, Identifiable {
     let title: String
     let description: String
     let type: String
+    /// Optional hint for the destination screen (e.g. a health status filter
+    /// like "Overdue" or "Due Soon"). Sent by the server; nil in older payloads.
+    var filter: String? = nil
 
     var icon: String {
         switch type {
         case "health": return "heart.fill"
         case "attendance": return "exclamationmark.circle"
         case "compliance": return "checkmark.seal"
+        case "message": return "envelope.badge.fill"
+        case "document": return "doc.text.fill"
+        case "absence": return "calendar.badge.minus"
         default: return "bell"
         }
     }
@@ -143,6 +212,9 @@ struct ProgramAlert: Codable, Identifiable {
         case "health":     return .cfHealth
         case "attendance": return .cfAttendance
         case "compliance": return .cfCompliance
+        case "message":    return .cfChildren
+        case "document":   return .cfFamily
+        case "absence":    return .cfAttendance
         default:           return .cfPrimary
         }
     }
@@ -332,6 +404,67 @@ struct FamilyEvent: Codable, Identifiable {
 struct FamilyAuthResult: Codable {
     let token: String
     let profile: FamilyProfile
+}
+
+// MARK: - Absence Reports
+
+/// A parent's "my child is not coming" report, reviewed by a family advocate.
+struct AbsenceReport: Codable, Identifiable {
+    let id: String
+    let childId: String
+    let childName: String
+    let familyName: String
+    let date: Date
+    let reason: String
+    let reasonLabel: String
+    let note: String
+    let status: String   // pending | approved | denied
+    let reportedAt: Date
+}
+
+/// In-app notification for a family (absence decisions, announcements, …).
+struct ParentNotification: Codable, Identifiable {
+    let id: String
+    let message: String
+    let type: String
+    let isRead: Bool
+    let createdAt: Date
+}
+
+/// Whether the program is open today, plus the next planned closure.
+struct SchoolStatus: Codable {
+    let isOpen: Bool
+    let label: String
+    let nextClosureTitle: String?
+    let nextClosureDate: Date?
+}
+
+// MARK: - Family Progress (graphs)
+
+struct FamilyProgress: Codable {
+    let attendance: [ChildAttendanceSeries]
+    let goals: [GoalProgressItem]
+}
+
+struct ChildAttendanceSeries: Codable, Identifiable {
+    let childId: String
+    let childName: String
+    let weeks: [WeekRate]
+    var id: String { childId }
+}
+
+struct WeekRate: Codable, Identifiable {
+    let weekStart: String
+    let label: String
+    let rate: Int
+    var id: String { weekStart }
+}
+
+struct GoalProgressItem: Codable, Identifiable {
+    let id: String
+    let title: String
+    let progress: Int
+    let status: String
 }
 
 // MARK: - Monthly Contact

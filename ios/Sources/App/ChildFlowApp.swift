@@ -7,7 +7,7 @@ struct ChildFlowApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
-        let teal = UIColor(red: 0.000, green: 0.427, blue: 0.467, alpha: 1)
+        let accent = UIColor(red: 0.310, green: 0.486, blue: 0.365, alpha: 1)
         let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
         for layout in [appearance.stackedLayoutAppearance,
@@ -15,12 +15,12 @@ struct ChildFlowApp: App {
                        appearance.compactInlineLayoutAppearance] {
             layout.normal.iconColor = .secondaryLabel
             layout.normal.titleTextAttributes = [.foregroundColor: UIColor.secondaryLabel]
-            layout.selected.iconColor = teal
-            layout.selected.titleTextAttributes = [.foregroundColor: teal]
+            layout.selected.iconColor = accent
+            layout.selected.titleTextAttributes = [.foregroundColor: accent]
         }
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
-        UITabBar.appearance().tintColor = teal
+        UITabBar.appearance().tintColor = accent
     }
 
     var body: some Scene {

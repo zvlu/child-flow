@@ -622,14 +622,19 @@ struct AlertLinkRow: View {
     private var destination: some View {
         switch alert.type {
         case "attendance": AttendancePlansView()
-        case "health":     HealthView()
+        // Server sends the status filter that matters most ("Overdue" before
+        // "Due Soon"), so the alert lands on the records needing action.
+        case "health":     HealthView(initialStatusFilter: alert.filter)
         case "compliance": ComplianceView()
+        case "message":    MessagingView()
+        case "document":   DocumentsView()
+        case "absence":    AbsenceReportsView()
         default:           EmptyView()
         }
     }
 
     private var isNavigable: Bool {
-        ["attendance", "health", "compliance"].contains(alert.type)
+        ["attendance", "health", "compliance", "message", "document", "absence"].contains(alert.type)
     }
 
     var body: some View {
@@ -778,7 +783,15 @@ class DashboardViewModel: ObservableObject {
                 ProgramAlert(id: "a2",
                              title: "5 Health Records Due This Month",
                              description: "Dental exams and physical screenings need scheduling.",
-                             type: "health")
+                             type: "health"),
+                ProgramAlert(id: "a3",
+                             title: "3 Family Messages Not Delivered",
+                             description: "1 failed to send and needs to be resent.",
+                             type: "message"),
+                ProgramAlert(id: "a4",
+                             title: "4 Documents Need Attention",
+                             description: "3 awaiting signature, 1 expired and needs renewal.",
+                             type: "document")
             ]
             #endif
         }

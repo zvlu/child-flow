@@ -54,7 +54,7 @@ const reportTemplates = [
   { name: "Enrollment Report", description: "Current enrollment, waitlist, and capacity data", icon: Users, color: "text-green-500 bg-green-50" },
   { name: "Family Services Report", description: "Home visits, contacts, and service referrals", icon: FileText, color: "text-purple-500 bg-purple-50" },
   { name: "Child Assessment Report", description: "Developmental assessment results and trends", icon: BarChart3, color: "text-amber-500 bg-amber-50" },
-  { name: "Staff Training Report", description: "Training hours, certifications, and compliance", icon: TrendingUp, color: "text-teal-500 bg-teal-50" },
+  { name: "Staff Training Report", description: "Training hours, certifications, and compliance", icon: TrendingUp, color: "text-[#5E8C6A] bg-[#F1F6F2]" },
   { name: "Income Eligibility Report", description: "Family income levels and eligibility verification", icon: FileText, color: "text-indigo-500 bg-indigo-50" },
 ];
 

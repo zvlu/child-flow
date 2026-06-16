@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,9 +65,18 @@ const ageString = (dob: unknown) => {
 const formatDate = (d: unknown) =>
   d ? new Date(d as string | Date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "—";
 
+const VALID_HEALTH_FILTERS = ["all", "current", "due_soon", "overdue"];
+
 export default function Health() {
+  const [, navigate] = useLocation();
+  const search0 = useSearch();
+  // Deep-link support: /health?status=overdue lands pre-filtered.
+  const initialFilter = (() => {
+    const s = new URLSearchParams(search0).get("status") ?? "all";
+    return VALID_HEALTH_FILTERS.includes(s) ? s : "all";
+  })();
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(initialFilter);
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({
     childId: "",
@@ -280,7 +290,12 @@ export default function Health() {
                       {filtered.map(record => {
                         const initials = record.name.split(" ").map(n => n[0]).join("");
                         return (
-                          <tr key={record.id} className="hover:bg-muted/20 transition-colors">
+                          <tr
+                            key={record.id}
+                            className="hover:bg-muted/20 transition-colors cursor-pointer"
+                            title={`Open ${record.name}'s health records`}
+                            onClick={() => navigate(`/children/${record.id}`)}
+                          >
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
                                 <Avatar className="h-8 w-8">
@@ -399,7 +414,9 @@ export default function Health() {
                     return (
                       <div
                         key={alert.recordId}
-                        className={`flex items-center gap-4 p-4 rounded-lg border ${overdue ? "border-red-200 bg-red-50" : "border-yellow-200 bg-yellow-50"}`}
+                        className={`flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-shadow hover:shadow-md ${overdue ? "border-red-200 bg-red-50" : "border-yellow-200 bg-yellow-50"}`}
+                        title={`Open ${alert.childName}'s health records`}
+                        onClick={() => navigate(`/children/${alert.childId}`)}
                       >
                         {overdue
                           ? <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />

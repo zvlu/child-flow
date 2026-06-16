@@ -5,7 +5,12 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerAuthRoutes } from "./auth";
 import { registerOAuthRoutes } from "./oauth";
+import { registerDashboardRoutes } from "../dashboard";
 import { registerFamilyRoutes } from "../family";
+import { registerMessagingRoutes } from "../messaging";
+import { registerRosterRoutes } from "../roster";
+import { registerAbsenceRoutes } from "../absences";
+import { registerAttendanceRoutes } from "../attendance";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -39,6 +44,16 @@ async function startServer() {
   registerAuthRoutes(app);
   // Parent (family app) onboarding + scoped data under /api/family/*
   registerFamilyRoutes(app);
+  // Staff dashboard stats + live alerts under /api/dashboard/stats
+  registerDashboardRoutes(app);
+  // Two-way staff <-> family messaging under /api/messaging/*
+  registerMessagingRoutes(app);
+  // Children + classroom rosters under /api/children, /api/classrooms
+  registerRosterRoutes(app);
+  // Parent-reported absences + advocate review under /api/family/absences, /api/absences
+  registerAbsenceRoutes(app);
+  // Teacher attendance + quick notes under /api/attendance, /api/children/:id/notes
+  registerAttendanceRoutes(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API
