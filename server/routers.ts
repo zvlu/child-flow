@@ -120,6 +120,27 @@ export const appRouter = router({
       .query(async ({ input: organizationId }) => {
         return mod.getChildFlags(organizationId);
       }),
+    addFlag: staffProcedure
+      .input(
+        z.object({
+          childId: z.number(),
+          type: z.enum(["allergy", "dietary", "disability", "special"]),
+          label: z.string().min(1).max(100),
+          detail: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await mod.addChildFlag(input);
+        await auditAccess(ctx, { action: "create", resourceType: "child_flag", resourceId: input.childId, detail: `${input.type}:${input.label}` });
+        return { success: true };
+      }),
+    removeFlag: staffProcedure
+      .input(z.object({ flagId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await mod.removeChildFlag(input.flagId);
+        await auditAccess(ctx, { action: "delete", resourceType: "child_flag", resourceId: input.flagId });
+        return { success: true };
+      }),
   }),
 
   families: router({

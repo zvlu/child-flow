@@ -14,13 +14,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   ArrowLeft, Edit, Heart, Phone, Mail, MapPin,
   CheckCircle2, Users, Baby, ChevronRight, Plus,
-  User, Calendar, Home, FileText, ShieldCheck, MessageSquare, Loader2, AlertCircle
+  User, Calendar, Home, FileText, ShieldCheck, MessageSquare, Loader2, AlertCircle, X
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { FlagChips } from "@/components/FlagChips";
 
 interface ChildDetailProps { id: string; }
 
@@ -83,6 +82,25 @@ export default function ChildDetail({ id }: ChildDetailProps) {
   );
   const { data: allFlags } = trpc.children.flags.useQuery(ORGANIZATION_ID);
   const childFlagList = (allFlags ?? []).filter((f: any) => f.childId === childId);
+  const [showFlagDialog, setShowFlagDialog] = useState(false);
+  const [flagType, setFlagType] = useState<"allergy" | "dietary" | "disability" | "special">("allergy");
+  const [flagLabel, setFlagLabel] = useState("");
+  const addFlag = trpc.children.addFlag.useMutation({
+    onSuccess: () => {
+      utils.children.flags.invalidate(ORGANIZATION_ID);
+      toast.success("Flag added");
+      setShowFlagDialog(false);
+      setFlagLabel("");
+    },
+    onError: (err) => toast.error(err.message || "Couldn't add flag"),
+  });
+  const removeFlag = trpc.children.removeFlag.useMutation({
+    onSuccess: () => {
+      utils.children.flags.invalidate(ORGANIZATION_ID);
+      toast.success("Flag removed");
+    },
+    onError: (err) => toast.error(err.message || "Couldn't remove flag"),
+  });
   const { data: documents, isLoading: isDocumentsLoading } = trpc.documents.list.useQuery(
     { organizationId: ORGANIZATION_ID, childId },
     { enabled: !isNaN(childId) }
@@ -255,9 +273,34 @@ export default function ChildDetail({ id }: ChildDetailProps) {
               {childStatusBadge(child.status)}
               <span className="text-sm text-slate-500 font-medium">{age} &bull; {classroomName} &bull; {teacherName}</span>
             </div>
-            {childFlagList.length > 0 && (
-              <div className="mt-2"><FlagChips flags={childFlagList} /></div>
-            )}
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {childFlagList.map((f: any) => (
+                <span
+                  key={f.id}
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                    f.type === "allergy" ? "bg-red-100 text-red-800"
+                    : f.type === "dietary" ? "bg-amber-100 text-amber-800"
+                    : f.type === "disability" ? "bg-indigo-100 text-indigo-800"
+                    : "bg-blue-100 text-blue-800"}`}
+                  title={f.detail ?? f.label}
+                >
+                  {f.label}
+                  <button
+                    onClick={() => removeFlag.mutate({ flagId: f.id })}
+                    className="ml-0.5 rounded-full hover:bg-black/10 p-0.5"
+                    aria-label={`Remove ${f.label} flag`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+              <button
+                onClick={() => { setFlagType("allergy"); setFlagLabel(""); setShowFlagDialog(true); }}
+                className="inline-flex items-center gap-1 rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-500 hover:border-primary hover:text-primary transition-colors"
+              >
+                <Plus className="h-3 w-3" /> Flag
+              </button>
+            </div>
           </div>
         </div>
         <Button
@@ -274,6 +317,50 @@ export default function ChildDetail({ id }: ChildDetailProps) {
       </div>
 
       {/* Edit Profile Dialog */}
+      {/* Add safety flag */}
+      <Dialog open={showFlagDialog} onOpenChange={setShowFlagDialog}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Add safety flag</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <Select value={flagType} onValueChange={(v) => setFlagType(v as typeof flagType)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="allergy">Allergy</SelectItem>
+                  <SelectItem value="dietary">Dietary</SelectItem>
+                  <SelectItem value="disability">Disability</SelectItem>
+                  <SelectItem value="special">Special need</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="flag-label">Label</Label>
+              <Input
+                id="flag-label"
+                value={flagLabel}
+                onChange={(e) => setFlagLabel(e.target.value)}
+                placeholder="e.g. Peanuts, Vegetarian, IEP"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button variant="outline" onClick={() => setShowFlagDialog(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!flagLabel.trim()) { toast.error("Label is required"); return; }
+                addFlag.mutate({ childId, type: flagType, label: flagLabel.trim() });
+              }}
+              disabled={addFlag.isPending}
+            >
+              {addFlag.isPending ? "Adding…" : "Add Flag"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent>
           <DialogHeader>

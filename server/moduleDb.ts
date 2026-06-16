@@ -104,6 +104,26 @@ export async function getChildFlags(organizationId: number) {
     .where(eq(children.organizationId, organizationId));
 }
 
+export async function addChildFlag(data: {
+  childId: number;
+  type: "allergy" | "dietary" | "disability" | "special";
+  label: string;
+  detail?: string | null;
+}) {
+  const db = await requireDb();
+  await db.insert(childFlags).values({
+    childId: data.childId,
+    type: data.type,
+    label: data.label,
+    detail: data.detail ?? null,
+  });
+}
+
+export async function removeChildFlag(id: number) {
+  const db = await requireDb();
+  await db.delete(childFlags).where(eq(childFlags.id, id));
+}
+
 /**
  * Move a child to a classroom (or unassign with null). Ends any active
  * assignment first, so a child is only ever in one room at a time.
