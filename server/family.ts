@@ -1,6 +1,6 @@
 import { MOBILE_SESSION_TTL_MS } from "@shared/const";
 import { randomBytes } from "crypto";
-import { and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
 import {
   attendance,
@@ -703,5 +703,138 @@ export function registerFamilyRoutes(app: Express) {
         status: g.status,
       })),
     });
+  });
+
+  // ---- Parent check-in / check-out (drop-off & pickup) ----
+
+  /** Today's check-in/out state for each of the parent's children. */
+  app.get("/api/family/attendance-today", async (req: Request, res: Response) => {
+    const parent = await requireParent(req);
+    if (!parent) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const kids = await db.select().from(children).where(eq(children.familyId, parent.familyId));
+    const now = new Date();
+    const start = new Date(now); start.setHours(0, 0, 0, 0);
+    const end = new Date(now); end.setHours(23, 59, 59, 999);
+    const rows = await db
+      .select()
+      .from(attendance)
+      .where(and(gte(attendance.date, start), lte(attendance.date, end)));
+    const byChild = new Map(rows.map(r => [r.childId, r]));
+
+    res.json(
+      kids.map(c => {
+        const r = byChild.get(c.id);
+        return {
+          childId: String(c.id),
+          childName: `${c.firstName} ${c.lastName}`,
+          status: r?.status ?? "none",
+          checkInTime: r?.checkInTime?.toISOString() ?? null,
+          checkOutTime: r?.checkOutTime?.toISOString() ?? null,
+        };
+      })
+    );
+  });
+
+  // Shared guard: the child must belong to the signed-in parent's family.
+  const requireOwnChild = async (parentFamilyId: number, childId: number) => {
+    const db = await getDb();
+    if (!db) return null;
+    const [child] = await db
+      .select()
+      .from(children)
+      .where(and(eq(children.id, childId), eq(children.familyId, parentFamilyId)))
+      .limit(1);
+    return child ?? null;
+  };
+
+  const upsertTodayAttendance = async (
+    child: typeof children.$inferSelect,
+    patch: { checkIn?: boolean; checkOut?: boolean }
+  ) => {
+    const db = await getDb();
+    if (!db) return;
+    const now = new Date();
+    const start = new Date(now); start.setHours(0, 0, 0, 0);
+    const end = new Date(now); end.setHours(23, 59, 59, 999);
+    const [existing] = await db
+      .select()
+      .from(attendance)
+      .where(and(eq(attendance.childId, child.id), gte(attendance.date, start), lte(attendance.date, end)))
+      .limit(1);
+    if (existing) {
+      await db
+        .update(attendance)
+        .set({
+          status: "present",
+          checkInTime: patch.checkIn ? existing.checkInTime ?? now : existing.checkInTime,
+          checkOutTime: patch.checkOut ? now : existing.checkOutTime,
+        })
+        .where(eq(attendance.id, existing.id));
+    } else {
+      await db.insert(attendance).values({
+        organizationId: child.organizationId,
+        childId: child.id,
+        date: now,
+        status: "present",
+        checkInTime: patch.checkIn ? now : null,
+        checkOutTime: patch.checkOut ? now : null,
+      });
+    }
+  };
+
+  app.post("/api/family/check-in", async (req: Request, res: Response) => {
+    const parent = await requireParent(req);
+    if (!parent) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const child = await requireOwnChild(parent.familyId, Number(req.body?.childId));
+    if (!child) {
+      res.status(403).json({ error: "Child not found in your family" });
+      return;
+    }
+    await upsertTodayAttendance(child, { checkIn: true });
+    await insertAuditLog({
+      userId: parent.id,
+      actorOpenId: parent.openId,
+      action: "update",
+      resourceType: "attendance",
+      resourceId: String(child.id),
+      ipAddress: clientIpFromReq(req),
+      detail: "parent check-in",
+    });
+    res.json({ success: true });
+  });
+
+  app.post("/api/family/check-out", async (req: Request, res: Response) => {
+    const parent = await requireParent(req);
+    if (!parent) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const child = await requireOwnChild(parent.familyId, Number(req.body?.childId));
+    if (!child) {
+      res.status(403).json({ error: "Child not found in your family" });
+      return;
+    }
+    await upsertTodayAttendance(child, { checkOut: true });
+    await insertAuditLog({
+      userId: parent.id,
+      actorOpenId: parent.openId,
+      action: "update",
+      resourceType: "attendance",
+      resourceId: String(child.id),
+      ipAddress: clientIpFromReq(req),
+      detail: "parent check-out",
+    });
+    res.json({ success: true });
   });
 }

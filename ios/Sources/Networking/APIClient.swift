@@ -376,6 +376,21 @@ actor APIClient {
         try await get("family/progress")
     }
 
+    // MARK: - Parent check-in / check-out
+    func getFamilyAttendanceToday() async throws -> [FamilyAttendanceToday] {
+        try await get("family/attendance-today")
+    }
+
+    func checkInChild(childId: String) async throws {
+        struct Req: Encodable { let childId: String }
+        let _: SuccessResponse = try await post("family/check-in", body: Req(childId: childId))
+    }
+
+    func checkOutChild(childId: String) async throws {
+        struct Req: Encodable { let childId: String }
+        let _: SuccessResponse = try await post("family/check-out", body: Req(childId: childId))
+    }
+
     // MARK: - Absence Reports
     func reportAbsence(childId: String, date: Date, reason: String, note: String) async throws -> AbsenceReport {
         struct Req: Encodable {

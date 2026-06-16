@@ -37,6 +37,19 @@ struct Child: Codable, Identifiable {
     var initials: String { "\(firstName.prefix(1))\(lastName.prefix(1))" }
 }
 
+/// Today's drop-off / pickup state for a child (parent check-in/out).
+struct FamilyAttendanceToday: Codable, Identifiable {
+    let childId: String
+    let childName: String
+    let status: String
+    let checkInTime: Date?
+    let checkOutTime: Date?
+
+    var id: String { childId }
+    var isCheckedIn: Bool { checkInTime != nil }
+    var isCheckedOut: Bool { checkOutTime != nil }
+}
+
 /// A color-coded safety flag shown on a child wherever they appear.
 struct ChildFlag: Codable, Identifiable {
     let id: String

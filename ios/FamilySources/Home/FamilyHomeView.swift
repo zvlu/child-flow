@@ -62,8 +62,14 @@ struct FamilyHomeView: View {
                         ProgressView().padding(.top, 40)
                     } else {
                         ForEach(viewModel.children) { child in
-                            FamilyChildCard(child: child)
-                                .padding(.horizontal)
+                            FamilyChildCard(
+                                child: child,
+                                today: viewModel.today(for: child.id),
+                                busy: viewModel.busyChildId == child.id,
+                                onCheckIn: { Task { await viewModel.checkIn(child.id) } },
+                                onCheckOut: { Task { await viewModel.checkOut(child.id) } }
+                            )
+                            .padding(.horizontal)
                         }
                     }
 
@@ -333,7 +339,20 @@ struct ReportAbsenceSheet: View {
 
 struct FamilyChildCard: View {
     let child: FamilyChild
+    var today: FamilyAttendanceToday? = nil
+    var busy: Bool = false
+    var onCheckIn: () -> Void = {}
+    var onCheckOut: () -> Void = {}
     @State private var expanded = true
+
+    private func timeStr(_ d: Date?) -> String {
+        guard let d else { return "" }
+        return d.formatted(.dateTime.hour().minute())
+    }
+
+    private var stateKey: String {
+        "\(today?.checkInTime != nil)-\(today?.checkOutTime != nil)"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -365,6 +384,14 @@ struct FamilyChildCard: View {
             }
 
             if expanded {
+                Divider()
+
+                // Drop-off / pickup — the parent's most frequent action, big and obvious.
+                checkInOutControl
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
+                    .animation(.spring(response: 0.45, dampingFraction: 0.85), value: stateKey)
+
                 Divider()
 
                 // Stats row
@@ -411,6 +438,68 @@ struct FamilyChildCard: View {
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+    }
+
+    @ViewBuilder
+    private var checkInOutControl: some View {
+        let checkedIn = today?.isCheckedIn ?? false
+        let checkedOut = today?.isCheckedOut ?? false
+
+        if checkedOut {
+            // Done for the day — calm confirmation, no further action.
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.seal.fill")
+                    .foregroundColor(.green)
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Picked up \(timeStr(today?.checkOutTime))")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Dropped off \(timeStr(today?.checkInTime))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        } else if checkedIn {
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    Circle().fill(Color.green).frame(width: 8, height: 8)
+                    Text("Checked in \(timeStr(today?.checkInTime))")
+                        .font(.subheadline.weight(.medium))
+                }
+                Spacer()
+                Button(action: onCheckOut) {
+                    Group {
+                        if busy { ProgressView().tint(.white) }
+                        else { Label("Check out", systemImage: "arrow.up.right.square") }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 9)
+                    .background(Color(hex: "C96E47"))
+                    .clipShape(Capsule())
+                }
+                .disabled(busy)
+            }
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        } else {
+            Button(action: onCheckIn) {
+                Group {
+                    if busy { ProgressView().tint(.white) }
+                    else { Label("Check in \(child.firstName)", systemImage: "checkmark.circle.fill") }
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.accentColor)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .disabled(busy)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
     }
 
     private func healthColor(_ status: String) -> Color {
@@ -505,10 +594,14 @@ class FamilyHomeViewModel: ObservableObject {
     @Published var schoolStatus: SchoolStatus?
     @Published var absences: [AbsenceReport] = []
     @Published var notifications: [ParentNotification] = []
+    @Published var attendanceToday: [String: FamilyAttendanceToday] = [:]
+    @Published var busyChildId: String? = nil
     @Published var isLoading = false
 
     /// Children for the report-absence sheet when the profile isn't cached.
     var profileChildren: [FamilyChild] { children }
+
+    func today(for childId: String) -> FamilyAttendanceToday? { attendanceToday[childId] }
 
     func load() async {
         isLoading = true
@@ -520,6 +613,31 @@ class FamilyHomeViewModel: ObservableObject {
         schoolStatus = (try? await APIClient.shared.getSchoolStatus()) ?? schoolStatus
         absences = (try? await APIClient.shared.getFamilyAbsences()) ?? absences
         notifications = (try? await APIClient.shared.getFamilyNotifications()) ?? notifications
+        await loadAttendance()
         isLoading = false
+    }
+
+    private func loadAttendance() async {
+        if let rows = try? await APIClient.shared.getFamilyAttendanceToday() {
+            attendanceToday = Dictionary(uniqueKeysWithValues: rows.map { ($0.childId, $0) })
+        }
+    }
+
+    func checkIn(_ childId: String) async {
+        busyChildId = childId
+        defer { busyChildId = nil }
+        do {
+            try await APIClient.shared.checkInChild(childId: childId)
+            await loadAttendance()
+        } catch {}
+    }
+
+    func checkOut(_ childId: String) async {
+        busyChildId = childId
+        defer { busyChildId = nil }
+        do {
+            try await APIClient.shared.checkOutChild(childId: childId)
+            await loadAttendance()
+        } catch {}
     }
 }
