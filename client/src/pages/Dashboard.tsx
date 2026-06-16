@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Link } from "wouter";
+import { motion, useReducedMotion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ export default function Dashboard() {
     return { rangeStart: start, rangeEnd: end };
   }, []);
 
+  const reduced = useReducedMotion() ?? false;
   const { data: stats, isLoading: statsLoading } = trpc.dashboard.stats.useQuery(ORGANIZATION_ID);
   const { data: followUps } = trpc.health.followUps.useQuery({ organizationId: ORGANIZATION_ID });
   const { data: insights } = trpc.aiInsights.list.useQuery({ organizationId: ORGANIZATION_ID });
@@ -289,7 +291,12 @@ export default function Dashboard() {
           return (
             <Link key={card.title} href={card.href}>
               <a className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
-                <Card className={`border-l-4 ${card.borderClass} transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 cursor-pointer`}>
+                <motion.div
+                  whileHover={reduced ? undefined : { y: -4, scale: 1.01 }}
+                  whileTap={reduced ? undefined : { scale: 0.99 }}
+                  transition={{ type: "spring", stiffness: 320, damping: 22 }}
+                >
+                <Card className={`border-l-4 ${card.borderClass} transition-shadow duration-150 hover:shadow-lg cursor-pointer`}>
                   <CardContent className="p-5">
                     <div className="flex items-center justify-between">
                       <div>
@@ -306,6 +313,7 @@ export default function Dashboard() {
                     </div>
                   </CardContent>
                 </Card>
+                </motion.div>
               </a>
             </Link>
           );
@@ -323,9 +331,16 @@ export default function Dashboard() {
               const Icon = action.icon;
               return (
                 <Link key={action.href} href={action.href}>
-                  <a className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all duration-150 cursor-pointer ${action.color}`}>
-                    <Icon className="h-6 w-6" />
-                    <span className="text-xs font-medium text-center leading-tight">{action.label}</span>
+                  <a className="block">
+                    <motion.div
+                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border cursor-pointer ${action.color}`}
+                      whileHover={reduced ? undefined : { y: -3, scale: 1.04 }}
+                      whileTap={reduced ? undefined : { scale: 0.96 }}
+                      transition={{ type: "spring", stiffness: 320, damping: 20 }}
+                    >
+                      <Icon className="h-6 w-6" />
+                      <span className="text-xs font-medium text-center leading-tight">{action.label}</span>
+                    </motion.div>
                   </a>
                 </Link>
               );
