@@ -150,6 +150,24 @@ export default function AppLayout({ children }: AppLayoutProps) {
   );
   const overdueCount = healthFollowUps.filter((item) => item.severity === "overdue").length;
 
+  // Aggregated notifications for the bell (health, attendance, absences,
+  // messages, documents) — same engine as the dashboard, refreshed each minute.
+  const { data: bellAlerts = [] } = trpc.dashboard.alerts.useQuery(undefined, { refetchInterval: 60_000 });
+  const alertHref = (a: { type: string; filter?: string }) => {
+    switch (a.type) {
+      case "health": return `/health?status=${a.filter === "Overdue" ? "overdue" : "due_soon"}`;
+      case "attendance": return "/attendance";
+      case "absence": return "/action-queue";
+      case "message": return "/communication";
+      case "document": return "/documents";
+      default: return "/dashboard";
+    }
+  };
+  const alertAccent = (type: string) =>
+    type === "health" || type === "attendance" ? "text-destructive"
+    : type === "absence" ? "text-amber-600"
+    : type === "message" ? "text-blue-600" : "text-slate-600";
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -433,50 +451,47 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 relative">
+                  <Button variant="ghost" size="icon" className="h-7 w-7 relative" aria-label={`Notifications${bellAlerts.length ? `, ${bellAlerts.length} new` : ""}`}>
                     <Bell className="h-3.5 w-3.5 text-slate-400" />
-                    {healthFollowUps.length > 0 && (
-                      <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 bg-destructive rounded-full" />
+                    {bellAlerts.length > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 flex items-center justify-center text-[9px] font-bold text-white bg-destructive rounded-full">
+                        {bellAlerts.length > 9 ? "9+" : bellAlerts.length}
+                      </span>
                     )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-96 rounded-xl">
                   <div className="px-3 py-2 border-b">
-                    <p className="text-sm font-semibold">Health Follow-up Alerts</p>
+                    <p className="text-sm font-semibold">Notifications</p>
                     <p className="text-xs text-muted-foreground">
-                      {healthFollowUps.length} total · {overdueCount} overdue
+                      {bellAlerts.length === 0 ? "You're all caught up" : `${bellAlerts.length} item${bellAlerts.length === 1 ? "" : "s"} need attention`}
                     </p>
                   </div>
-                  {healthFollowUps.length === 0 ? (
-                    <div className="px-3 py-4 text-xs text-muted-foreground">
-                      No upcoming or overdue health follow-ups in the next 30 days.
+                  {bellAlerts.length === 0 ? (
+                    <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                      Nothing needs your attention right now.
                     </div>
                   ) : (
-                    healthFollowUps.slice(0, 6).map((alert) => (
-                      <DropdownMenuItem key={alert.recordId} asChild>
-                        <Link href="/health" asChild>
-                          <a className="flex flex-col items-start gap-0.5 py-2">
-                            <span className={cn(
-                              "text-[11px] font-semibold uppercase tracking-wide",
-                              alert.severity === "overdue" ? "text-destructive" : "text-amber-600"
-                            )}>
-                              {alert.severity === "overdue" ? "Overdue" : "Due Soon"}
-                            </span>
-                            <span className="text-sm leading-tight">{alert.message}</span>
-                          </a>
-                        </Link>
-                      </DropdownMenuItem>
-                    ))
+                    <div className="max-h-80 overflow-y-auto">
+                      {bellAlerts.map((alert) => (
+                        <DropdownMenuItem key={alert.id} asChild>
+                          <Link href={alertHref(alert)} asChild>
+                            <a className="flex flex-col items-start gap-0.5 py-2 cursor-pointer">
+                              <span className={cn("text-[11px] font-semibold uppercase tracking-wide", alertAccent(alert.type))}>
+                                {alert.type}
+                              </span>
+                              <span className="text-sm leading-tight font-medium">{alert.title}</span>
+                              <span className="text-xs text-muted-foreground leading-tight">{alert.description}</span>
+                            </a>
+                          </Link>
+                        </DropdownMenuItem>
+                      ))}
+                    </div>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/health" asChild>
-                      <a className="text-sm font-medium">Open Health Records</a>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/action-queue" asChild>
-                      <a className="text-sm font-medium">Open Action Queue</a>
+                    <Link href="/dashboard" asChild>
+                      <a className="text-sm font-medium cursor-pointer">Open dashboard</a>
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>

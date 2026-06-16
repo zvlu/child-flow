@@ -25,6 +25,7 @@ import {
 } from "./db";
 import * as mod from "./moduleDb";
 import { createFamilyInvitation, listFamilyInvitations } from "./family";
+import { computeDashboard } from "./dashboard";
 import { CommunicationService } from "./services/communication";
 
 export const appRouter = router({
@@ -319,6 +320,11 @@ export const appRouter = router({
       .query(async ({ input: organizationId }) => {
         return mod.getDashboardStats(organizationId);
       }),
+    // Aggregated actionable alerts for the notification bell (shared with iOS).
+    alerts: staffProcedure.query(async () => {
+      const data = await computeDashboard();
+      return data?.alerts ?? [];
+    }),
   }),
 
   calendar: router({
