@@ -7,10 +7,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Settings as SettingsIcon, Bell, Lock, Users, Building2, Save, Check } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Settings as SettingsIcon, Bell, Lock, Users, Building2, Save, Check, UserCircle, Loader2 } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
+
+const roleLabel: Record<string, string> = { admin: "Administrator", staff: "Staff", parent: "Parent" };
 
 export default function Settings() {
   const [saved, setSaved] = useState(false);
+  const { user, loading } = useAuth();
+  const isAdmin = useIsAdmin();
+  const initials = user?.name
+    ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "?";
 
   const handleSave = () => {
     setSaved(true);
@@ -35,15 +45,75 @@ export default function Settings() {
         )}
       </div>
 
-      <Tabs defaultValue="program">
-        <TabsList className="grid grid-cols-4 w-full max-w-md">
-          <TabsTrigger value="program">Program</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
+      <Tabs defaultValue="account">
+        <TabsList className={`grid w-full ${isAdmin ? "grid-cols-5 max-w-2xl" : "grid-cols-3 max-w-md"}`}>
+          <TabsTrigger value="account">Account</TabsTrigger>
+          {isAdmin && <TabsTrigger value="program">Program</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
 
-        {/* Program Settings */}
+        {/* Account — the real signed-in user */}
+        <TabsContent value="account" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <UserCircle className="h-4 w-4 text-primary" />
+                My Account
+              </CardTitle>
+              <CardDescription>Your profile as it appears across Sprout</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {loading ? (
+                <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+              ) : !user ? (
+                <div className="py-6 text-center text-sm text-muted-foreground">
+                  You're not signed in. <a href="/" className="text-primary font-medium">Return to sign in</a>.
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-16 w-16">
+                      <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">{initials}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-lg font-bold text-foreground">{user.name || "Unnamed user"}</p>
+                      <p className="text-sm text-muted-foreground">{user.email || "No email on file"}</p>
+                      <Badge className="mt-1 bg-primary/10 text-primary hover:bg-primary/10 text-xs">
+                        {roleLabel[(user as any).role] ?? (user as any).role ?? "Member"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground">Full name</Label>
+                      <p className="text-sm font-medium">{user.name || "—"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground">Email</Label>
+                      <p className="text-sm font-medium">{user.email || "—"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground">Role</Label>
+                      <p className="text-sm font-medium">{roleLabel[(user as any).role] ?? "—"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground">Account ID</Label>
+                      <p className="text-sm font-medium font-mono">{(user as any).id ?? "—"}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground border-t pt-3">
+                    Your name and role are managed by your program administrator. Use the Security tab to change your password.
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Program Settings (admin only) */}
+        {isAdmin && (
         <TabsContent value="program" className="mt-4 space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -133,8 +203,10 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
-        {/* User Management */}
+        {/* User Management (admin only) */}
+        {isAdmin && (
         <TabsContent value="users" className="mt-4 space-y-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-foreground">Staff Users</h3>
@@ -167,6 +239,7 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* Notifications */}
         <TabsContent value="notifications" className="mt-4 space-y-4">

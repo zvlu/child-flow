@@ -121,7 +121,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [moreToolsOpen, setMoreToolsOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { user, logout, loading } = useAuth();
   const { theme, setTheme } = useTheme();
   const topNavPrimaryItems = topNavItems.slice(0, TOP_NAV_PRIMARY_COUNT);
@@ -259,7 +259,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10" onClick={() => handleTopNavAction("Print")}>
             <Printer className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10" onClick={() => handleTopNavAction("User Profile")}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10" onClick={() => navigate("/settings")} aria-label="Account & settings">
             <UserCircle className="h-4 w-4" />
           </Button>
           <DropdownMenu>
