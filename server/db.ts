@@ -150,16 +150,25 @@ export async function updateUserSettings(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const current = await getUserByOpenId(openId);
-  const merged = {
-    ...(current?.settings ?? {}),
-    ...patch,
-    notifications: {
-      ...(current?.settings?.notifications ?? {}),
-      ...(patch.notifications ?? {}),
-    },
-  };
-  // Drop the notifications key entirely if it ended up empty so we don't store {}.
-  if (Object.keys(merged.notifications).length === 0) delete (merged as any).notifications;
+  const merged: NonNullable<typeof users.$inferSelect.settings> = { ...(current?.settings ?? {}) };
+
+  if (patch.twoFactorEnabled !== undefined) merged.twoFactorEnabled = patch.twoFactorEnabled;
+
+  // Notification toggles merge key-by-key so changing one preference never
+  // resets the others.
+  if (patch.notifications !== undefined) {
+    merged.notifications = { ...(current?.settings?.notifications ?? {}), ...patch.notifications };
+    if (Object.keys(merged.notifications).length === 0) delete merged.notifications;
+  }
+
+  // Navigation layout is replaced wholesale (the client always sends the full
+  // arranged set); an empty object means "reset to defaults".
+  if (patch.navigation !== undefined) {
+    const hasPrefs = patch.navigation.topNav || patch.navigation.sideNav;
+    if (hasPrefs) merged.navigation = patch.navigation;
+    else delete merged.navigation;
+  }
+
   await db.update(users).set({ settings: merged }).where(eq(users.openId, openId));
   return merged;
 }

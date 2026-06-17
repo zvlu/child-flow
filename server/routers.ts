@@ -67,6 +67,12 @@ export const appRouter = router({
         z.object({
           twoFactorEnabled: z.boolean().optional(),
           notifications: z.record(z.string(), z.boolean()).optional(),
+          navigation: z
+            .object({
+              topNav: z.object({ order: z.array(z.string()).optional(), hidden: z.array(z.string()).optional() }).optional(),
+              sideNav: z.object({ order: z.array(z.string()).optional(), hidden: z.array(z.string()).optional() }).optional(),
+            })
+            .optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {

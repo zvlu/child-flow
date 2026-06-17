@@ -9,12 +9,16 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Settings as SettingsIcon, Bell, Lock, Users, Building2, Save, UserCircle, Loader2, Plus, Trash2, ShieldCheck } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Lock, Users, Building2, Save, UserCircle, Loader2, Plus, Trash2, ShieldCheck, LayoutGrid, ChevronUp, ChevronDown, RotateCcw, Eye, EyeOff } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
+import {
+  TOP_NAV_ITEMS, SIDE_NAV_SECTIONS, TOP_NAV_PRIMARY_COUNT, sortByOrder,
+  type NavItem, type NavSection,
+} from "@/config/nav";
 
 const roleLabel: Record<string, string> = { admin: "Administrator", staff: "Staff", parent: "Parent" };
 
@@ -68,10 +72,11 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="account">
-        <TabsList className={`grid w-full ${isAdmin ? "grid-cols-5 max-w-2xl" : "grid-cols-3 max-w-md"}`}>
+        <TabsList className={`grid w-full ${isAdmin ? "grid-cols-6 max-w-3xl" : "grid-cols-4 max-w-xl"}`}>
           <TabsTrigger value="account">Account</TabsTrigger>
           {isAdmin && <TabsTrigger value="program">Program</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
+          <TabsTrigger value="layout">Layout</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
@@ -114,6 +119,15 @@ export default function Settings() {
           <StaffUsers />
         </TabsContent>
         )}
+
+        {/* Layout — customize the sidebar + top nav (all roles) */}
+        <TabsContent value="layout" className="mt-4 space-y-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          ) : (
+            <NavigationSettings key={(user as any)?.id ?? "anon"} settings={user?.settings} onSaved={refresh} disabled={!user} />
+          )}
+        </TabsContent>
 
         {/* Notifications — persisted per user */}
         <TabsContent value="notifications" className="mt-4 space-y-4">
@@ -551,6 +565,162 @@ function ProgramSettings() {
           {saved && <p className="text-xs text-center text-muted-foreground">Not yet persisted.</p>}
         </CardContent>
       </Card>
+    </>
+  );
+}
+
+/* --------------------------- Layout / Navigation --------------------------- */
+
+function reorder<T>(arr: T[], idx: number, dir: -1 | 1): T[] {
+  const j = idx + dir;
+  if (j < 0 || j >= arr.length) return arr;
+  const copy = [...arr];
+  [copy[idx], copy[j]] = [copy[j], copy[idx]];
+  return copy;
+}
+
+function NavigationSettings({ settings, onSaved, disabled }: { settings: any; onSaved: () => Promise<void>; disabled: boolean }) {
+  const nav = settings?.navigation;
+
+  // Local working copy: full item lists in the saved order (hidden items kept so
+  // they can be re-enabled), plus the hidden sets.
+  const [topItems, setTopItems] = useState<NavItem[]>(() => sortByOrder(TOP_NAV_ITEMS, nav?.topNav?.order));
+  const [topHidden, setTopHidden] = useState<Set<string>>(() => new Set<string>(nav?.topNav?.hidden ?? []));
+  const [sideSections, setSideSections] = useState<NavSection[]>(
+    () => SIDE_NAV_SECTIONS.map(s => ({ ...s, items: sortByOrder(s.items, nav?.sideNav?.order) }))
+  );
+  const [sideHidden, setSideHidden] = useState<Set<string>>(() => new Set<string>(nav?.sideNav?.hidden ?? []));
+
+  const save = trpc.auth.updateSettings.useMutation({
+    onSuccess: async () => { await onSaved(); toast.success("Navigation layout saved"); },
+    onError: (e) => toast.error(e.message || "Could not save layout"),
+  });
+
+  const buildNavigation = () => ({
+    topNav: { order: topItems.map(i => i.path), hidden: Array.from(topHidden) },
+    sideNav: { order: sideSections.flatMap(s => s.items.map(i => i.path)), hidden: Array.from(sideHidden) },
+  });
+
+  // Compare current working copy to what's saved to drive the Save button.
+  const savedSerialized = JSON.stringify({
+    t: sortByOrder(TOP_NAV_ITEMS, nav?.topNav?.order).map(i => i.path),
+    th: [...(nav?.topNav?.hidden ?? [])].sort(),
+    s: SIDE_NAV_SECTIONS.flatMap(s => sortByOrder(s.items, nav?.sideNav?.order)).map(i => i.path),
+    sh: [...(nav?.sideNav?.hidden ?? [])].sort(),
+  });
+  const currentSerialized = JSON.stringify({
+    t: topItems.map(i => i.path),
+    th: Array.from(topHidden).sort(),
+    s: sideSections.flatMap(s => s.items.map(i => i.path)),
+    sh: Array.from(sideHidden).sort(),
+  });
+  const dirty = currentSerialized !== savedSerialized;
+  const hasCustomization = Boolean(nav?.topNav || nav?.sideNav) || topHidden.size > 0 || sideHidden.size > 0 || dirty;
+
+  const toggle = (set: Set<string>, setter: (s: Set<string>) => void, path: string) => {
+    const next = new Set(set);
+    next.has(path) ? next.delete(path) : next.add(path);
+    setter(next);
+  };
+
+  const reset = () => {
+    setTopItems(sortByOrder(TOP_NAV_ITEMS, undefined));
+    setTopHidden(new Set());
+    setSideSections(SIDE_NAV_SECTIONS.map(s => ({ ...s })));
+    setSideHidden(new Set());
+    // Persist the cleared state (server drops the navigation key -> defaults).
+    save.mutate({ navigation: {} });
+  };
+
+  const Row = ({ item, hidden, onToggle, onUp, onDown, isFirst, isLast, dim }: {
+    item: NavItem; hidden: boolean; onToggle: () => void; onUp: () => void; onDown: () => void;
+    isFirst: boolean; isLast: boolean; dim?: boolean;
+  }) => {
+    const Icon = item.icon;
+    return (
+      <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border border-border ${hidden ? "opacity-50" : ""}`}>
+        <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        <span className="flex-1 text-sm font-medium truncate">{item.label}{dim && <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">More</span>}</span>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-7 w-7" disabled={isFirst} onClick={onUp} aria-label={`Move ${item.label} up`}><ChevronUp className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" disabled={isLast} onClick={onDown} aria-label={`Move ${item.label} down`}><ChevronDown className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggle} aria-label={hidden ? `Show ${item.label}` : `Hide ${item.label}`}>
+            {hidden ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-primary" />}
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  const visibleTopCount = topItems.filter(i => !topHidden.has(i.path)).length;
+
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-foreground flex items-center gap-2"><LayoutGrid className="h-4 w-4 text-primary" />Customize Navigation</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Reorder and hide items in your top bar and side menu. Saved to your account.</p>
+        </div>
+        <Button variant="outline" size="sm" className="gap-2" disabled={disabled || save.isPending || !hasCustomization} onClick={reset}>
+          <RotateCcw className="h-4 w-4" />Reset to default
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Top Navigation Bar</CardTitle>
+          <CardDescription>The first {TOP_NAV_PRIMARY_COUNT} visible items show in the bar; the rest collapse under “More”.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {topItems.map((item, i) => (
+            <Row
+              key={item.path}
+              item={item}
+              hidden={topHidden.has(item.path)}
+              isFirst={i === 0}
+              isLast={i === topItems.length - 1}
+              dim={!topHidden.has(item.path) && topItems.filter((x, xi) => xi <= i && !topHidden.has(x.path)).length > TOP_NAV_PRIMARY_COUNT}
+              onToggle={() => toggle(topHidden, setTopHidden, item.path)}
+              onUp={() => setTopItems(prev => reorder(prev, i, -1))}
+              onDown={() => setTopItems(prev => reorder(prev, i, 1))}
+            />
+          ))}
+          <p className="text-xs text-muted-foreground pt-1">{visibleTopCount} of {topItems.length} items visible.</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Side Menu</CardTitle>
+          <CardDescription>Reorder within each section and hide items you don’t use.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {sideSections.map((section, si) => (
+            <div key={section.title} className="space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{section.title}</p>
+              {section.items.map((item, ii) => (
+                <Row
+                  key={item.path}
+                  item={item}
+                  hidden={sideHidden.has(item.path)}
+                  isFirst={ii === 0}
+                  isLast={ii === section.items.length - 1}
+                  onToggle={() => toggle(sideHidden, setSideHidden, item.path)}
+                  onUp={() => setSideSections(prev => prev.map((s, x) => x !== si ? s : { ...s, items: reorder(s.items, ii, -1) }))}
+                  onDown={() => setSideSections(prev => prev.map((s, x) => x !== si ? s : { ...s, items: reorder(s.items, ii, 1) }))}
+                />
+              ))}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end">
+        <Button className="gap-2" disabled={disabled || !dirty || save.isPending} onClick={() => save.mutate({ navigation: buildNavigation() })}>
+          {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Save Layout
+        </Button>
+      </div>
     </>
   );
 }

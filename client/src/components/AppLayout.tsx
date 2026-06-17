@@ -52,66 +52,12 @@ import { trpc } from "@/lib/trpc";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { CommandPalette } from "./CommandPalette";
-
-const topNavItems = [
-  { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
-  { path: "/communication", label: "Communication", icon: MessageSquare },
-  { path: "/calendar", label: "Calendar", icon: CalendarDays },
-  { path: "/reports", label: "Reports", icon: FileText },
-  { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
-  { path: "/performance", label: "Performance Panel", icon: BarChart3 },
-  { path: "/billing", label: "Billing", icon: DollarSign },
-  { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
-  { path: "/staff-operations", label: "Staff Operations", icon: Clock },
-  { path: "/bulk-actions", label: "Bulk Actions", icon: Layers },
-];
-const TOP_NAV_PRIMARY_COUNT = 5;
-
-const sideNavSections = [
-  {
-    title: "Core",
-    items: [
-      { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { path: "/children", label: "Children", icon: Baby },
-      { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
-      { path: "/staff", label: "Staff", icon: UserCog },
-      { path: "/family-services", label: "Family Services", icon: Home },
-      { path: "/classrooms", label: "Classrooms", icon: School },
-    ],
-  },
-  {
-    title: "Operations",
-    items: [
-      { path: "/enrollment", label: "Enrollment", icon: BookOpen },
-      { path: "/health", label: "Health Records", icon: Heart },
-      { path: "/calendar", label: "Calendar", icon: CalendarDays },
-      { path: "/documents", label: "Documents", icon: FileText },
-      { path: "/digital-documents", label: "E-Signatures", icon: FileSignature },
-      { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
-      { path: "/bulk-actions", label: "Bulk Actions", icon: Layers },
-      { path: "/compliance", label: "Compliance", icon: ShieldCheck },
-    ],
-  },
-  {
-    title: "Business",
-    items: [
-      { path: "/billing", label: "Billing", icon: DollarSign },
-      { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
-      { path: "/staff-operations", label: "Staff Operations", icon: Clock },
-      { path: "/parent-portal", label: "Parent Portal", icon: Users },
-    ],
-  },
-  {
-    title: "Insights",
-    items: [
-      { path: "/performance", label: "Performance Panel", icon: BarChart3 },
-      { path: "/reports", label: "Reports", icon: FileText },
-      { path: "/report-builder", label: "Report Builder", icon: Zap },
-      { path: "/ai-insights", label: "AI Insights", icon: Zap },
-      { path: "/settings", label: "Settings", icon: Settings },
-    ],
-  },
-];
+import {
+  TOP_NAV_PRIMARY_COUNT,
+  ALL_SIDE_NAV_ITEMS,
+  applyTopNav,
+  applySideNav,
+} from "@/config/nav";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -124,8 +70,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [location, navigate] = useLocation();
   const { user, logout, loading } = useAuth();
   const { theme, setTheme } = useTheme();
-  const topNavPrimaryItems = topNavItems.slice(0, TOP_NAV_PRIMARY_COUNT);
-  const topNavOverflowItems = topNavItems.slice(TOP_NAV_PRIMARY_COUNT);
+  // Apply the signed-in user's saved layout (hide + reorder); falls back to
+  // app defaults when there are no preferences.
+  const navPrefs = (user as any)?.settings?.navigation ?? null;
+  const effectiveTopNav = applyTopNav(navPrefs);
+  const effectiveSideSections = applySideNav(navPrefs);
+  const topNavPrimaryItems = effectiveTopNav.slice(0, TOP_NAV_PRIMARY_COUNT);
+  const topNavOverflowItems = effectiveTopNav.slice(TOP_NAV_PRIMARY_COUNT);
 
   const handleTopNavAction = (label: string) => {
     toast.info(`${label} module selected`);
@@ -133,7 +84,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const isTopNavActive = (path: string) => location === path || location.startsWith(`${path}/`);
   const isNavItemActive = (path: string) => location === path || (path !== "/dashboard" && location.startsWith(path));
-  const allSideNavItems = sideNavSections.flatMap((section) => section.items);
+  const allSideNavItems = ALL_SIDE_NAV_ITEMS;
   const moreToolsItems = [
     { path: "/bulk-actions", label: "Bulk Actions", icon: Zap },
     { path: "/billing", label: "Billing", icon: FileText },
@@ -320,7 +271,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
           <nav className="flex-1 overflow-y-auto py-4 px-2">
             <div className="space-y-4">
-              {sideNavSections.map((section) => (
+              {effectiveSideSections.map((section) => (
                 <div key={section.title}>
                   {sidebarOpen && (
                     <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-sidebar-foreground/40">

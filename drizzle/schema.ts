@@ -47,6 +47,14 @@ export type UserSettings = {
   twoFactorEnabled?: boolean;
   /** Notification channel/topic toggles keyed by a stable preference id. */
   notifications?: Record<string, boolean>;
+  /**
+   * Per-user navigation layout. Each surface stores a desired path `order` and a
+   * set of `hidden` paths; absent/empty means "use the app defaults".
+   */
+  navigation?: {
+    topNav?: { order?: string[]; hidden?: string[] };
+    sideNav?: { order?: string[]; hidden?: string[] };
+  };
 };
 
 export type User = typeof users.$inferSelect;
