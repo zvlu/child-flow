@@ -11,9 +11,10 @@ function Switch({
     <SwitchPrimitive.Root
       data-slot="switch"
       className={cn(
-        // Unchecked track must stay clearly visible on warm/cream surfaces —
-        // the old bg-input token is now near-cream and the switch vanished.
-        "peer data-[state=checked]:bg-primary data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600 focus-visible:border-ring focus-visible:ring-ring/50 inline-flex h-[1.3rem] w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent shadow-sm transition-all outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50",
+        // iOS-style sliding toggle. Track stays clearly visible on warm/cream
+        // surfaces (the old bg-input token is near-cream and disappeared); the
+        // white thumb slides the full width off -> on.
+        "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-transparent p-0.5 shadow-sm transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-slate-300 dark:data-[state=unchecked]:bg-slate-600",
         className
       )}
       {...props}
@@ -21,7 +22,9 @@ function Switch({
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
         className={cn(
-          "bg-white shadow pointer-events-none block size-4 rounded-full ring-0 transition-transform data-[state=checked]:translate-x-[calc(100%-2px)] data-[state=unchecked]:translate-x-0.5"
+          // shrink-0 is required: as a flex child the thumb otherwise collapses
+          // to width:0 (its width utility gets shrunk away), making it invisible.
+          "pointer-events-none block h-5 w-5 shrink-0 rounded-full bg-white shadow ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
         )}
       />
     </SwitchPrimitive.Root>
