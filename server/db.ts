@@ -1,5 +1,4 @@
 import { eq, and, gte, lte } from "drizzle-orm";
-import type { MySql2QueryResult } from "drizzle-orm/mysql2";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users, organizations, children, staff, families, attendance,
@@ -8,7 +7,6 @@ import {
   auditLogs, InsertAuditLog
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
-import { AuditLog } from "../drizzle/schema";
 
 const FOLLOW_UP_TYPES = new Set(["immunization", "physical", "dental", "vision", "hearing"]);
 
@@ -372,8 +370,3 @@ export async function getPirData(organizationId: number, year: string) {
   );
 }
 
-export async function createAuditLog(data: InsertAuditLog): Promise<MySql2QueryResult<AuditLog>> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return await db.insert(auditLogs).values(data);
-}
