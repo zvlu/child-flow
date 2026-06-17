@@ -16,6 +16,7 @@ import {
   InsertMealPlan, InsertMealItem, InsertCertification, InsertCustomReport,
   InsertEducationRecord, InsertAiInsight, InsertBulkActionLog,
   InsertActivityLog, InsertAttendance,
+  customRoles, InsertCustomRole,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -104,6 +105,26 @@ export async function getChildFlags(organizationId: number) {
     .where(eq(children.organizationId, organizationId));
 }
 
+export async function addChildFlag(data: {
+  childId: number;
+  type: "allergy" | "dietary" | "disability" | "special";
+  label: string;
+  detail?: string | null;
+}) {
+  const db = await requireDb();
+  await db.insert(childFlags).values({
+    childId: data.childId,
+    type: data.type,
+    label: data.label,
+    detail: data.detail ?? null,
+  });
+}
+
+export async function removeChildFlag(id: number) {
+  const db = await requireDb();
+  await db.delete(childFlags).where(eq(childFlags.id, id));
+}
+
 /**
  * Move a child to a classroom (or unassign with null). Ends any active
  * assignment first, so a child is only ever in one room at a time.
@@ -188,6 +209,32 @@ export async function updateStaff(id: number, data: Partial<InsertStaff>) {
   return { success: true };
 }
 
+// ==================== CUSTOM ROLES ====================
+
+export async function getCustomRoles(organizationId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(customRoles)
+    .where(eq(customRoles.organizationId, organizationId))
+    .orderBy(customRoles.name);
+}
+
+export async function createCustomRole(data: InsertCustomRole) {
+  const db = await requireDb();
+  const [result] = await db.insert(customRoles).values(data);
+  return { id: result.insertId };
+}
+
+export async function deleteCustomRole(id: number, organizationId: number) {
+  const db = await requireDb();
+  // Scope the delete to the org so one program can't remove another's roles.
+  await db
+    .delete(customRoles)
+    .where(and(eq(customRoles.id, id), eq(customRoles.organizationId, organizationId)));
+  return { success: true };
+}
+
 // ==================== STUDENT NOTES ====================
 
 export async function getStudentNotes(organizationId: number, childId?: number) {
@@ -215,6 +262,12 @@ export async function createCalendarEvent(data: InsertCalendarEvent) {
   const db = await requireDb();
   const [result] = await db.insert(calendarEvents).values(data);
   return { id: result.insertId };
+}
+
+export async function updateCalendarEvent(id: number, data: Partial<InsertCalendarEvent>) {
+  const db = await requireDb();
+  await db.update(calendarEvents).set(data).where(eq(calendarEvents.id, id));
+  return { success: true };
 }
 
 export async function deleteCalendarEvent(id: number) {

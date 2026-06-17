@@ -32,26 +32,22 @@ async function requireStaff(req: Request): Promise<User | null> {
   }
 }
 
-export function registerDashboardRoutes(app: Express) {
-  app.get("/api/dashboard/stats", async (req: Request, res: Response) => {
-    const user = await requireStaff(req);
-    if (!user) {
-      res.status(401).json({ error: "Please sign in again" });
-      return;
-    }
+export type DashboardAlert = { id: string; title: string; description: string; type: string; filter?: string };
 
+/**
+ * Shared dashboard computation — stats + actionable alerts from live data.
+ * Used by both the REST /api/dashboard/stats endpoint (iOS) and the
+ * dashboard.alerts tRPC query (web notification bell). Returns null if the DB
+ * is unavailable.
+ */
+export async function computeDashboard() {
     const db = await getDb();
-    if (!db) {
-      res.status(500).json({ error: "Database not available" });
-      return;
-    }
+    if (!db) return null;
 
-    // Single-program deployment: the app doesn't send an org id, so use the
-    // first organization.
+    // Single-program deployment: use the first organization.
     const [org] = await db.select().from(organizations).limit(1);
     if (!org) {
-      res.json({ stats: { totalEnrolled: 0, attendanceRate: 0, healthDue: 0, complianceScore: 0 }, alerts: [] });
-      return;
+      return { stats: { totalEnrolled: 0, attendanceRate: 0, healthDue: 0, complianceScore: 0 }, alerts: [] as DashboardAlert[] };
     }
 
     const kids = await db
@@ -221,7 +217,7 @@ export function registerDashboardRoutes(app: Express) {
       });
     }
 
-    res.json({
+    return {
       stats: {
         totalEnrolled: kids.length,
         attendanceRate: orgRate,
@@ -229,6 +225,21 @@ export function registerDashboardRoutes(app: Express) {
         complianceScore,
       },
       alerts,
-    });
+    };
+}
+
+export function registerDashboardRoutes(app: Express) {
+  app.get("/api/dashboard/stats", async (req: Request, res: Response) => {
+    const user = await requireStaff(req);
+    if (!user) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const data = await computeDashboard();
+    if (!data) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    res.json(data);
   });
 }

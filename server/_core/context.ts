@@ -4,6 +4,7 @@ import type { User } from "../../drizzle/schema";
 import { getSessionCookieOptions } from "./cookies";
 import { ENV } from "./env";
 import { sdk } from "./sdk";
+import { getUserByOpenId } from "../db";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -25,6 +26,7 @@ const DEV_MOCK_USER: User = {
   passwordHash: null,
   role: "admin",
   familyId: null,
+  settings: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   lastSignedIn: new Date(),
@@ -68,7 +70,14 @@ export async function createContext(
       );
       warnedAboutDevBypass = true;
     }
-    user = DEV_MOCK_USER;
+    // Prefer the persisted row so profile/settings edits made during local dev
+    // actually round-trip (the static literal would otherwise mask every write).
+    // Fall back to the in-memory mock when the DB is unavailable or unseeded.
+    try {
+      user = (await getUserByOpenId(DEV_MOCK_USER.openId)) ?? DEV_MOCK_USER;
+    } catch {
+      user = DEV_MOCK_USER;
+    }
   }
 
   return {
