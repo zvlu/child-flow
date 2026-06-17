@@ -13,35 +13,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
-
-/** Serialize an array of row objects to CSV (headers = union of keys). */
-function objectsToCsv(rows: Record<string, any>[]): string {
-  if (!rows.length) return "";
-  const headerSet = new Set<string>();
-  for (const r of rows) for (const k of Object.keys(r)) headerSet.add(k);
-  const headers = Array.from(headerSet);
-  const cell = (v: unknown): string => {
-    if (v == null) return "";
-    let s: string;
-    if (v instanceof Date) s = v.toISOString().slice(0, 10);
-    else if (typeof v === "object") s = JSON.stringify(v);
-    else s = String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  return [headers.join(","), ...rows.map((r) => headers.map((h) => cell(r[h])).join(","))].join("\n");
-}
-
-function downloadCsv(filename: string, csv: string) {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
+import { objectsToCsv, downloadCsv } from "@/lib/csv";
 
 const attendanceByMonth = [
   { month: "Sep", rate: 88 }, { month: "Oct", rate: 91 }, { month: "Nov", rate: 87 },

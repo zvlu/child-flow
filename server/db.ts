@@ -253,6 +253,15 @@ export async function createChild(data: InsertChild) {
   return result;
 }
 
+/** Insert many children in one statement (CSV bulk import). Returns the count. */
+export async function bulkCreateChildren(rows: InsertChild[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  if (rows.length === 0) return { count: 0 };
+  await db.insert(children).values(rows);
+  return { count: rows.length };
+}
+
 export async function getOrganizationStaff(organizationId: number) {
   const db = await getDb();
   if (!db) return [];

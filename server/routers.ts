@@ -18,6 +18,7 @@ import {
   getOrganizationChildren,
   getChildById,
   createChild,
+  bulkCreateChildren,
   getOrganizationStaff,
   getAttendanceByDate,
   getFamilySiblings,
@@ -192,6 +193,33 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const result = await createChild(input);
         await auditAccess(ctx, { action: "create", resourceType: "child", detail: `org:${input.organizationId}` });
+        return result;
+      }),
+    // CSV bulk import: create many children at once from an uploaded sheet.
+    bulkImport: staffProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          rows: z
+            .array(
+              z.object({
+                firstName: z.string().trim().min(1).max(100),
+                lastName: z.string().trim().min(1).max(100),
+                dateOfBirth: z.date().optional(),
+                gender: z.enum(["male", "female", "other", "prefer_not_to_say"]).optional(),
+                status: z.enum(["active", "inactive", "graduated", "withdrawn"]).optional(),
+                notes: z.string().max(1000).optional(),
+              })
+            )
+            .min(1)
+            .max(1000),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const result = await bulkCreateChildren(
+          input.rows.map((r) => ({ ...r, organizationId: input.organizationId }))
+        );
+        await auditAccess(ctx, { action: "create", resourceType: "child", detail: `bulk_import:${result.count}` });
         return result;
       }),
     siblings: staffProcedure

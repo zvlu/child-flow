@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
-  Search, Plus, Baby, ChevronRight, Download, Upload, MoreHorizontal, Loader2
+  Search, Plus, Baby, ChevronRight, Download, Upload, MoreHorizontal, Loader2, FileText
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
@@ -16,6 +17,10 @@ import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { FlagChips } from "@/components/FlagChips";
+import { objectsToCsv, downloadCsv, parseCsvToObjects } from "@/lib/csv";
+
+const GENDERS = new Set(["male", "female", "other", "prefer_not_to_say"]);
+const STATUSES = new Set(["active", "inactive", "graduated", "withdrawn"]);
 
 const healthBadge = (status: string) => {
   if (status === "current") return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Current</Badge>;
@@ -82,6 +87,71 @@ export default function Children() {
     },
     onError: (err) => toast.error(err.message || "Failed to withdraw child"),
   });
+
+  // CSV import/export
+  const [importOpen, setImportOpen] = useState(false);
+  const [csvText, setCsvText] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const parsedRows = useMemo(() => {
+    if (!csvText.trim()) return [];
+    return parseCsvToObjects(csvText).map((o) => {
+      const firstName = (o.firstname || o.first || "").trim();
+      const lastName = (o.lastname || o.last || "").trim();
+      const dobRaw = o.dateofbirth || o.dob || o.birthdate || "";
+      const dob = dobRaw ? new Date(dobRaw) : undefined;
+      const gender = GENDERS.has((o.gender || "").toLowerCase()) ? (o.gender.toLowerCase() as any) : undefined;
+      const status = STATUSES.has((o.status || "").toLowerCase()) ? (o.status.toLowerCase() as any) : undefined;
+      return {
+        firstName, lastName,
+        dateOfBirth: dob && !isNaN(dob.getTime()) ? dob : undefined,
+        gender, status,
+        notes: o.notes || undefined,
+        _valid: Boolean(firstName && lastName),
+      };
+    });
+  }, [csvText]);
+  const validRows = parsedRows.filter((r) => r._valid);
+  const skippedCount = parsedRows.length - validRows.length;
+
+  const bulkImport = trpc.children.bulkImport.useMutation({
+    onSuccess: (res) => {
+      utils.children.list.invalidate(ORGANIZATION_ID);
+      toast.success(`Imported ${res.count} ${res.count === 1 ? "child" : "children"}`);
+      setImportOpen(false); setCsvText("");
+    },
+    onError: (e) => toast.error(e.message || "Import failed"),
+  });
+
+  const onPickCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try { setCsvText(await file.text()); } catch { toast.error("Could not read that file."); }
+  };
+
+  const submitImport = () => {
+    if (!validRows.length) { toast.error("No valid rows to import. Each row needs a first and last name."); return; }
+    bulkImport.mutate({
+      organizationId: ORGANIZATION_ID,
+      rows: validRows.map(({ _valid, ...r }) => r),
+    });
+  };
+
+  const exportChildren = () => {
+    const rows = allChildren.map((c: any) => ({
+      firstName: c.firstName,
+      lastName: c.lastName,
+      dateOfBirth: c.dateOfBirth ? new Date(c.dateOfBirth).toISOString().slice(0, 10) : "",
+      gender: c.gender ?? "",
+      status: c.status ?? "",
+      classroom: classroomByChild.get(c.id) ?? "",
+      familyContact: familyContactById.get(c.familyId) ?? "",
+    }));
+    if (!rows.length) { toast.message("No children to export."); return; }
+    downloadCsv(`children-${new Date().toISOString().slice(0, 10)}.csv`, objectsToCsv(rows));
+    toast.success(`Exported ${rows.length} children to CSV`);
+  };
 
   const classroomByChild = useMemo(() => {
     const m = new Map<number, string>();
@@ -188,10 +258,60 @@ export default function Children() {
           <p className="text-muted-foreground text-sm mt-0.5">{filtered.length} of {allChildren.length} children</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Upload className="h-4 w-4" /> Import
-          </Button>
-          <Button variant="outline" size="sm" className="gap-2">
+          <Dialog open={importOpen} onOpenChange={setImportOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Upload className="h-4 w-4" /> Import
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Import Children from CSV</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <p className="text-sm text-muted-foreground">
+                  Upload or paste CSV with a header row. Recognized columns:{" "}
+                  <code className="text-xs bg-muted px-1 py-0.5 rounded">firstName, lastName, dateOfBirth, gender, status, notes</code>.
+                  Each row needs at least a first and last name; dates use YYYY-MM-DD.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onPickCsv} />
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => fileRef.current?.click()}>
+                    <FileText className="h-4 w-4" /> Choose CSV file
+                  </Button>
+                  <span className="text-xs text-muted-foreground">or paste below</span>
+                </div>
+                <textarea
+                  value={csvText}
+                  onChange={(e) => setCsvText(e.target.value)}
+                  rows={8}
+                  spellCheck={false}
+                  placeholder={"firstName,lastName,dateOfBirth,gender,status\nAva,Nguyen,2021-04-12,female,active\nLiam,Brooks,2021-11-03,male,active"}
+                  className="w-full rounded-lg border border-border bg-background p-3 font-mono text-xs"
+                />
+                {parsedRows.length > 0 && (
+                  <div className="rounded-lg border border-border p-3 space-y-1">
+                    <p className="text-sm font-medium">
+                      {validRows.length} ready to import
+                      {skippedCount > 0 && <span className="text-muted-foreground"> · {skippedCount} skipped (missing name)</span>}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {validRows.slice(0, 6).map((r) => `${r.firstName} ${r.lastName}`).join(", ")}
+                      {validRows.length > 6 ? "…" : ""}
+                    </p>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button variant="outline" onClick={() => { setImportOpen(false); setCsvText(""); }}>Cancel</Button>
+                  <Button onClick={submitImport} disabled={!validRows.length || bulkImport.isPending} className="gap-2">
+                    {bulkImport.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    Import {validRows.length || ""}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Button variant="outline" size="sm" className="gap-2" onClick={exportChildren}>
             <Download className="h-4 w-4" /> Export
           </Button>
           <Link href="/enrollment">
