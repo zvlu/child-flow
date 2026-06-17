@@ -4,7 +4,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { ORGANIZATION_ID } from "@/const";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -371,6 +371,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <div className="p-3 border-t border-sidebar-border">
               <div className="flex items-center gap-3 w-full p-2 rounded-lg bg-sidebar-accent/50">
                 <Avatar className="h-8 w-8 flex-shrink-0">
+                  {(user as any)?.avatarUrl ? (
+                    <AvatarImage src={(user as any).avatarUrl} alt={user?.name || "Profile picture"} className="object-cover" />
+                  ) : null}
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
                     {initials}
                   </AvatarFallback>

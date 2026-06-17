@@ -132,7 +132,7 @@ export async function setUserPassword(openId: string, passwordHash: string | nul
 }
 
 /** Update a user's own editable profile fields (currently just display name). */
-export async function updateUserProfile(openId: string, data: { name?: string }) {
+export async function updateUserProfile(openId: string, data: { name?: string; avatarUrl?: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(users).set(data).where(eq(users.openId, openId));

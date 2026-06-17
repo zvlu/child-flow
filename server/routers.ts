@@ -40,11 +40,11 @@ export const appRouter = router({
       if (!opts.ctx.user) return null;
       // Never expose the password hash (or let new sensitive columns leak by
       // default) — return an explicit allowlist of fields.
-      const { id, openId, name, email, role, lastSignedIn, settings } = opts.ctx.user;
+      const { id, openId, name, email, role, lastSignedIn, settings, avatarUrl } = opts.ctx.user;
       // Surface whether a password is set (so the UI can adjust the change-password
       // flow) without ever returning the hash itself.
       const hasPassword = Boolean(opts.ctx.user.passwordHash);
-      return { id, openId, name, email, role, lastSignedIn, settings, hasPassword };
+      return { id, openId, name, email, role, lastSignedIn, settings, avatarUrl, hasPassword };
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -60,6 +60,23 @@ export const appRouter = router({
         await updateUserProfile(ctx.user.openId, { name: input.name });
         await auditAccess(ctx, { action: "update", resourceType: "user", resourceId: ctx.user.id, detail: "profile" });
         return { success: true, name: input.name };
+      }),
+    // Set or clear the signed-in user's profile picture. The client resizes/crops
+    // to a small square and sends a base64 image data URL; null removes it.
+    setAvatar: protectedProcedure
+      .input(
+        z.object({
+          avatarUrl: z
+            .string()
+            .max(1_500_000, "Image is too large — pick a smaller picture.")
+            .regex(/^data:image\/(png|jpeg|jpg|webp|gif);base64,/, "Unsupported image format.")
+            .nullable(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await updateUserProfile(ctx.user.openId, { avatarUrl: input.avatarUrl });
+        await auditAccess(ctx, { action: "update", resourceType: "user", resourceId: ctx.user.id, detail: input.avatarUrl ? "avatar" : "avatar:removed" });
+        return { success: true };
       }),
     // Persist notification / 2FA preferences (merged into users.settings).
     updateSettings: protectedProcedure

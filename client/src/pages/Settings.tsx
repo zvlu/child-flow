@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,9 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Settings as SettingsIcon, Bell, Lock, Users, Building2, Save, UserCircle, Loader2, Plus, Trash2, ShieldCheck, LayoutGrid, ChevronUp, ChevronDown, RotateCcw, Eye, EyeOff } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Lock, Users, Building2, Save, UserCircle, Loader2, Plus, Trash2, ShieldCheck, LayoutGrid, ChevronUp, ChevronDown, RotateCcw, Eye, EyeOff, Camera } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -167,14 +167,72 @@ export default function Settings() {
 
 /* ----------------------------- Account ----------------------------- */
 
+/**
+ * Read an image File, center-crop to a square and downscale to `size`px, then
+ * return a compact JPEG data URL. Keeps avatars small enough to live in the DB
+ * column and travel over tRPC.
+ */
+async function fileToAvatarDataUrl(file: File, size = 256): Promise<string> {
+  const sourceUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("decode failed"));
+    i.src = sourceUrl;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no canvas context");
+  const min = Math.min(img.width, img.height);
+  const sx = (img.width - min) / 2;
+  const sy = (img.height - min) / 2;
+  ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+
 function AccountForm({ user, initials, onSaved }: { user: any; initials: string; onSaved: () => Promise<void> }) {
   const [name, setName] = useState<string>(user.name ?? "");
   useEffect(() => { setName(user.name ?? ""); }, [user.name]);
+
+  const [avatar, setAvatar] = useState<string | null>(user.avatarUrl ?? null);
+  useEffect(() => { setAvatar(user.avatarUrl ?? null); }, [user.avatarUrl]);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const updateProfile = trpc.auth.updateProfile.useMutation({
     onSuccess: async () => { await onSaved(); toast.success("Profile updated"); },
     onError: (e) => toast.error(e.message || "Could not update profile"),
   });
+
+  const setAvatarMut = trpc.auth.setAvatar.useMutation({
+    onSuccess: async () => { await onSaved(); },
+    onError: (e) => { setAvatar(user.avatarUrl ?? null); toast.error(e.message || "Could not update picture"); },
+  });
+
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // let the same file be re-picked later
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please choose an image file."); return; }
+    try {
+      const dataUrl = await fileToAvatarDataUrl(file);
+      setAvatar(dataUrl); // optimistic preview
+      setAvatarMut.mutate({ avatarUrl: dataUrl }, { onSuccess: () => toast.success("Profile picture updated") });
+    } catch {
+      toast.error("Could not read that image. Try a different file.");
+    }
+  };
+
+  const onRemoveAvatar = () => {
+    setAvatar(null);
+    setAvatarMut.mutate({ avatarUrl: null }, { onSuccess: () => toast.success("Profile picture removed") });
+  };
 
   const trimmed = name.trim();
   const dirty = trimmed !== (user.name ?? "") && trimmed.length > 0;
@@ -182,15 +240,39 @@ function AccountForm({ user, initials, onSaved }: { user: any; initials: string;
   return (
     <>
       <div className="flex items-center gap-4">
-        <Avatar className="h-16 w-16">
-          <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">{initials}</AvatarFallback>
-        </Avatar>
+        <div className="relative">
+          <Avatar className="h-16 w-16">
+            {avatar ? <AvatarImage src={avatar} alt={user.name || "Profile picture"} className="object-cover" /> : null}
+            <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">{initials}</AvatarFallback>
+          </Avatar>
+          <button
+            type="button"
+            data-icon-button
+            onClick={() => fileRef.current?.click()}
+            disabled={setAvatarMut.isPending}
+            className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow ring-2 ring-card disabled:opacity-60"
+            aria-label="Change profile picture"
+          >
+            {setAvatarMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
+        </div>
         <div>
           <p className="text-lg font-bold text-foreground">{user.name || "Unnamed user"}</p>
           <p className="text-sm text-muted-foreground">{user.email || "No email on file"}</p>
           <Badge className="mt-1 bg-primary/10 text-primary hover:bg-primary/10 text-xs">
             {roleLabel[user.role] ?? user.role ?? "Member"}
           </Badge>
+          <div className="flex items-center gap-2 mt-2">
+            <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" disabled={setAvatarMut.isPending} onClick={() => fileRef.current?.click()}>
+              <Camera className="h-3.5 w-3.5" />{avatar ? "Change photo" : "Upload photo"}
+            </Button>
+            {avatar && (
+              <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs text-destructive" disabled={setAvatarMut.isPending} onClick={onRemoveAvatar}>
+                <Trash2 className="h-3.5 w-3.5" />Remove
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

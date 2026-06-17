@@ -137,7 +137,7 @@
    * Radio/Tab/Select-trigger must NOT get 24px side padding or the moving parts
    * get squeezed out of the track (see Switch thumb).
    */
-  button:not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([role="tab"]):not([role="combobox"]), .btn, [class*="Button"] {
+  button:not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([role="tab"]):not([role="combobox"]):not([data-icon-button]), .btn, [class*="Button"] {
     border-radius: 9999px !important;
     padding-left: 1.5rem !important;
     padding-right: 1.5rem !important;

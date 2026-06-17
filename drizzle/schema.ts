@@ -1,4 +1,4 @@
-import { date, decimal, int, json, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { date, decimal, int, json, mediumtext, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -16,6 +16,12 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
+  /**
+   * Profile picture as a self-contained data URL (data:image/...;base64,...).
+   * The client resizes/crops to a small square before upload, so this stays
+   * well within mediumtext; null means "show initials".
+   */
+  avatarUrl: mediumtext("avatarUrl"),
   /**
    * scrypt password hash for email/password (native mobile) sign-in.
    * Null for OAuth-only accounts. Never returned to clients.

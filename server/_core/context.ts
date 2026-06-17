@@ -23,6 +23,7 @@ const DEV_MOCK_USER: User = {
   name: "Test Administrator",
   email: "admin@childflow.org",
   loginMethod: "dev",
+  avatarUrl: null,
   passwordHash: null,
   role: "admin",
   familyId: null,
