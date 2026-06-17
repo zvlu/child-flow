@@ -12,6 +12,8 @@ import {
   updateUserSettings,
   setUserPassword,
   getOrganizationByAgencyId,
+  getOrganizationById,
+  updateOrganization,
   getUserOrganizations,
   getOrganizationChildren,
   getChildById,
@@ -131,6 +133,34 @@ export const appRouter = router({
       .input(z.string())
       .query(async ({ input }) => {
         return getOrganizationByAgencyId(input);
+      }),
+    // Single organization by id — backs the editable Program settings panel.
+    get: staffProcedure
+      .input(z.number())
+      .query(async ({ input: id }) => {
+        return getOrganizationById(id);
+      }),
+    // Persist the editable program profile (admin only).
+    update: adminProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().trim().min(1).max(255).optional(),
+          director: z.string().trim().max(160).nullable().optional(),
+          directorEmail: z.string().trim().max(320).email().or(z.literal("")).nullable().optional(),
+          phone: z.string().trim().max(32).nullable().optional(),
+          address: z.string().trim().max(400).nullable().optional(),
+          maxChildren: z.number().int().min(0).max(100000).optional(),
+          classroomCount: z.number().int().min(0).max(10000).nullable().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        // Normalize empty director email to null so we don't store "".
+        if (data.directorEmail === "") data.directorEmail = null;
+        await updateOrganization(id, data);
+        await auditAccess(ctx, { action: "update", resourceType: "organization", resourceId: id, detail: "program_settings" });
+        return { success: true };
       }),
   }),
 

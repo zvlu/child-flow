@@ -203,6 +203,24 @@ export async function getOrganizationByAgencyId(agencyId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function getOrganizationById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(organizations).where(eq(organizations.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/** Update the editable program-profile fields of an organization. */
+export async function updateOrganization(
+  id: number,
+  data: Partial<Pick<typeof organizations.$inferInsert,
+    "name" | "director" | "directorEmail" | "phone" | "address" | "maxChildren" | "classroomCount">>
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(organizations).set(data).where(eq(organizations.id, id));
+}
+
 export async function getUserOrganizations(userId: number) {
   const db = await getDb();
   if (!db) return [];

@@ -620,34 +620,91 @@ function StaffUsers() {
 // Program-wide details are presentational here; persisting them is tracked
 // separately (the organizations table doesn't yet carry these columns).
 function ProgramSettings() {
-  const [saved, setSaved] = useState(false);
-  const note = () => { setSaved(true); toast.message("Program settings are display-only for now"); setTimeout(() => setSaved(false), 1500); };
+  const orgQuery = trpc.organizations.get.useQuery(ORGANIZATION_ID);
+  const org = orgQuery.data;
+
+  const blank = { name: "", director: "", directorEmail: "", phone: "", address: "", maxChildren: "", classroomCount: "" };
+  const [form, setForm] = useState(blank);
+  useEffect(() => {
+    if (!org) return;
+    setForm({
+      name: org.name ?? "",
+      director: org.director ?? "",
+      directorEmail: org.directorEmail ?? "",
+      phone: org.phone ?? "",
+      address: org.address ?? "",
+      maxChildren: org.maxChildren != null ? String(org.maxChildren) : "",
+      classroomCount: org.classroomCount != null ? String(org.classroomCount) : "",
+    });
+  }, [org]);
+
+  const update = trpc.organizations.update.useMutation({
+    onSuccess: async () => { await orgQuery.refetch(); toast.success("Program settings saved"); },
+    onError: (e) => toast.error(e.message || "Could not save program settings"),
+  });
+
+  const set = (k: keyof typeof blank) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const baseline = org
+    ? {
+        name: org.name ?? "", director: org.director ?? "", directorEmail: org.directorEmail ?? "",
+        phone: org.phone ?? "", address: org.address ?? "",
+        maxChildren: org.maxChildren != null ? String(org.maxChildren) : "",
+        classroomCount: org.classroomCount != null ? String(org.classroomCount) : "",
+      }
+    : blank;
+  const dirty = !!org && JSON.stringify(form) !== JSON.stringify(baseline);
+
+  const onSave = () => {
+    if (!form.name.trim()) { toast.error("Program name is required."); return; }
+    update.mutate({
+      id: ORGANIZATION_ID,
+      name: form.name.trim(),
+      director: form.director.trim() || null,
+      directorEmail: form.directorEmail.trim() || null,
+      phone: form.phone.trim() || null,
+      address: form.address.trim() || null,
+      maxChildren: form.maxChildren.trim() === "" ? undefined : Number(form.maxChildren),
+      classroomCount: form.classroomCount.trim() === "" ? null : Number(form.classroomCount),
+    });
+  };
+
+  if (orgQuery.isLoading) {
+    return <Card><CardContent className="py-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></CardContent></Card>;
+  }
+  if (!org) {
+    return <Card><CardContent className="py-6 text-center text-sm text-muted-foreground">Couldn't load your program details.</CardContent></Card>;
+  }
+
   return (
-    <>
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Program Information</CardTitle>
-          <CardDescription>Contact and capacity details shown across the program.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label htmlFor="program-name">Program Name</Label><Input id="program-name" defaultValue="Springfield Head Start" /></div>
-            <div className="space-y-2"><Label htmlFor="program-id">Program ID</Label><Input id="program-id" defaultValue="IL-001" disabled className="bg-muted" /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label htmlFor="director">Program Director</Label><Input id="director" defaultValue="Lisa Thompson" /></div>
-            <div className="space-y-2"><Label htmlFor="director-email">Director Email</Label><Input id="director-email" type="email" defaultValue="l.thompson@childflow.org" /></div>
-          </div>
-          <div className="space-y-2"><Label htmlFor="address">Program Address</Label><Input id="address" defaultValue="123 Education Lane, Springfield, IL 62701" /></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label htmlFor="capacity">Total Capacity</Label><Input id="capacity" type="number" defaultValue="51" /></div>
-            <div className="space-y-2"><Label htmlFor="classrooms">Number of Classrooms</Label><Input id="classrooms" type="number" defaultValue="3" /></div>
-          </div>
-          <Button onClick={note} className="w-full gap-2"><Save className="h-4 w-4" />Save Changes</Button>
-          {saved && <p className="text-xs text-center text-muted-foreground">Not yet persisted.</p>}
-        </CardContent>
-      </Card>
-    </>
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Program Information</CardTitle>
+        <CardDescription>Contact and capacity details for {org.name}. Changes save to your program.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2"><Label htmlFor="program-name">Program Name</Label><Input id="program-name" value={form.name} maxLength={255} onChange={set("name")} /></div>
+          <div className="space-y-2"><Label htmlFor="program-id">Program ID</Label><Input id="program-id" value={org.agencyId} disabled className="bg-muted" /></div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2"><Label htmlFor="director">Program Director</Label><Input id="director" value={form.director} maxLength={160} onChange={set("director")} /></div>
+          <div className="space-y-2"><Label htmlFor="director-email">Director Email</Label><Input id="director-email" type="email" value={form.directorEmail} maxLength={320} onChange={set("directorEmail")} /></div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2"><Label htmlFor="phone">Program Phone</Label><Input id="phone" value={form.phone} maxLength={32} onChange={set("phone")} /></div>
+          <div className="space-y-2"><Label htmlFor="address">Program Address</Label><Input id="address" value={form.address} maxLength={400} onChange={set("address")} /></div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2"><Label htmlFor="capacity">Total Capacity</Label><Input id="capacity" type="number" min={0} value={form.maxChildren} onChange={set("maxChildren")} /></div>
+          <div className="space-y-2"><Label htmlFor="classrooms">Number of Classrooms</Label><Input id="classrooms" type="number" min={0} value={form.classroomCount} onChange={set("classroomCount")} /></div>
+        </div>
+        <Button onClick={onSave} disabled={!dirty || update.isPending} className="w-full gap-2">
+          {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save Changes
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

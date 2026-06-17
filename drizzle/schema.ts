@@ -102,6 +102,12 @@ export const organizations = mysqlTable("organizations", {
   name: varchar("name", { length: 255 }).notNull(),
   agencyId: varchar("agencyId", { length: 64 }).notNull().unique(),
   description: text("description"),
+  /** Editable program profile (Settings › Program). */
+  director: varchar("director", { length: 160 }),
+  directorEmail: varchar("directorEmail", { length: 320 }),
+  phone: varchar("phone", { length: 32 }),
+  address: varchar("address", { length: 400 }),
+  classroomCount: int("classroomCount"),
   ownerId: int("ownerId").notNull().references(() => users.id),
   subscriptionTier: mysqlEnum("subscriptionTier", ["starter", "professional", "enterprise"]).default("starter").notNull(),
   maxChildren: int("maxChildren").default(100),
