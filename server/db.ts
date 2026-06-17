@@ -131,6 +131,39 @@ export async function setUserPassword(openId: string, passwordHash: string | nul
   await db.update(users).set({ passwordHash }).where(eq(users.openId, openId));
 }
 
+/** Update a user's own editable profile fields (currently just display name). */
+export async function updateUserProfile(openId: string, data: { name?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set(data).where(eq(users.openId, openId));
+}
+
+/**
+ * Merge a partial settings patch into the user's existing settings JSON.
+ * Reading-then-writing keeps untouched preferences intact and lets the column
+ * grow without every caller having to send the whole object.
+ */
+export async function updateUserSettings(
+  openId: string,
+  patch: Partial<NonNullable<typeof users.$inferSelect.settings>>
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const current = await getUserByOpenId(openId);
+  const merged = {
+    ...(current?.settings ?? {}),
+    ...patch,
+    notifications: {
+      ...(current?.settings?.notifications ?? {}),
+      ...(patch.notifications ?? {}),
+    },
+  };
+  // Drop the notifications key entirely if it ended up empty so we don't store {}.
+  if (Object.keys(merged.notifications).length === 0) delete (merged as any).notifications;
+  await db.update(users).set({ settings: merged }).where(eq(users.openId, openId));
+  return merged;
+}
+
 /**
  * Append a row to the audit log.
  * Best-effort: failures are logged but never propagated into the request path,

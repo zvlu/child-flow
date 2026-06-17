@@ -2,10 +2,15 @@ import { COOKIE_NAME, NOT_ADMIN_ERR_MSG } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router, staffProcedure, adminProcedure } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router, staffProcedure, adminProcedure } from "./_core/trpc";
 import { auditAccess } from "./_core/audit";
+import { hashPassword, verifyPassword } from "./_core/password";
 import { z } from "zod";
 import {
+  getUserByOpenId,
+  updateUserProfile,
+  updateUserSettings,
+  setUserPassword,
   getOrganizationByAgencyId,
   getUserOrganizations,
   getOrganizationChildren,
@@ -35,8 +40,11 @@ export const appRouter = router({
       if (!opts.ctx.user) return null;
       // Never expose the password hash (or let new sensitive columns leak by
       // default) — return an explicit allowlist of fields.
-      const { id, openId, name, email, role, lastSignedIn } = opts.ctx.user;
-      return { id, openId, name, email, role, lastSignedIn };
+      const { id, openId, name, email, role, lastSignedIn, settings } = opts.ctx.user;
+      // Surface whether a password is set (so the UI can adjust the change-password
+      // flow) without ever returning the hash itself.
+      const hasPassword = Boolean(opts.ctx.user.passwordHash);
+      return { id, openId, name, email, role, lastSignedIn, settings, hasPassword };
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -45,6 +53,51 @@ export const appRouter = router({
         success: true,
       } as const;
     }),
+    // Update the signed-in user's own editable profile (display name).
+    updateProfile: protectedProcedure
+      .input(z.object({ name: z.string().trim().min(1).max(120) }))
+      .mutation(async ({ input, ctx }) => {
+        await updateUserProfile(ctx.user.openId, { name: input.name });
+        await auditAccess(ctx, { action: "update", resourceType: "user", resourceId: ctx.user.id, detail: "profile" });
+        return { success: true, name: input.name };
+      }),
+    // Persist notification / 2FA preferences (merged into users.settings).
+    updateSettings: protectedProcedure
+      .input(
+        z.object({
+          twoFactorEnabled: z.boolean().optional(),
+          notifications: z.record(z.string(), z.boolean()).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const settings = await updateUserSettings(ctx.user.openId, input);
+        await auditAccess(ctx, { action: "update", resourceType: "user", resourceId: ctx.user.id, detail: "settings" });
+        return { success: true, settings };
+      }),
+    // Change the signed-in user's password. Verifies the current password when
+    // one is already set; first-time set (OAuth-only accounts) skips that check.
+    changePassword: protectedProcedure
+      .input(
+        z.object({
+          currentPassword: z.string().optional(),
+          newPassword: z.string().min(8).max(200),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        // Re-read the row so we verify against the persisted hash, not a stale one.
+        const fresh = await getUserByOpenId(ctx.user.openId);
+        const existingHash = fresh?.passwordHash ?? null;
+        if (existingHash) {
+          const ok = await verifyPassword(input.currentPassword ?? "", existingHash);
+          if (!ok) {
+            await auditAccess(ctx, { action: "update_failed", resourceType: "user", resourceId: ctx.user.id, detail: "password:bad_current" });
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Current password is incorrect." });
+          }
+        }
+        await setUserPassword(ctx.user.openId, await hashPassword(input.newPassword));
+        await auditAccess(ctx, { action: "update", resourceType: "user", resourceId: ctx.user.id, detail: "password" });
+        return { success: true };
+      }),
   }),
 
   organizations: router({
@@ -242,6 +295,38 @@ export const appRouter = router({
         const { id, ...data } = input;
         await auditAccess(ctx, { action: "update", resourceType: "staff", resourceId: id });
         return mod.updateStaff(id, data);
+      }),
+  }),
+
+  // Admin-defined staff role labels (e.g. "Family Advocate"). These are display
+  // labels mapped to a fixed access tier — they never widen the RBAC enum.
+  roles: router({
+    list: staffProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId }) => {
+        return mod.getCustomRoles(organizationId);
+      }),
+    create: adminProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          name: z.string().trim().min(1).max(100),
+          description: z.string().max(500).optional(),
+          accessLevel: z.enum(["staff", "admin"]).default("staff"),
+          color: z.enum(["sage", "peach", "indigo", "amber", "red", "blue"]).default("sage"),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const result = await mod.createCustomRole(input);
+        await auditAccess(ctx, { action: "create", resourceType: "custom_role", resourceId: result.id, detail: `${input.name}:${input.accessLevel}` });
+        return result;
+      }),
+    delete: adminProcedure
+      .input(z.object({ id: z.number(), organizationId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await mod.deleteCustomRole(input.id, input.organizationId);
+        await auditAccess(ctx, { action: "delete", resourceType: "custom_role", resourceId: input.id });
+        return { success: true };
       }),
   }),
 

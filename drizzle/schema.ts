@@ -31,10 +31,23 @@ export const users = mysqlTable("users", {
   role: mysqlEnum("role", ["admin", "staff", "parent"]).default("staff").notNull(),
   /** For parent accounts: the family this user belongs to. Null for staff/admin. */
   familyId: int("familyId"),
+  /**
+   * Per-user preferences (notification toggles, 2FA flag). Stored as JSON so the
+   * preference set can grow without a migration. Never contains secrets.
+   */
+  settings: json("settings").$type<UserSettings>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
+
+/** Shape of users.settings — all fields optional so partial updates merge cleanly. */
+export type UserSettings = {
+  /** Whether the user has opted into two-factor auth (flag only; not a TOTP secret). */
+  twoFactorEnabled?: boolean;
+  /** Notification channel/topic toggles keyed by a stable preference id. */
+  notifications?: Record<string, boolean>;
+};
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -146,6 +159,26 @@ export const staff = mysqlTable("staff", {
 
 export type Staff = typeof staff.$inferSelect;
 export type InsertStaff = typeof staff.$inferInsert;
+
+/**
+ * Admin-defined staff roles (e.g. "Family Advocate", "Health Coordinator").
+ * These are organization-scoped *labels* layered on top of the fixed access
+ * tiers — `accessLevel` maps a custom role to the underlying users.role tier
+ * (staff or admin) so the RBAC surface stays a closed enum while programs can
+ * name positions however they like. `color` themes the badge shown in the UI.
+ */
+export const customRoles = mysqlTable("custom_roles", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  accessLevel: mysqlEnum("accessLevel", ["staff", "admin"]).default("staff").notNull(),
+  color: varchar("color", { length: 24 }).default("sage").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CustomRole = typeof customRoles.$inferSelect;
+export type InsertCustomRole = typeof customRoles.$inferInsert;
 
 /**
  * Families table for storing family information.

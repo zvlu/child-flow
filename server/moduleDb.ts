@@ -16,6 +16,7 @@ import {
   InsertMealPlan, InsertMealItem, InsertCertification, InsertCustomReport,
   InsertEducationRecord, InsertAiInsight, InsertBulkActionLog,
   InsertActivityLog, InsertAttendance,
+  customRoles, InsertCustomRole,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -205,6 +206,32 @@ export async function createStaff(data: InsertStaff) {
 export async function updateStaff(id: number, data: Partial<InsertStaff>) {
   const db = await requireDb();
   await db.update(staff).set(data).where(eq(staff.id, id));
+  return { success: true };
+}
+
+// ==================== CUSTOM ROLES ====================
+
+export async function getCustomRoles(organizationId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(customRoles)
+    .where(eq(customRoles.organizationId, organizationId))
+    .orderBy(customRoles.name);
+}
+
+export async function createCustomRole(data: InsertCustomRole) {
+  const db = await requireDb();
+  const [result] = await db.insert(customRoles).values(data);
+  return { id: result.insertId };
+}
+
+export async function deleteCustomRole(id: number, organizationId: number) {
+  const db = await requireDb();
+  // Scope the delete to the org so one program can't remove another's roles.
+  await db
+    .delete(customRoles)
+    .where(and(eq(customRoles.id, id), eq(customRoles.organizationId, organizationId)));
   return { success: true };
 }
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,24 +8,52 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Settings as SettingsIcon, Bell, Lock, Users, Building2, Save, Check, UserCircle, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Settings as SettingsIcon, Bell, Lock, Users, Building2, Save, UserCircle, Loader2, Plus, Trash2, ShieldCheck } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { ORGANIZATION_ID } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
+import { toast } from "sonner";
 
 const roleLabel: Record<string, string> = { admin: "Administrator", staff: "Staff", parent: "Parent" };
 
+const staffRoleLabel: Record<string, string> = {
+  admin: "Administrator", teacher: "Teacher", assistant: "Assistant", coordinator: "Coordinator",
+};
+
+// Notification preferences keyed by a stable id (persisted in users.settings).
+// A missing value is treated as ON, so existing accounts default to opted-in.
+const NOTIFICATION_PREFS = [
+  { id: "health_screening", label: "Health Screening Reminders", description: "Get alerts when health screenings are due or overdue" },
+  { id: "attendance", label: "Attendance Alerts", description: "Notify when attendance falls below threshold" },
+  { id: "enrollment", label: "Enrollment Updates", description: "Updates on applications and waitlist changes" },
+  { id: "family_services", label: "Family Services Reminders", description: "Reminders for home visits and parent meetings" },
+  { id: "staff_training", label: "Staff Training Alerts", description: "Notifications about training requirements" },
+  { id: "compliance", label: "Compliance Reminders", description: "PIR submission and compliance deadline alerts" },
+  { id: "daily_digest", label: "Daily Digest", description: "Receive a daily summary of key metrics" },
+  { id: "email", label: "Email Notifications", description: "Receive notifications via email" },
+] as const;
+
+const ROLE_COLORS = ["sage", "peach", "indigo", "amber", "red", "blue"] as const;
+type RoleColor = (typeof ROLE_COLORS)[number];
+
+const roleColorClasses: Record<RoleColor, string> = {
+  sage: "bg-primary/10 text-primary border-primary/20",
+  peach: "bg-orange-100 text-orange-700 border-orange-200",
+  indigo: "bg-indigo-100 text-indigo-700 border-indigo-200",
+  amber: "bg-amber-100 text-amber-700 border-amber-200",
+  red: "bg-red-100 text-red-700 border-red-200",
+  blue: "bg-blue-100 text-blue-700 border-blue-200",
+};
+
 export default function Settings() {
-  const [saved, setSaved] = useState(false);
-  const { user, loading } = useAuth();
+  const { user, loading, refresh } = useAuth();
   const isAdmin = useIsAdmin();
+
   const initials = user?.name
     ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
     : "?";
-
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
 
   return (
     <div className="p-6 space-y-6">
@@ -37,12 +65,6 @@ export default function Settings() {
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5">Manage program settings, users, and preferences</p>
         </div>
-        {saved && (
-          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-50 border border-green-200">
-            <Check className="h-4 w-4 text-green-600" />
-            <span className="text-sm font-medium text-green-700">Saved successfully</span>
-          </div>
-        )}
       </div>
 
       <Tabs defaultValue="account">
@@ -54,7 +76,7 @@ export default function Settings() {
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
 
-        {/* Account — the real signed-in user */}
+        {/* Account — the real signed-in user, with an editable display name */}
         <TabsContent value="account" className="mt-4 space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -72,41 +94,7 @@ export default function Settings() {
                   You're not signed in. <a href="/" className="text-primary font-medium">Return to sign in</a>.
                 </div>
               ) : (
-                <>
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-16 w-16">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">{initials}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-lg font-bold text-foreground">{user.name || "Unnamed user"}</p>
-                      <p className="text-sm text-muted-foreground">{user.email || "No email on file"}</p>
-                      <Badge className="mt-1 bg-primary/10 text-primary hover:bg-primary/10 text-xs">
-                        {roleLabel[(user as any).role] ?? (user as any).role ?? "Member"}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 pt-2 border-t">
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground">Full name</Label>
-                      <p className="text-sm font-medium">{user.name || "—"}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground">Email</Label>
-                      <p className="text-sm font-medium">{user.email || "—"}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground">Role</Label>
-                      <p className="text-sm font-medium">{roleLabel[(user as any).role] ?? "—"}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-muted-foreground">Account ID</Label>
-                      <p className="text-sm font-medium font-mono">{(user as any).id ?? "—"}</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground border-t pt-3">
-                    Your name and role are managed by your program administrator. Use the Security tab to change your password.
-                  </p>
-                </>
+                <AccountForm user={user} initials={initials} onSaved={refresh} />
               )}
             </CardContent>
           </Card>
@@ -115,228 +103,454 @@ export default function Settings() {
         {/* Program Settings (admin only) */}
         {isAdmin && (
         <TabsContent value="program" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-primary" />
-                Program Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="program-name">Program Name</Label>
-                  <Input id="program-name" defaultValue="Springfield Head Start" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="program-id">Program ID</Label>
-                  <Input id="program-id" defaultValue="IL-001" disabled className="bg-muted" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="director">Program Director</Label>
-                  <Input id="director" defaultValue="Lisa Thompson" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="director-email">Director Email</Label>
-                  <Input id="director-email" type="email" defaultValue="l.thompson@childflow.org" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="address">Program Address</Label>
-                <Input id="address" defaultValue="123 Education Lane, Springfield, IL 62701" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" defaultValue="(555) 111-0000" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" defaultValue="info@childflow.org" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="capacity">Total Capacity</Label>
-                  <Input id="capacity" type="number" defaultValue="51" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="classrooms">Number of Classrooms</Label>
-                  <Input id="classrooms" type="number" defaultValue="3" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="program-year">Program Year</Label>
-                <Select defaultValue="2024-2025">
-                  <SelectTrigger id="program-year">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2024-2025">2024-2025</SelectItem>
-                    <SelectItem value="2023-2024">2023-2024</SelectItem>
-                    <SelectItem value="2025-2026">2025-2026</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={handleSave} className="w-full gap-2"><Save className="h-4 w-4" />Save Changes</Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Program Hours</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="open-time">Opening Time</Label>
-                  <Input id="open-time" type="time" defaultValue="08:00" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="close-time">Closing Time</Label>
-                  <Input id="close-time" type="time" defaultValue="17:00" />
-                </div>
-              </div>
-              <Button onClick={handleSave} className="w-full gap-2"><Save className="h-4 w-4" />Save Changes</Button>
-            </CardContent>
-          </Card>
+          <ProgramSettings />
         </TabsContent>
         )}
 
-        {/* User Management (admin only) */}
+        {/* User Management (admin only) — real staff + custom role labels */}
         {isAdmin && (
-        <TabsContent value="users" className="mt-4 space-y-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-foreground">Staff Users</h3>
-            <Button size="sm" className="gap-2"><Users className="h-4 w-4" />Add User</Button>
-          </div>
-
-          <Card>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border">
-                {[
-                  { name: "Lisa Thompson", role: "Program Director", email: "l.thompson@childflow.org", status: "active", permissions: "Full Access" },
-                  { name: "Patricia Lee", role: "Lead Teacher", email: "p.lee@childflow.org", status: "active", permissions: "Classroom" },
-                  { name: "Angela Davis", role: "Teacher Assistant", email: "a.davis@childflow.org", status: "active", permissions: "Classroom" },
-                  { name: "Jennifer Kim", role: "Family Service Worker", email: "j.kim@childflow.org", status: "active", permissions: "Family Services" },
-                  { name: "David Martinez", role: "Health Coordinator", email: "d.martinez@childflow.org", status: "active", permissions: "Health" },
-                ].map(user => (
-                  <div key={user.email} className="flex items-center justify-between p-4 hover:bg-muted/20 transition-colors">
-                    <div>
-                      <p className="font-medium text-sm text-foreground">{user.name}</p>
-                      <p className="text-xs text-muted-foreground">{user.role} • {user.email}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge variant="outline" className="text-xs">{user.permissions}</Badge>
-                      <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-xs">Active</Badge>
-                      <Button variant="ghost" size="sm" className="text-xs">Edit</Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="users" className="mt-4 space-y-6">
+          <CustomRolesManager />
+          <StaffUsers />
         </TabsContent>
         )}
 
-        {/* Notifications */}
+        {/* Notifications — persisted per user */}
         <TabsContent value="notifications" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Bell className="h-4 w-4 text-primary" />
-                Notification Preferences
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[
-                { label: "Health Screening Reminders", description: "Get alerts when health screenings are due or overdue" },
-                { label: "Attendance Alerts", description: "Notify when attendance falls below threshold" },
-                { label: "Enrollment Updates", description: "Updates on applications and waitlist changes" },
-                { label: "Family Services Reminders", description: "Reminders for home visits and parent meetings" },
-                { label: "Staff Training Alerts", description: "Notifications about training requirements" },
-                { label: "Compliance Reminders", description: "PIR submission and compliance deadline alerts" },
-                { label: "Daily Digest", description: "Receive a daily summary of key metrics" },
-                { label: "Email Notifications", description: "Receive notifications via email" },
-              ].map(item => (
-                <div key={item.label} className="flex items-center justify-between p-3 rounded-lg border border-border">
-                  <div>
-                    <p className="font-medium text-sm text-foreground">{item.label}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-              ))}
-              <Button onClick={handleSave} className="w-full gap-2"><Save className="h-4 w-4" />Save Preferences</Button>
-            </CardContent>
-          </Card>
+          {loading ? (
+            <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          ) : (
+            <NotificationPreferences settings={user?.settings} onSaved={refresh} disabled={!user} />
+          )}
         </TabsContent>
 
-        {/* Security */}
+        {/* Security — real password change + persisted 2FA */}
         <TabsContent value="security" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Lock className="h-4 w-4 text-primary" />
-                Password & Security
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="current-password">Current Password</Label>
-                <Input id="current-password" type="password" placeholder="••••••••" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="new-password">New Password</Label>
-                <Input id="new-password" type="password" placeholder="••••••••" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm Password</Label>
-                <Input id="confirm-password" type="password" placeholder="••••••••" />
-              </div>
-              <Button className="w-full gap-2"><Save className="h-4 w-4" />Update Password</Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Two-Factor Authentication</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-lg border border-border">
-                <div>
-                  <p className="font-medium text-sm text-foreground">Enable 2FA</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Add an extra layer of security to your account</p>
-                </div>
-                <Switch />
-              </div>
-              <p className="text-xs text-muted-foreground">Two-factor authentication requires you to verify your identity using a second method when logging in.</p>
-            </CardContent>
-          </Card>
-
+          <PasswordCard hasPassword={Boolean((user as any)?.hasPassword)} disabled={!user} />
+          <TwoFactorCard enabled={Boolean(user?.settings?.twoFactorEnabled)} onSaved={refresh} disabled={!user} />
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Active Sessions</CardTitle>
+              <CardDescription>This is the device you're currently signed in on.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {[
-                { device: "Chrome on Windows", location: "Springfield, IL", lastActive: "Just now" },
-                { device: "Safari on macOS", location: "Springfield, IL", lastActive: "2 hours ago" },
-              ].map((session, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-border">
-                  <div>
-                    <p className="font-medium text-sm text-foreground">{session.device}</p>
-                    <p className="text-xs text-muted-foreground">{session.location} • {session.lastActive}</p>
-                  </div>
-                  <Button variant="ghost" size="sm" className="text-xs text-destructive">Sign Out</Button>
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+                <div>
+                  <p className="font-medium text-sm text-foreground">This device</p>
+                  <p className="text-xs text-muted-foreground">
+                    Last signed in {user?.lastSignedIn ? new Date(user.lastSignedIn).toLocaleString() : "—"}
+                  </p>
                 </div>
-              ))}
+                <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-xs">Current</Badge>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+/* ----------------------------- Account ----------------------------- */
+
+function AccountForm({ user, initials, onSaved }: { user: any; initials: string; onSaved: () => Promise<void> }) {
+  const [name, setName] = useState<string>(user.name ?? "");
+  useEffect(() => { setName(user.name ?? ""); }, [user.name]);
+
+  const updateProfile = trpc.auth.updateProfile.useMutation({
+    onSuccess: async () => { await onSaved(); toast.success("Profile updated"); },
+    onError: (e) => toast.error(e.message || "Could not update profile"),
+  });
+
+  const trimmed = name.trim();
+  const dirty = trimmed !== (user.name ?? "") && trimmed.length > 0;
+
+  return (
+    <>
+      <div className="flex items-center gap-4">
+        <Avatar className="h-16 w-16">
+          <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">{initials}</AvatarFallback>
+        </Avatar>
+        <div>
+          <p className="text-lg font-bold text-foreground">{user.name || "Unnamed user"}</p>
+          <p className="text-sm text-muted-foreground">{user.email || "No email on file"}</p>
+          <Badge className="mt-1 bg-primary/10 text-primary hover:bg-primary/10 text-xs">
+            {roleLabel[user.role] ?? user.role ?? "Member"}
+          </Badge>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+        <div className="space-y-2 col-span-2 sm:col-span-1">
+          <Label htmlFor="display-name">Display name</Label>
+          <Input id="display-name" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-muted-foreground">Email</Label>
+          <p className="text-sm font-medium pt-2">{user.email || "—"}</p>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-muted-foreground">Role</Label>
+          <p className="text-sm font-medium">{roleLabel[user.role] ?? "—"}</p>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-muted-foreground">Account ID</Label>
+          <p className="text-sm font-medium font-mono">{user.id ?? "—"}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between border-t pt-3">
+        <p className="text-xs text-muted-foreground">
+          Your email and role are managed by your program administrator.
+        </p>
+        <Button
+          size="sm"
+          className="gap-2"
+          disabled={!dirty || updateProfile.isPending}
+          onClick={() => updateProfile.mutate({ name: trimmed })}
+        >
+          {updateProfile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Save
+        </Button>
+      </div>
+    </>
+  );
+}
+
+/* --------------------------- Notifications --------------------------- */
+
+function NotificationPreferences({ settings, onSaved, disabled }: { settings: any; onSaved: () => Promise<void>; disabled: boolean }) {
+  const stored: Record<string, boolean> = settings?.notifications ?? {};
+  // Missing value defaults to ON.
+  const initial = useMemo(() => {
+    const out: Record<string, boolean> = {};
+    for (const p of NOTIFICATION_PREFS) out[p.id] = stored[p.id] ?? true;
+    return out;
+  }, [settings]);
+
+  const [prefs, setPrefs] = useState<Record<string, boolean>>(initial);
+  useEffect(() => { setPrefs(initial); }, [initial]);
+
+  const save = trpc.auth.updateSettings.useMutation({
+    onSuccess: async () => { await onSaved(); toast.success("Notification preferences saved"); },
+    onError: (e) => toast.error(e.message || "Could not save preferences"),
+  });
+
+  const dirty = NOTIFICATION_PREFS.some(p => prefs[p.id] !== initial[p.id]);
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Bell className="h-4 w-4 text-primary" />
+          Notification Preferences
+        </CardTitle>
+        <CardDescription>Choose which alerts you want to receive. Saved to your account.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {NOTIFICATION_PREFS.map(item => (
+          <div key={item.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
+            <div>
+              <p className="font-medium text-sm text-foreground">{item.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+            </div>
+            <Switch
+              checked={prefs[item.id] ?? true}
+              disabled={disabled}
+              onCheckedChange={(v) => setPrefs(prev => ({ ...prev, [item.id]: v }))}
+            />
+          </div>
+        ))}
+        <Button
+          className="w-full gap-2"
+          disabled={disabled || !dirty || save.isPending}
+          onClick={() => save.mutate({ notifications: prefs })}
+        >
+          {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Save Preferences
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ------------------------------ Security ------------------------------ */
+
+function PasswordCard({ hasPassword, disabled }: { hasPassword: boolean; disabled: boolean }) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+
+  const change = trpc.auth.changePassword.useMutation({
+    onSuccess: () => {
+      toast.success("Password updated");
+      setCurrent(""); setNext(""); setConfirm("");
+    },
+    onError: (e) => toast.error(e.message || "Could not update password"),
+  });
+
+  const submit = () => {
+    if (next.length < 8) { toast.error("New password must be at least 8 characters"); return; }
+    if (next !== confirm) { toast.error("Passwords do not match"); return; }
+    if (hasPassword && !current) { toast.error("Enter your current password"); return; }
+    change.mutate({ currentPassword: hasPassword ? current : undefined, newPassword: next });
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Lock className="h-4 w-4 text-primary" />
+          Password & Security
+        </CardTitle>
+        <CardDescription>
+          {hasPassword ? "Change the password you use to sign in." : "Set a password to enable email sign-in."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {hasPassword && (
+          <div className="space-y-2">
+            <Label htmlFor="current-password">Current Password</Label>
+            <Input id="current-password" type="password" placeholder="••••••••" value={current} onChange={(e) => setCurrent(e.target.value)} />
+          </div>
+        )}
+        <div className="space-y-2">
+          <Label htmlFor="new-password">New Password</Label>
+          <Input id="new-password" type="password" placeholder="At least 8 characters" value={next} onChange={(e) => setNext(e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="confirm-password">Confirm Password</Label>
+          <Input id="confirm-password" type="password" placeholder="••••••••" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        </div>
+        <Button className="w-full gap-2" disabled={disabled || change.isPending} onClick={submit}>
+          {change.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          {hasPassword ? "Update Password" : "Set Password"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TwoFactorCard({ enabled, onSaved, disabled }: { enabled: boolean; onSaved: () => Promise<void>; disabled: boolean }) {
+  const save = trpc.auth.updateSettings.useMutation({
+    onSuccess: async (res) => { await onSaved(); toast.success(res.settings?.twoFactorEnabled ? "Two-factor enabled" : "Two-factor disabled"); },
+    onError: (e) => toast.error(e.message || "Could not update setting"),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Two-Factor Authentication</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between p-3 rounded-lg border border-border">
+          <div>
+            <p className="font-medium text-sm text-foreground">Enable 2FA</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Add an extra layer of security to your account</p>
+          </div>
+          <Switch
+            checked={enabled}
+            disabled={disabled || save.isPending}
+            onCheckedChange={(v) => save.mutate({ twoFactorEnabled: v })}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">Two-factor authentication requires you to verify your identity using a second method when logging in.</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* --------------------------- Custom Roles --------------------------- */
+
+function CustomRolesManager() {
+  const utils = trpc.useUtils();
+  const rolesQuery = trpc.roles.list.useQuery(ORGANIZATION_ID);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState<{ name: string; description: string; accessLevel: "staff" | "admin"; color: RoleColor }>(
+    { name: "", description: "", accessLevel: "staff", color: "sage" }
+  );
+
+  const create = trpc.roles.create.useMutation({
+    onSuccess: () => { utils.roles.list.invalidate(); setOpen(false); setForm({ name: "", description: "", accessLevel: "staff", color: "sage" }); toast.success("Role created"); },
+    onError: (e) => toast.error(e.message || "Could not create role"),
+  });
+  const remove = trpc.roles.delete.useMutation({
+    onSuccess: () => { utils.roles.list.invalidate(); toast.success("Role removed"); },
+    onError: (e) => toast.error(e.message || "Could not remove role"),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              Custom Roles
+            </CardTitle>
+            <CardDescription>Name the positions in your program (e.g. Family Advocate). Each maps to an access level.</CardDescription>
+          </div>
+          <Button size="sm" className="gap-2" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />Add Role</Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {rolesQuery.isLoading ? (
+          <div className="flex items-center justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+        ) : (rolesQuery.data?.length ?? 0) === 0 ? (
+          <div className="py-6 text-center text-sm text-muted-foreground">
+            No custom roles yet. Add one like <span className="font-medium text-foreground">Family Advocate</span> to get started.
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {rolesQuery.data!.map(role => (
+              <div key={role.id} className={`group flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${roleColorClasses[(role.color as RoleColor)] ?? roleColorClasses.sage}`}>
+                <span className="font-medium">{role.name}</span>
+                <span className="text-[10px] uppercase tracking-wide opacity-70">{role.accessLevel}</span>
+                <button
+                  className="opacity-50 hover:opacity-100 transition-opacity"
+                  title={`Remove ${role.name}`}
+                  disabled={remove.isPending}
+                  onClick={() => remove.mutate({ id: role.id, organizationId: ORGANIZATION_ID })}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add Custom Role</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="role-name">Role name</Label>
+              <Input id="role-name" placeholder="Family Advocate" value={form.name} maxLength={100} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role-desc">Description (optional)</Label>
+              <Input id="role-desc" placeholder="Supports families with resources and referrals" value={form.description} maxLength={500} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Access level</Label>
+                <Select value={form.accessLevel} onValueChange={(v) => setForm(f => ({ ...f, accessLevel: v as "staff" | "admin" }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="staff">Staff — program data access</SelectItem>
+                    <SelectItem value="admin">Admin — full administration</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Badge color</Label>
+                <Select value={form.color} onValueChange={(v) => setForm(f => ({ ...f, color: v as RoleColor }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ROLE_COLORS.map(c => (
+                      <SelectItem key={c} value={c}><span className="capitalize">{c}</span></SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button
+              className="gap-2"
+              disabled={!form.name.trim() || create.isPending}
+              onClick={() => create.mutate({
+                organizationId: ORGANIZATION_ID,
+                name: form.name.trim(),
+                description: form.description.trim() || undefined,
+                accessLevel: form.accessLevel,
+                color: form.color,
+              })}
+            >
+              {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Create Role
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+/* ----------------------------- Staff list ----------------------------- */
+
+function StaffUsers() {
+  const staffQuery = trpc.staff.list.useQuery(ORGANIZATION_ID);
+
+  return (
+    <div className="space-y-3">
+      <h3 className="font-semibold text-foreground flex items-center gap-2"><Users className="h-4 w-4 text-primary" />Staff Users</h3>
+      <Card>
+        <CardContent className="p-0">
+          {staffQuery.isLoading ? (
+            <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          ) : (staffQuery.data?.length ?? 0) === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">No staff members yet.</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {staffQuery.data!.map(member => (
+                <div key={member.id} className="flex items-center justify-between p-4 hover:bg-muted/20 transition-colors">
+                  <div>
+                    <p className="font-medium text-sm text-foreground">{member.firstName} {member.lastName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {member.position || staffRoleLabel[member.role ?? "teacher"]}{member.email ? ` • ${member.email}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="text-xs">{staffRoleLabel[member.role ?? "teacher"]}</Badge>
+                    <Badge className={`text-xs ${member.isActive ? "bg-green-100 text-green-700 hover:bg-green-100" : "bg-muted text-muted-foreground hover:bg-muted"}`}>
+                      {member.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      <p className="text-xs text-muted-foreground">Add and edit staff from the <a href="/staff" className="text-primary font-medium">Staff</a> page.</p>
+    </div>
+  );
+}
+
+/* ---------------------------- Program (admin) ---------------------------- */
+// Program-wide details are presentational here; persisting them is tracked
+// separately (the organizations table doesn't yet carry these columns).
+function ProgramSettings() {
+  const [saved, setSaved] = useState(false);
+  const note = () => { setSaved(true); toast.message("Program settings are display-only for now"); setTimeout(() => setSaved(false), 1500); };
+  return (
+    <>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Program Information</CardTitle>
+          <CardDescription>Contact and capacity details shown across the program.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label htmlFor="program-name">Program Name</Label><Input id="program-name" defaultValue="Springfield Head Start" /></div>
+            <div className="space-y-2"><Label htmlFor="program-id">Program ID</Label><Input id="program-id" defaultValue="IL-001" disabled className="bg-muted" /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label htmlFor="director">Program Director</Label><Input id="director" defaultValue="Lisa Thompson" /></div>
+            <div className="space-y-2"><Label htmlFor="director-email">Director Email</Label><Input id="director-email" type="email" defaultValue="l.thompson@childflow.org" /></div>
+          </div>
+          <div className="space-y-2"><Label htmlFor="address">Program Address</Label><Input id="address" defaultValue="123 Education Lane, Springfield, IL 62701" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label htmlFor="capacity">Total Capacity</Label><Input id="capacity" type="number" defaultValue="51" /></div>
+            <div className="space-y-2"><Label htmlFor="classrooms">Number of Classrooms</Label><Input id="classrooms" type="number" defaultValue="3" /></div>
+          </div>
+          <Button onClick={note} className="w-full gap-2"><Save className="h-4 w-4" />Save Changes</Button>
+          {saved && <p className="text-xs text-center text-muted-foreground">Not yet persisted.</p>}
+        </CardContent>
+      </Card>
+    </>
   );
 }

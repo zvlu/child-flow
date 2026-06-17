@@ -1,7 +1,7 @@
 import * as db from "../db";
 import type { TrpcContext } from "./context";
 
-type AuditAction = "read" | "create" | "update" | "delete";
+type AuditAction = "read" | "create" | "update" | "delete" | "update_failed";
 
 type AuditParams = {
   action: AuditAction;
