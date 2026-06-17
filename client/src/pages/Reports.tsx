@@ -5,9 +5,43 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
-import { Download, FileText, BarChart3, TrendingUp, Users, Heart, ClipboardCheck, ShieldCheck } from "lucide-react";
+import { Download, FileText, BarChart3, TrendingUp, Users, Heart, ClipboardCheck, ShieldCheck, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { ORGANIZATION_ID } from "@/const";
+import { toast } from "sonner";
+
+/** Serialize an array of row objects to CSV (headers = union of keys). */
+function objectsToCsv(rows: Record<string, any>[]): string {
+  if (!rows.length) return "";
+  const headerSet = new Set<string>();
+  for (const r of rows) for (const k of Object.keys(r)) headerSet.add(k);
+  const headers = Array.from(headerSet);
+  const cell = (v: unknown): string => {
+    if (v == null) return "";
+    let s: string;
+    if (v instanceof Date) s = v.toISOString().slice(0, 10);
+    else if (typeof v === "object") s = JSON.stringify(v);
+    else s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return [headers.join(","), ...rows.map((r) => headers.map((h) => cell(r[h])).join(","))].join("\n");
+}
+
+function downloadCsv(filename: string, csv: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 const attendanceByMonth = [
   { month: "Sep", rate: 88 }, { month: "Oct", rate: 91 }, { month: "Nov", rate: 87 },
@@ -59,6 +93,74 @@ const reportTemplates = [
 ];
 
 export default function Reports() {
+  const orgId = ORGANIZATION_ID;
+  const utils = trpc.useUtils();
+  const [, navigate] = useLocation();
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const today = () => new Date().toISOString().slice(0, 10);
+  const runExport = async (key: string, fileBase: string, fetcher: () => Promise<any[]>) => {
+    setBusy(key);
+    try {
+      const rows = await fetcher();
+      if (!rows || rows.length === 0) { toast.message("No data to export yet."); return; }
+      downloadCsv(`${fileBase}-${today()}.csv`, objectsToCsv(rows as Record<string, any>[]));
+      toast.success(`Exported ${rows.length} row${rows.length === 1 ? "" : "s"} to CSV`);
+    } catch (e: any) {
+      toast.error(e?.message || "Export failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Each export pulls live data on demand via the query cache's imperative fetch.
+  const fetchAttendance = () => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 30);
+    return utils.attendance.getRange.fetch({ organizationId: orgId, start, end });
+  };
+  const exporters: Record<string, { file: string; fetch: () => Promise<any[]> }> = {
+    "Attendance Report": { file: "attendance-30d", fetch: fetchAttendance },
+    "Health Screening Report": { file: "health-screenings", fetch: () => utils.health.list.fetch({ organizationId: orgId }) },
+    "Enrollment Report": { file: "enrollment-applications", fetch: () => utils.enrollment.list.fetch(orgId) },
+    "Family Services Report": { file: "family-services", fetch: () => utils.familyServices.list.fetch({ organizationId: orgId }) },
+    "Child Assessment Report": { file: "assessments", fetch: () => utils.education.list.fetch({ organizationId: orgId }) },
+    "Staff Training Report": { file: "certifications", fetch: () => utils.staffOps.certifications.fetch(orgId) },
+    "Income Eligibility Report": {
+      file: "income-eligibility",
+      fetch: async () => {
+        const apps = await utils.enrollment.list.fetch(orgId);
+        return apps.map((a) => ({
+          child: `${a.childFirstName} ${a.childLastName}`,
+          incomeLevel: a.incomeLevel ?? "",
+          householdSize: a.householdSize ?? "",
+          status: a.status,
+        }));
+      },
+    },
+  };
+
+  const onTemplate = (name: string) => {
+    if (name.includes("PIR")) { navigate("/compliance"); return; }
+    const ex = exporters[name];
+    if (!ex) { toast.message("This report isn't available yet."); return; }
+    runExport(name, ex.file, ex.fetch);
+  };
+
+  // Saved-report "Download" maps the report type to a live CSV export.
+  const onSavedDownload = (type: string) => {
+    const byType: Record<string, { file: string; fetch: () => Promise<any[]> }> = {
+      Attendance: exporters["Attendance Report"],
+      Health: exporters["Health Screening Report"],
+      "Family Services": exporters["Family Services Report"],
+      Staff: exporters["Staff Training Report"],
+      Compliance: { file: "children-roster", fetch: () => utils.children.list.fetch(orgId) },
+    };
+    const ex = byType[type] ?? { file: "children-roster", fetch: () => utils.children.list.fetch(orgId) };
+    runExport(`saved-${type}`, ex.file, ex.fetch);
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -77,7 +179,9 @@ export default function Reports() {
               <SelectItem value="2022-2023">2022-2023</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />Export All</Button>
+          <Button variant="outline" size="sm" className="gap-2" disabled={busy === "all"} onClick={() => runExport("all", "children-roster", () => utils.children.list.fetch(orgId))}>
+            {busy === "all" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}Export All
+          </Button>
         </div>
       </div>
 
@@ -97,7 +201,9 @@ export default function Reports() {
                   <CardTitle className="text-base">Attendance Rate Trend</CardTitle>
                   <CardDescription>Monthly average attendance rate — 2024-2025 program year</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" className="gap-2 text-xs"><Download className="h-3.5 w-3.5" />Export</Button>
+                <Button variant="outline" size="sm" className="gap-2 text-xs" disabled={busy === "Attendance Report"} onClick={() => onTemplate("Attendance Report")}>
+                  {busy === "Attendance Report" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}Export
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -202,8 +308,9 @@ export default function Reports() {
                     </div>
                     <h3 className="font-semibold text-sm text-foreground leading-tight">{template.name}</h3>
                     <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{template.description}</p>
-                    <Button variant="outline" size="sm" className="w-full mt-4 text-xs gap-1 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                      <FileText className="h-3.5 w-3.5" />Generate Report
+                    <Button variant="outline" size="sm" disabled={busy === template.name} onClick={() => onTemplate(template.name)} className="w-full mt-4 text-xs gap-1 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      {busy === template.name ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                      {template.name.includes("PIR") ? "Open PIR" : "Generate CSV"}
                     </Button>
                   </CardContent>
                 </Card>
@@ -230,10 +337,10 @@ export default function Reports() {
                     </div>
                     <Badge variant="outline" className="text-xs">{report.format}</Badge>
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" className="text-xs gap-1">
-                        <Download className="h-3.5 w-3.5" />Download
+                      <Button variant="ghost" size="sm" className="text-xs gap-1" disabled={busy === `saved-${report.type}`} onClick={() => onSavedDownload(report.type)}>
+                        {busy === `saved-${report.type}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}Download
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-xs">Re-run</Button>
+                      <Button variant="ghost" size="sm" className="text-xs" onClick={() => onSavedDownload(report.type)}>Re-run</Button>
                     </div>
                   </div>
                 ))}
