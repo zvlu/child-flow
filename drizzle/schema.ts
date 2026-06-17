@@ -224,6 +224,38 @@ export type Family = typeof families.$inferSelect;
 export type InsertFamily = typeof families.$inferInsert;
 
 /**
+ * Enrollment applications / waitlist. Each row is a prospective child's
+ * application; staff triage it (priority + status) and, on approval, "enroll"
+ * it — which creates the real family + child records and links back via
+ * enrolledChildId so the same application is never enrolled twice.
+ */
+export const enrollmentApplications = mysqlTable("enrollment_applications", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  childFirstName: varchar("childFirstName", { length: 100 }).notNull(),
+  childLastName: varchar("childLastName", { length: 100 }).notNull(),
+  dateOfBirth: timestamp("dateOfBirth"),
+  gender: mysqlEnum("gender", ["male", "female", "other", "prefer_not_to_say"]),
+  parentName: varchar("parentName", { length: 160 }),
+  parentPhone: varchar("parentPhone", { length: 32 }),
+  parentEmail: varchar("parentEmail", { length: 320 }),
+  address: varchar("address", { length: 400 }),
+  incomeLevel: mysqlEnum("incomeLevel", ["below_100", "below_130", "below_185", "above_185"]),
+  householdSize: int("householdSize"),
+  priority: mysqlEnum("priority", ["high", "medium", "low"]).default("medium").notNull(),
+  status: mysqlEnum("status", ["pending", "reviewing", "approved", "denied", "enrolled"]).default("pending").notNull(),
+  notes: text("notes"),
+  /** children.id once this application has been enrolled; null while not. */
+  enrolledChildId: int("enrolledChildId"),
+  appliedDate: timestamp("appliedDate").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type EnrollmentApplication = typeof enrollmentApplications.$inferSelect;
+export type InsertEnrollmentApplication = typeof enrollmentApplications.$inferInsert;
+
+/**
  * One-time invitation codes that let a parent create a family-app account
  * bound to a specific family. Staff generate these; the family onboarding flow
  * (verify-code → register) consumes them. A code is single-use and expires.

@@ -307,6 +307,66 @@ export const appRouter = router({
       }),
   }),
 
+  // Enrollment applications / waitlist. Triage prospective children and, on
+  // approval, enroll them (creates real family + child records).
+  enrollment: router({
+    list: staffProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId }) => {
+        return mod.getEnrollmentApplications(organizationId);
+      }),
+    create: staffProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          childFirstName: z.string().trim().min(1).max(100),
+          childLastName: z.string().trim().min(1).max(100),
+          dateOfBirth: z.date().optional(),
+          gender: z.enum(["male", "female", "other", "prefer_not_to_say"]).optional(),
+          parentName: z.string().trim().max(160).optional(),
+          parentPhone: z.string().trim().max(32).optional(),
+          parentEmail: z.string().trim().email().max(320).or(z.literal("")).optional(),
+          address: z.string().trim().max(400).optional(),
+          incomeLevel: z.enum(["below_100", "below_130", "below_185", "above_185"]).optional(),
+          householdSize: z.number().int().min(1).max(30).optional(),
+          priority: z.enum(["high", "medium", "low"]).optional(),
+          notes: z.string().max(1000).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const { parentEmail, ...rest } = input;
+        const result = await mod.createEnrollmentApplication({
+          ...rest,
+          parentEmail: parentEmail ? parentEmail : null,
+        });
+        await auditAccess(ctx, { action: "create", resourceType: "enrollment_application", detail: `org:${input.organizationId}` });
+        return result;
+      }),
+    setStatus: staffProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          organizationId: z.number(),
+          status: z.enum(["pending", "reviewing", "approved", "denied"]).optional(),
+          priority: z.enum(["high", "medium", "low"]).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const { id, organizationId, ...data } = input;
+        await mod.updateEnrollmentApplication(id, organizationId, data);
+        await auditAccess(ctx, { action: "update", resourceType: "enrollment_application", resourceId: id, detail: JSON.stringify(data) });
+        return { success: true };
+      }),
+    // Approve & enroll: materialize the application into family + child records.
+    enroll: staffProcedure
+      .input(z.object({ id: z.number(), organizationId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const result = await mod.enrollApplication(input.id, input.organizationId);
+        await auditAccess(ctx, { action: "create", resourceType: "child", resourceId: result.childId, detail: `enrolled_from_application:${input.id}` });
+        return result;
+      }),
+  }),
+
   staff: router({
     list: staffProcedure
       .input(z.number())

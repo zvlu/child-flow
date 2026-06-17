@@ -17,6 +17,7 @@ import {
   InsertEducationRecord, InsertAiInsight, InsertBulkActionLog,
   InsertActivityLog, InsertAttendance,
   customRoles, InsertCustomRole,
+  enrollmentApplications, InsertEnrollmentApplication,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -233,6 +234,79 @@ export async function deleteCustomRole(id: number, organizationId: number) {
     .delete(customRoles)
     .where(and(eq(customRoles.id, id), eq(customRoles.organizationId, organizationId)));
   return { success: true };
+}
+
+// ==================== ENROLLMENT APPLICATIONS ====================
+
+export async function getEnrollmentApplications(organizationId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(enrollmentApplications)
+    .where(eq(enrollmentApplications.organizationId, organizationId))
+    .orderBy(desc(enrollmentApplications.appliedDate));
+}
+
+export async function createEnrollmentApplication(data: InsertEnrollmentApplication) {
+  const db = await requireDb();
+  const [result] = await db.insert(enrollmentApplications).values(data);
+  return { id: result.insertId };
+}
+
+export async function updateEnrollmentApplication(
+  id: number,
+  organizationId: number,
+  data: Partial<Pick<InsertEnrollmentApplication, "status" | "priority" | "notes">>
+) {
+  const db = await requireDb();
+  await db
+    .update(enrollmentApplications)
+    .set(data)
+    .where(and(eq(enrollmentApplications.id, id), eq(enrollmentApplications.organizationId, organizationId)));
+  return { success: true };
+}
+
+/**
+ * Approve-and-enroll: turn an application into real family + child records and
+ * mark it enrolled. Idempotent — if already enrolled, returns the existing
+ * childId instead of creating duplicates.
+ */
+export async function enrollApplication(id: number, organizationId: number) {
+  const db = await requireDb();
+  const [app] = await db
+    .select()
+    .from(enrollmentApplications)
+    .where(and(eq(enrollmentApplications.id, id), eq(enrollmentApplications.organizationId, organizationId)))
+    .limit(1);
+  if (!app) throw new Error("Application not found");
+  if (app.enrolledChildId) return { childId: app.enrolledChildId, familyId: null, alreadyEnrolled: true };
+
+  const [famResult] = await db.insert(families).values({
+    organizationId,
+    primaryContactName: app.parentName || `${app.childFirstName} ${app.childLastName} family`,
+    primaryContactPhone: app.parentPhone ?? null,
+    primaryContactEmail: app.parentEmail ?? null,
+    address: app.address ?? null,
+  });
+  const familyId = Number(famResult.insertId);
+
+  const [childResult] = await db.insert(children).values({
+    organizationId,
+    firstName: app.childFirstName,
+    lastName: app.childLastName,
+    dateOfBirth: app.dateOfBirth ?? null,
+    gender: app.gender ?? null,
+    familyId,
+    status: "active",
+  });
+  const childId = Number(childResult.insertId);
+
+  await db
+    .update(enrollmentApplications)
+    .set({ status: "enrolled", enrolledChildId: childId })
+    .where(eq(enrollmentApplications.id, id));
+
+  return { childId, familyId, alreadyEnrolled: false };
 }
 
 // ==================== STUDENT NOTES ====================
