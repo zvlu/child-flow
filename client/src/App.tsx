@@ -34,6 +34,7 @@ import InKind from "./pages/InKind";
 import Assessments from "./pages/Assessments";
 import OrgAdmin from "./pages/OrgAdmin";
 import RequestProgram from "./pages/RequestProgram";
+import SignIn from "./pages/SignIn";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
@@ -41,6 +42,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/request-program" component={RequestProgram} />
+      <Route path="/signin" component={SignIn} />
       <Route path="/dashboard">
         {() => (
           <AppLayout>

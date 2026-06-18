@@ -131,6 +131,13 @@ export async function setUserPassword(openId: string, passwordHash: string | nul
   await db.update(users).set({ passwordHash }).where(eq(users.openId, openId));
 }
 
+/** Bind a user to an organization (used by self-serve signup). */
+export async function assignUserOrganization(openId: string, organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ organizationId }).where(eq(users.openId, openId));
+}
+
 /** Update a user's own editable profile fields (currently just display name). */
 export async function updateUserProfile(openId: string, data: { name?: string; avatarUrl?: string | null }) {
   const db = await getDb();
