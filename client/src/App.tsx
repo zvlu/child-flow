@@ -31,6 +31,7 @@ import { StaffOperations } from "./pages/StaffOperations";
 import { ReportBuilder } from "./pages/ReportBuilder";
 import { ActionQueue } from "./pages/ActionQueue";
 import InKind from "./pages/InKind";
+import Assessments from "./pages/Assessments";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
@@ -90,6 +91,13 @@ function Router() {
         {() => (
           <AppLayout>
             <InKind />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/assessments">
+        {() => (
+          <AppLayout>
+            <Assessments />
           </AppLayout>
         )}
       </Route>

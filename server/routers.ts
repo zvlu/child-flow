@@ -1058,10 +1058,13 @@ export const appRouter = router({
           description: z.string().optional(),
           assessmentDate: z.date(),
           score: z.string().optional(),
+          domain: z.string().max(80).optional(),
         })
       )
-      .mutation(async ({ input }) => {
-        return mod.createEducationRecord(input);
+      .mutation(async ({ input, ctx }) => {
+        const result = await mod.createEducationRecord(input);
+        await auditAccess(ctx, { action: "create", resourceType: "education_record", resourceId: input.childId, detail: input.type });
+        return result;
       }),
   }),
 

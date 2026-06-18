@@ -481,6 +481,8 @@ export const educationRecords = mysqlTable("education_records", {
   description: text("description"),
   assessmentDate: timestamp("assessmentDate").notNull(),
   score: varchar("score", { length: 50 }),
+  /** Developmental domain (e.g. DRDP: ATL-REG, SED, LLD, COG, PD-HLTH). */
+  domain: varchar("domain", { length: 80 }),
   recordedBy: int("recordedBy").references(() => staff.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
