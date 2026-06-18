@@ -14,6 +14,7 @@ import {
   getOrganizationByAgencyId,
   getOrganizationById,
   updateOrganization,
+  getOrganizationUsage,
   getUserOrganizations,
   getOrganizationChildren,
   getChildById,
@@ -35,6 +36,28 @@ import * as mod from "./moduleDb";
 import { createFamilyInvitation, listFamilyInvitations } from "./family";
 import { computeDashboard } from "./dashboard";
 import { CommunicationService } from "./services/communication";
+
+/** Block creation when it would push the org past its plan's child limit. */
+async function assertChildCapacity(organizationId: number, adding: number) {
+  const usage = await getOrganizationUsage(organizationId);
+  if (usage?.maxChildren != null && usage.children + adding > usage.maxChildren) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Enrollment limit reached — your ${usage.subscriptionTier} plan allows ${usage.maxChildren} children (currently ${usage.children}). Raise the limit in Settings → Program or upgrade your plan.`,
+    });
+  }
+}
+
+/** Block creation when it would push the org past its plan's staff limit. */
+async function assertStaffCapacity(organizationId: number, adding: number) {
+  const usage = await getOrganizationUsage(organizationId);
+  if (usage?.maxStaff != null && usage.staff + adding > usage.maxStaff) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Staff limit reached — your ${usage.subscriptionTier} plan allows ${usage.maxStaff} staff (currently ${usage.staff}). Raise the limit in Settings → Program or upgrade your plan.`,
+    });
+  }
+}
 
 export const appRouter = router({
   system: systemRouter,
@@ -141,6 +164,12 @@ export const appRouter = router({
       .query(async ({ input: id }) => {
         return getOrganizationById(id);
       }),
+    // Live enrollment/staff counts vs plan limits — backs the Plan & Usage card.
+    usage: staffProcedure
+      .input(z.number())
+      .query(async ({ input: id }) => {
+        return getOrganizationUsage(id);
+      }),
     // Persist the editable program profile (admin only).
     update: adminProcedure
       .input(
@@ -152,7 +181,9 @@ export const appRouter = router({
           phone: z.string().trim().max(32).nullable().optional(),
           address: z.string().trim().max(400).nullable().optional(),
           maxChildren: z.number().int().min(0).max(100000).optional(),
+          maxStaff: z.number().int().min(0).max(100000).optional(),
           classroomCount: z.number().int().min(0).max(10000).nullable().optional(),
+          subscriptionTier: z.enum(["starter", "professional", "enterprise"]).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -191,6 +222,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        await assertChildCapacity(input.organizationId, 1);
         const result = await createChild(input);
         await auditAccess(ctx, { action: "create", resourceType: "child", detail: `org:${input.organizationId}` });
         return result;
@@ -216,6 +248,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        await assertChildCapacity(input.organizationId, input.rows.length);
         const result = await bulkCreateChildren(
           input.rows.map((r) => ({ ...r, organizationId: input.organizationId }))
         );
@@ -389,6 +422,7 @@ export const appRouter = router({
     enroll: staffProcedure
       .input(z.object({ id: z.number(), organizationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
+        await assertChildCapacity(input.organizationId, 1);
         const result = await mod.enrollApplication(input.id, input.organizationId);
         await auditAccess(ctx, { action: "create", resourceType: "child", resourceId: result.childId, detail: `enrolled_from_application:${input.id}` });
         return result;
@@ -457,6 +491,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        await assertStaffCapacity(input.organizationId, 1);
         const result = await mod.createStaff(input);
         await auditAccess(ctx, { action: "create", resourceType: "staff", detail: `org:${input.organizationId}` });
         return result;

@@ -214,11 +214,28 @@ export async function getOrganizationById(id: number) {
 export async function updateOrganization(
   id: number,
   data: Partial<Pick<typeof organizations.$inferInsert,
-    "name" | "director" | "directorEmail" | "phone" | "address" | "maxChildren" | "classroomCount">>
+    "name" | "director" | "directorEmail" | "phone" | "address" | "maxChildren" | "classroomCount" | "maxStaff" | "subscriptionTier">>
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(organizations).set(data).where(eq(organizations.id, id));
+}
+
+/** Current enrollment/staff counts vs the org's plan limits — backs usage UI + enforcement. */
+export async function getOrganizationUsage(organizationId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+  if (!org) return null;
+  const kids = await db.select({ id: children.id }).from(children).where(eq(children.organizationId, organizationId));
+  const staffRows = await db.select({ id: staff.id }).from(staff).where(eq(staff.organizationId, organizationId));
+  return {
+    children: kids.length,
+    staff: staffRows.length,
+    maxChildren: org.maxChildren ?? null,
+    maxStaff: org.maxStaff ?? null,
+    subscriptionTier: org.subscriptionTier,
+  };
 }
 
 export async function getUserOrganizations(userId: number) {

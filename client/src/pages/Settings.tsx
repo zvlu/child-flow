@@ -109,6 +109,7 @@ export default function Settings() {
         {isAdmin && (
         <TabsContent value="program" className="mt-4 space-y-4">
           <ProgramSettings />
+          <PlanUsageCard />
         </TabsContent>
         )}
 
@@ -703,6 +704,97 @@ function ProgramSettings() {
         <Button onClick={onSave} disabled={!dirty || update.isPending} className="w-full gap-2">
           {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save Changes
         </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ----------------------------- Plan & Usage ----------------------------- */
+
+const TIERS: Record<string, { label: string; perChild: number; base: number }> = {
+  starter: { label: "Starter", perChild: 3, base: 0 },
+  professional: { label: "Professional", perChild: 2.5, base: 49 },
+  enterprise: { label: "Enterprise", perChild: 2, base: 199 },
+};
+const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+
+function UsageBar({ label, used, max }: { label: string; used: number; max: number | null }) {
+  const pct = max && max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
+  const over = max != null && used > max;
+  const near = pct >= 90;
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-sm">
+        <span className="text-muted-foreground">{label}</span>
+        <span className={`font-semibold ${over ? "text-destructive" : ""}`}>{used}{max != null ? ` / ${max}` : ""}</span>
+      </div>
+      <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${over || near ? "bg-destructive" : pct >= 75 ? "bg-amber-500" : "bg-primary"}`} style={{ width: `${max ? Math.max(pct, 4) : 0}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function PlanUsageCard() {
+  const orgId = ORGANIZATION_ID;
+  const usageQuery = trpc.organizations.usage.useQuery(orgId);
+  const u = usageQuery.data;
+
+  const [tier, setTier] = useState<string>("starter");
+  const [maxStaff, setMaxStaff] = useState<string>("");
+  useEffect(() => { if (u) { setTier(u.subscriptionTier); setMaxStaff(u.maxStaff != null ? String(u.maxStaff) : ""); } }, [u]);
+
+  const update = trpc.organizations.update.useMutation({
+    onSuccess: async () => { await usageQuery.refetch(); toast.success("Plan updated"); },
+    onError: (e) => toast.error(e.message || "Could not update plan"),
+  });
+
+  if (usageQuery.isLoading) return <Card><CardContent className="py-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></CardContent></Card>;
+  if (!u) return null;
+
+  const dirty = tier !== u.subscriptionTier || (maxStaff === "" ? u.maxStaff != null : Number(maxStaff) !== u.maxStaff);
+  const rate = TIERS[tier] ?? TIERS.starter;
+  const estimate = rate.base + u.children * rate.perChild;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" />Plan & Usage</CardTitle>
+        <CardDescription>Subscription tier, capacity limits, and current usage. Limits are enforced when adding children or staff.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Subscription Tier</Label>
+            <Select value={tier} onValueChange={setTier}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(TIERS).map(([v, t]) => <SelectItem key={v} value={v}>{t.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2"><Label>Staff Limit</Label><Input type="number" min={0} value={maxStaff} onChange={(e) => setMaxStaff(e.target.value)} /></div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <UsageBar label="Children enrolled" used={u.children} max={u.maxChildren} />
+          <UsageBar label="Staff" used={u.staff} max={maxStaff === "" ? null : Number(maxStaff)} />
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border border-border p-3">
+          <div>
+            <p className="text-sm font-medium">Estimated monthly cost</p>
+            <p className="text-xs text-muted-foreground">{rate.label}: {usd(rate.base)} base + {u.children} × {usd(rate.perChild)}/child</p>
+          </div>
+          <p className="text-xl font-bold text-primary">{usd(estimate)}</p>
+        </div>
+        <p className="text-[11px] text-muted-foreground">Capacity (children) is set as “Total Capacity” above. Estimate is illustrative.</p>
+
+        <div className="flex justify-end">
+          <Button disabled={!dirty || update.isPending} className="gap-2" onClick={() => update.mutate({ id: orgId, subscriptionTier: tier as any, maxStaff: maxStaff === "" ? undefined : Number(maxStaff) })}>
+            {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save Plan
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
