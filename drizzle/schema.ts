@@ -35,6 +35,12 @@ export const users = mysqlTable("users", {
    * - parent: family-app account; sees ONLY their own family via familyId
    */
   role: mysqlEnum("role", ["admin", "staff", "parent"]).default("staff").notNull(),
+  /**
+   * The organization (program) this user belongs to. Staff/admin are scoped to
+   * exactly one org; data routes derive/enforce access from this rather than
+   * trusting a client-supplied id. Null for the platform owner / unassigned.
+   */
+  organizationId: int("organizationId"),
   /** For parent accounts: the family this user belongs to. Null for staff/admin. */
   familyId: int("familyId"),
   /**

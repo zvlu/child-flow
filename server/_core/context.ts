@@ -26,6 +26,7 @@ const DEV_MOCK_USER: User = {
   avatarUrl: null,
   passwordHash: null,
   role: "admin",
+  organizationId: 1,
   familyId: null,
   settings: null,
   createdAt: new Date(),

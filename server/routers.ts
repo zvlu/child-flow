@@ -70,12 +70,12 @@ export const appRouter = router({
       if (!opts.ctx.user) return null;
       // Never expose the password hash (or let new sensitive columns leak by
       // default) — return an explicit allowlist of fields.
-      const { id, openId, name, email, role, lastSignedIn, settings, avatarUrl } = opts.ctx.user;
+      const { id, openId, name, email, role, lastSignedIn, settings, avatarUrl, organizationId, familyId } = opts.ctx.user;
       // Surface whether a password is set (so the UI can adjust the change-password
       // flow) without ever returning the hash itself.
       const hasPassword = Boolean(opts.ctx.user.passwordHash);
       const isOwner = isPlatformOwner(opts.ctx.user.openId);
-      return { id, openId, name, email, role, lastSignedIn, settings, avatarUrl, hasPassword, isOwner };
+      return { id, openId, name, email, role, lastSignedIn, settings, avatarUrl, organizationId, familyId, hasPassword, isOwner };
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
