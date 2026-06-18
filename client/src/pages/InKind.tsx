@@ -11,6 +11,7 @@ import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { objectsToCsv, downloadCsv } from "@/lib/csv";
+import { dateInputToLocal } from "@/lib/date";
 
 const TYPE_LABEL: Record<string, string> = {
   volunteer: "Volunteer Time", goods: "Donated Goods", services: "Services", facility: "Facility / Space", other: "Other",
@@ -73,7 +74,7 @@ export default function InKind() {
       type: form.type as any,
       contributor: form.contributor.trim(),
       description: form.description.trim() || undefined,
-      date: form.date ? new Date(form.date) : new Date(),
+      date: dateInputToLocal(form.date) ?? new Date(),
       hours: form.type === "volunteer" && form.hours ? Number(form.hours) : undefined,
       value,
     });

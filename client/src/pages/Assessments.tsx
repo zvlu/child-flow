@@ -12,6 +12,7 @@ import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { objectsToCsv, downloadCsv } from "@/lib/csv";
+import { dateInputToLocal } from "@/lib/date";
 
 const DRDP_DOMAINS = [
   { code: "ATL-REG", label: "Approaches to Learning–Self-Regulation" },
@@ -67,7 +68,7 @@ export default function Assessments() {
       type: "assessment",
       title: form.title.trim() || `${form.domain} — ${form.level}`,
       description: form.notes.trim() || undefined,
-      assessmentDate: form.date ? new Date(form.date) : new Date(),
+      assessmentDate: dateInputToLocal(form.date) ?? new Date(),
       score: form.level,
       domain: form.domain,
     });

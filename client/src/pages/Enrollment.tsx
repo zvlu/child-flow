@@ -13,6 +13,7 @@ import { Plus, Search, Clock, CheckCircle2, XCircle, ArrowRight, BookOpen, Alert
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
+import { dateInputToLocal } from "@/lib/date";
 
 const INCOME_LABEL: Record<string, string> = {
   below_100: "Below 100% FPL",
@@ -95,7 +96,7 @@ export default function Enrollment() {
       organizationId: orgId,
       childFirstName: form.childFirstName.trim(),
       childLastName: form.childLastName.trim(),
-      dateOfBirth: form.dateOfBirth ? new Date(form.dateOfBirth) : undefined,
+      dateOfBirth: dateInputToLocal(form.dateOfBirth),
       gender: (form.gender || undefined) as any,
       parentName: form.parentName.trim() || undefined,
       parentPhone: form.parentPhone.trim() || undefined,
