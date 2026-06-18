@@ -4,7 +4,23 @@ import { randomUUID } from "crypto";
 import * as db from "../db";
 import { hashPassword, verifyPassword } from "./password";
 import { getSessionCookieOptions } from "./cookies";
+import { rateLimit } from "./rateLimit";
 import { sdk } from "./sdk";
+
+/**
+ * Throttle an endpoint by client IP. Returns true if the request was rejected
+ * (and has already written a 429 response).
+ */
+function throttled(req: Request, res: Response, action: string, max: number, windowMs: number): boolean {
+  const ip = clientIp(req) ?? "unknown";
+  const { ok, retryAfterSec } = rateLimit(`${action}:${ip}`, max, windowMs);
+  if (!ok) {
+    res.setHeader("Retry-After", String(retryAfterSec));
+    res.status(429).json({ error: "Too many attempts. Please wait a bit and try again." });
+    return true;
+  }
+  return false;
+}
 
 /** Issue a web session cookie for openId (mirrors the OAuth callback). */
 async function setWebSession(req: Request, res: Response, openId: string, name: string) {
@@ -58,6 +74,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   app.post("/api/auth/login", async (req: Request, res: Response) => {
+    if (throttled(req, res, "login", 10, 10 * 60 * 1000)) return;
     const email =
       typeof req.body?.email === "string"
         ? req.body.email.trim().toLowerCase()
@@ -115,6 +132,7 @@ export function registerAuthRoutes(app: Express) {
    * sets the browser session cookie instead of returning a bearer token.
    */
   app.post("/api/auth/web-login", async (req: Request, res: Response) => {
+    if (throttled(req, res, "login", 10, 10 * 60 * 1000)) return;
     const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
     const password = typeof req.body?.password === "string" ? req.body.password : "";
     const ip = clientIp(req);
@@ -140,6 +158,7 @@ export function registerAuthRoutes(app: Express) {
    * separate from every other program.
    */
   app.post("/api/auth/web-signup", async (req: Request, res: Response) => {
+    if (throttled(req, res, "signup", 5, 60 * 60 * 1000)) return;
     const programName = typeof req.body?.programName === "string" ? req.body.programName.trim() : "";
     const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
     const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
