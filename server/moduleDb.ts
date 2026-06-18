@@ -19,6 +19,7 @@ import {
   customRoles, InsertCustomRole,
   enrollmentApplications, InsertEnrollmentApplication,
   inKindContributions, InsertInKindContribution,
+  programRequests, InsertProgramRequest, organizations, InsertOrganization,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -333,6 +334,52 @@ export async function deleteInKindContribution(id: number, organizationId: numbe
     .delete(inKindContributions)
     .where(and(eq(inKindContributions.id, id), eq(inKindContributions.organizationId, organizationId)));
   return { success: true };
+}
+
+// ==================== PROGRAM REQUESTS (self-serve onboarding) ====================
+
+export async function createProgramRequest(data: InsertProgramRequest) {
+  const db = await requireDb();
+  const [result] = await db.insert(programRequests).values(data);
+  return { id: result.insertId };
+}
+
+export async function getProgramRequests() {
+  const db = await requireDb();
+  return db.select().from(programRequests).orderBy(desc(programRequests.createdAt));
+}
+
+export async function declineProgramRequest(id: number) {
+  const db = await requireDb();
+  await db.update(programRequests).set({ status: "declined" }).where(eq(programRequests.id, id));
+  return { success: true };
+}
+
+/**
+ * Approve a pending request: create the organization (active) and link it back.
+ * Idempotent — if already approved, returns the existing org id.
+ */
+export async function approveProgramRequest(id: number, ownerId: number) {
+  const db = await requireDb();
+  const [req] = await db.select().from(programRequests).where(eq(programRequests.id, id)).limit(1);
+  if (!req) throw new Error("Request not found");
+  if (req.createdOrgId) return { orgId: req.createdOrgId, alreadyApproved: true };
+
+  // Fall back to a generated agency id if the requester didn't supply one.
+  const agencyId = (req.agencyId && req.agencyId.trim()) || `REQ-${req.id}`;
+  const orgValues: InsertOrganization = {
+    name: req.organizationName,
+    agencyId,
+    ownerId,
+    subscriptionTier: "starter",
+    maxChildren: 100,
+    maxStaff: 20,
+    isActive: 1,
+  };
+  const [orgResult] = await db.insert(organizations).values(orgValues);
+  const orgId = Number(orgResult.insertId);
+  await db.update(programRequests).set({ status: "approved", createdOrgId: orgId }).where(eq(programRequests.id, id));
+  return { orgId, alreadyApproved: false };
 }
 
 // ==================== STUDENT NOTES ====================

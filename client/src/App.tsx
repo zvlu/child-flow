@@ -33,12 +33,14 @@ import { ActionQueue } from "./pages/ActionQueue";
 import InKind from "./pages/InKind";
 import Assessments from "./pages/Assessments";
 import OrgAdmin from "./pages/OrgAdmin";
+import RequestProgram from "./pages/RequestProgram";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/request-program" component={RequestProgram} />
       <Route path="/dashboard">
         {() => (
           <AppLayout>

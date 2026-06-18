@@ -279,6 +279,29 @@ export type InKindContribution = typeof inKindContributions.$inferSelect;
 export type InsertInKindContribution = typeof inKindContributions.$inferInsert;
 
 /**
+ * Public "request a program" submissions (self-serve onboarding front door).
+ * Anyone can submit; the platform owner reviews and, on approval, an
+ * organization is created and linked via createdOrgId.
+ */
+export const programRequests = mysqlTable("program_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationName: varchar("organizationName", { length: 255 }).notNull(),
+  agencyId: varchar("agencyId", { length: 64 }),
+  contactName: varchar("contactName", { length: 160 }).notNull(),
+  contactEmail: varchar("contactEmail", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 32 }),
+  message: varchar("message", { length: 1000 }),
+  status: mysqlEnum("status", ["pending", "approved", "declined"]).default("pending").notNull(),
+  /** organizations.id created when this request is approved; null otherwise. */
+  createdOrgId: int("createdOrgId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ProgramRequest = typeof programRequests.$inferSelect;
+export type InsertProgramRequest = typeof programRequests.$inferInsert;
+
+/**
  * One-time invitation codes that let a parent create a family-app account
  * bound to a specific family. Staff generate these; the family onboarding flow
  * (verify-code → register) consumes them. A code is single-use and expires.

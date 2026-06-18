@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Building2, Plus, Loader2, ShieldAlert } from "lucide-react";
+import { Building2, Plus, Loader2, ShieldAlert, Inbox, Check, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
@@ -37,6 +37,18 @@ export default function OrgAdmin() {
   const setActive = trpc.organizations.setActive.useMutation({
     onSuccess: async () => { await utils.organizations.listAll.invalidate(); },
     onError: (e) => toast.error(e.message || "Could not update organization"),
+  });
+
+  const requestsQuery = trpc.programRequests.list.useQuery(undefined, { enabled: isOwner });
+  const requests = requestsQuery.data ?? [];
+  const pendingRequests = requests.filter((r: any) => r.status === "pending");
+  const approve = trpc.programRequests.approve.useMutation({
+    onSuccess: async () => { await Promise.all([utils.programRequests.list.invalidate(), utils.organizations.listAll.invalidate()]); toast.success("Approved — organization created"); },
+    onError: (e) => toast.error(e.message || "Could not approve request"),
+  });
+  const decline = trpc.programRequests.decline.useMutation({
+    onSuccess: async () => { await utils.programRequests.list.invalidate(); toast.success("Request declined"); },
+    onError: (e) => toast.error(e.message || "Could not decline request"),
   });
 
   const set = (k: keyof typeof BLANK) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -116,6 +128,52 @@ export default function OrgAdmin() {
           </CardContent></Card>
         ))}
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Inbox className="h-4 w-4 text-primary" />Program Requests
+            {pendingRequests.length > 0 && <Badge className="bg-amber-100 text-amber-700 border-0 text-xs">{pendingRequests.length} pending</Badge>}
+          </CardTitle>
+          <CardDescription>Self-serve requests from prospective programs. Approving provisions an organization.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {requestsQuery.isLoading ? (
+            <div className="py-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          ) : requests.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">No requests yet.</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {requests.map((r: any) => (
+                <div key={r.id} className="flex items-start gap-4 px-6 py-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-sm text-foreground">{r.organizationName}</p>
+                      {r.status === "pending" && <Badge className="bg-amber-100 text-amber-700 border-0 text-xs">Pending</Badge>}
+                      {r.status === "approved" && <Badge className="bg-green-100 text-green-700 border-0 text-xs">Approved</Badge>}
+                      {r.status === "declined" && <Badge className="bg-red-100 text-red-700 border-0 text-xs">Declined</Badge>}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {r.contactName} • {r.contactEmail}{r.phone ? ` • ${r.phone}` : ""}{r.agencyId ? ` • ${r.agencyId}` : ""}
+                    </p>
+                    {r.message && <p className="text-xs text-muted-foreground mt-1 italic">“{r.message}”</p>}
+                  </div>
+                  {r.status === "pending" && (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Button variant="outline" size="sm" className="text-xs gap-1" disabled={approve.isPending} onClick={() => approve.mutate({ id: r.id })}>
+                        <Check className="h-3.5 w-3.5 text-green-600" />Approve
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-xs gap-1" disabled={decline.isPending} onClick={() => decline.mutate({ id: r.id })}>
+                        <X className="h-3.5 w-3.5 text-red-500" />Decline
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-base">All Programs</CardTitle><CardDescription>Toggle active to suspend or restore a program.</CardDescription></CardHeader>

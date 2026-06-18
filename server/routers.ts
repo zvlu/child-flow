@@ -511,6 +511,50 @@ export const appRouter = router({
       }),
   }),
 
+  // Self-serve onboarding: anyone can request a program; the platform owner
+  // reviews and approves (which provisions the organization).
+  programRequests: router({
+    create: publicProcedure
+      .input(
+        z.object({
+          organizationName: z.string().trim().min(1).max(255),
+          agencyId: z.string().trim().max(64).optional(),
+          contactName: z.string().trim().min(1).max(160),
+          contactEmail: z.string().trim().email().max(320),
+          phone: z.string().trim().max(32).optional(),
+          message: z.string().trim().max(1000).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await mod.createProgramRequest({
+          organizationName: input.organizationName,
+          agencyId: input.agencyId || null,
+          contactName: input.contactName,
+          contactEmail: input.contactEmail,
+          phone: input.phone || null,
+          message: input.message || null,
+        });
+        return { success: true };
+      }),
+    list: superAdminProcedure.query(async () => {
+      return mod.getProgramRequests();
+    }),
+    approve: superAdminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const result = await mod.approveProgramRequest(input.id, ctx.user.id);
+        await auditAccess(ctx, { action: "create", resourceType: "organization", resourceId: result.orgId, detail: `approved_request:${input.id}` });
+        return result;
+      }),
+    decline: superAdminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await mod.declineProgramRequest(input.id);
+        await auditAccess(ctx, { action: "update", resourceType: "program_request", resourceId: input.id, detail: "declined" });
+        return { success: true };
+      }),
+  }),
+
   staff: router({
     list: staffProcedure
       .input(z.number())
