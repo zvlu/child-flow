@@ -14,3 +14,16 @@ export const ENV = {
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
 };
+
+/**
+ * Platform owner = the super-admin who manages organizations across the whole
+ * deployment. In production this MUST match the configured OWNER_OPEN_ID. When
+ * no owner is configured (local dev), the dev-auth-bypass admin is treated as
+ * owner — and the bypass is force-disabled in production, so this never grants
+ * owner access in prod.
+ */
+export function isPlatformOwner(openId: string | null | undefined): boolean {
+  if (!openId) return false;
+  if (ENV.ownerOpenId) return openId === ENV.ownerOpenId;
+  return ENV.allowDevAuthBypass && !ENV.isProduction;
+}

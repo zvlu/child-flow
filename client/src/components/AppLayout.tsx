@@ -45,7 +45,8 @@ import {
   Clock,
   FileSignature,
   Layers,
-  School
+  School,
+  Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -74,6 +75,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   // app defaults when there are no preferences.
   const navPrefs = (user as any)?.settings?.navigation ?? null;
   const navRole = ((user as any)?.role ?? "staff") as "admin" | "staff" | "parent";
+  const isOwner = Boolean((user as any)?.isOwner);
   const effectiveTopNav = applyTopNav(navPrefs, navRole);
   const effectiveSideSections = applySideNav(navPrefs, navRole);
   const topNavPrimaryItems = effectiveTopNav.slice(0, TOP_NAV_PRIMARY_COUNT);
@@ -305,6 +307,32 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   </ul>
                 </div>
               ))}
+
+              {isOwner && (
+                <div>
+                  {sidebarOpen && (
+                    <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-sidebar-foreground/40">Platform</p>
+                  )}
+                  <ul className="space-y-1">
+                    <li>
+                      <Link href="/org-admin" asChild>
+                        <a
+                          onClick={() => setMobileNavOpen(false)}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-150",
+                            isNavItemActive("/org-admin")
+                              ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          )}
+                        >
+                          <Building2 className="h-4 w-4 flex-shrink-0" />
+                          {sidebarOpen && <span className="flex-1 truncate">Organizations</span>}
+                        </a>
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+              )}
 
               <div className="pt-1">
                 {sidebarOpen ? (

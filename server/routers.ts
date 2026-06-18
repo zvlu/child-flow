@@ -2,7 +2,8 @@ import { COOKIE_NAME, NOT_ADMIN_ERR_MSG } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router, staffProcedure, adminProcedure } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router, staffProcedure, adminProcedure, superAdminProcedure } from "./_core/trpc";
+import { isPlatformOwner } from "./_core/env";
 import { auditAccess } from "./_core/audit";
 import { hashPassword, verifyPassword } from "./_core/password";
 import { z } from "zod";
@@ -15,6 +16,9 @@ import {
   getOrganizationById,
   updateOrganization,
   getOrganizationUsage,
+  getAllOrganizations,
+  createOrganization,
+  setOrganizationActive,
   getUserOrganizations,
   getOrganizationChildren,
   getChildById,
@@ -70,7 +74,8 @@ export const appRouter = router({
       // Surface whether a password is set (so the UI can adjust the change-password
       // flow) without ever returning the hash itself.
       const hasPassword = Boolean(opts.ctx.user.passwordHash);
-      return { id, openId, name, email, role, lastSignedIn, settings, avatarUrl, hasPassword };
+      const isOwner = isPlatformOwner(opts.ctx.user.openId);
+      return { id, openId, name, email, role, lastSignedIn, settings, avatarUrl, hasPassword, isOwner };
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -169,6 +174,41 @@ export const appRouter = router({
       .input(z.number())
       .query(async ({ input: id }) => {
         return getOrganizationUsage(id);
+      }),
+    // ---- Platform-owner (super-admin) cross-org management ----
+    listAll: superAdminProcedure.query(async () => {
+      return getAllOrganizations();
+    }),
+    create: superAdminProcedure
+      .input(
+        z.object({
+          name: z.string().trim().min(1).max(255),
+          agencyId: z.string().trim().min(1).max(64),
+          subscriptionTier: z.enum(["starter", "professional", "enterprise"]).optional(),
+          maxChildren: z.number().int().min(0).max(100000).optional(),
+          maxStaff: z.number().int().min(0).max(100000).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const existing = await getOrganizationByAgencyId(input.agencyId);
+        if (existing) throw new TRPCError({ code: "CONFLICT", message: `Agency ID "${input.agencyId}" is already in use.` });
+        const result = await createOrganization({
+          name: input.name,
+          agencyId: input.agencyId,
+          ownerId: ctx.user.id,
+          subscriptionTier: input.subscriptionTier ?? "starter",
+          maxChildren: input.maxChildren ?? 100,
+          maxStaff: input.maxStaff ?? 20,
+        });
+        await auditAccess(ctx, { action: "create", resourceType: "organization", resourceId: result.id, detail: input.agencyId });
+        return result;
+      }),
+    setActive: superAdminProcedure
+      .input(z.object({ id: z.number(), isActive: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
+        await setOrganizationActive(input.id, input.isActive ? 1 : 0);
+        await auditAccess(ctx, { action: "update", resourceType: "organization", resourceId: input.id, detail: input.isActive ? "activated" : "deactivated" });
+        return { success: true };
       }),
     // Persist the editable program profile (admin only).
     update: adminProcedure

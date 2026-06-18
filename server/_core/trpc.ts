@@ -5,6 +5,7 @@ import type { User } from "../../drizzle/schema";
 import type { TrpcContext } from "./context";
 import { clientIpFromReq } from "./audit";
 import { insertAuditLog } from "../db";
+import { isPlatformOwner } from "./env";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -65,6 +66,31 @@ const requireRole = (roles: Array<User["role"]>) =>
 
 /** Program administration: staff management, bulk operations. */
 export const adminProcedure = t.procedure.use(requireRole(["admin"]));
+
+/**
+ * Platform owner (super-admin) gate for cross-organization management. Denied
+ * attempts are audit-logged like the role gate.
+ */
+export const superAdminProcedure = t.procedure.use(
+  t.middleware(async ({ ctx, next, path }) => {
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    }
+    if (!isPlatformOwner(ctx.user.openId)) {
+      await insertAuditLog({
+        userId: ctx.user.id,
+        actorOpenId: ctx.user.openId,
+        action: "access_denied",
+        resourceType: "rbac",
+        resourceId: path,
+        ipAddress: clientIpFromReq(ctx.req),
+        detail: "required=platform_owner",
+      });
+      throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+    }
+    return next({ ctx: { ...ctx, user: ctx.user } });
+  }),
+);
 
 /**
  * Internal program staff (admin included). This is the default tier for all

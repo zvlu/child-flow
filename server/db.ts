@@ -244,6 +244,37 @@ export async function getUserOrganizations(userId: number) {
   return await db.select().from(organizations).where(eq(organizations.ownerId, userId));
 }
 
+/** All organizations with live children/staff counts — platform-owner dashboard. */
+export async function getAllOrganizations() {
+  const db = await getDb();
+  if (!db) return [];
+  const orgs = await db.select().from(organizations).orderBy(organizations.name);
+  const kids = await db.select({ organizationId: children.organizationId, id: children.id }).from(children);
+  const staffRows = await db.select({ organizationId: staff.organizationId, id: staff.id }).from(staff);
+  const tally = (rows: { organizationId: number }[]) => {
+    const m = new Map<number, number>();
+    for (const r of rows) m.set(r.organizationId, (m.get(r.organizationId) ?? 0) + 1);
+    return m;
+  };
+  const childCount = tally(kids);
+  const staffCount = tally(staffRows);
+  return orgs.map((o) => ({ ...o, childrenCount: childCount.get(o.id) ?? 0, staffCount: staffCount.get(o.id) ?? 0 }));
+}
+
+export async function createOrganization(data: InsertOrganization) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [result] = await db.insert(organizations).values(data);
+  return { id: result.insertId };
+}
+
+export async function setOrganizationActive(id: number, isActive: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(organizations).set({ isActive }).where(eq(organizations.id, id));
+  return { success: true };
+}
+
 export async function getOrganizationChildren(organizationId: number) {
   const db = await getDb();
   if (!db) return [];

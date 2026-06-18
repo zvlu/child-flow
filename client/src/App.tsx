@@ -32,6 +32,7 @@ import { ReportBuilder } from "./pages/ReportBuilder";
 import { ActionQueue } from "./pages/ActionQueue";
 import InKind from "./pages/InKind";
 import Assessments from "./pages/Assessments";
+import OrgAdmin from "./pages/OrgAdmin";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
@@ -98,6 +99,13 @@ function Router() {
         {() => (
           <AppLayout>
             <Assessments />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/org-admin">
+        {() => (
+          <AppLayout>
+            <OrgAdmin />
           </AppLayout>
         )}
       </Route>
