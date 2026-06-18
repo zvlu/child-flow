@@ -128,6 +128,13 @@ export async function removeChildFlag(id: number) {
   await db.delete(childFlags).where(eq(childFlags.id, id));
 }
 
+/** The child a flag belongs to (for record-level tenant checks). */
+export async function getChildIdForFlag(flagId: number): Promise<number | null> {
+  const db = await requireDb();
+  const [row] = await db.select({ childId: childFlags.childId }).from(childFlags).where(eq(childFlags.id, flagId)).limit(1);
+  return row?.childId ?? null;
+}
+
 /**
  * Move a child to a classroom (or unassign with null). Ends any active
  * assignment first, so a child is only ever in one room at a time.

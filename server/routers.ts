@@ -52,6 +52,18 @@ async function assertChildCapacity(organizationId: number, adding: number) {
   }
 }
 
+/**
+ * Record-level tenant check for routes keyed by a child id (not an org id, so
+ * the org-scope middleware can't see them). Owner is exempt.
+ */
+async function assertChildInOrg(user: { openId: string; organizationId: number | null }, childId: number) {
+  if (isPlatformOwner(user.openId)) return;
+  const child = await getChildById(childId);
+  if (!child || child.organizationId !== user.organizationId) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "You don't have access to that record." });
+  }
+}
+
 /** Block creation when it would push the org past its plan's staff limit. */
 async function assertStaffCapacity(organizationId: number, adding: number) {
   const usage = await getOrganizationUsage(organizationId);
@@ -250,8 +262,12 @@ export const appRouter = router({
     getById: staffProcedure
       .input(z.number())
       .query(async ({ input: childId, ctx }) => {
+        const child = await getChildById(childId);
+        if (!isPlatformOwner(ctx.user.openId) && (!child || child.organizationId !== ctx.user.organizationId)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have access to that record." });
+        }
         await auditAccess(ctx, { action: "read", resourceType: "child", resourceId: childId });
-        return getChildById(childId);
+        return child;
       }),
     create: orgStaffProcedure
       .input(
@@ -302,8 +318,13 @@ export const appRouter = router({
       }),
     siblings: staffProcedure
       .input(z.number())
-      .query(async ({ input: familyId }) => {
-        return getFamilySiblings(familyId);
+      .query(async ({ input: familyId, ctx }) => {
+        const siblings = await getFamilySiblings(familyId);
+        // Children in a family share an org; block if they aren't this user's.
+        if (!isPlatformOwner(ctx.user.openId) && siblings.some((c) => c.organizationId !== ctx.user.organizationId)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have access to that record." });
+        }
+        return siblings;
       }),
     update: orgStaffProcedure
       .input(
@@ -319,6 +340,7 @@ export const appRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
+        await assertChildInOrg(ctx.user, id);
         await auditAccess(ctx, { action: "update", resourceType: "child", resourceId: id });
         return mod.updateChild(id, data);
       }),
@@ -343,6 +365,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        await assertChildInOrg(ctx.user, input.childId);
         await mod.addChildFlag(input);
         await auditAccess(ctx, { action: "create", resourceType: "child_flag", resourceId: input.childId, detail: `${input.type}:${input.label}` });
         return { success: true };
@@ -350,6 +373,8 @@ export const appRouter = router({
     removeFlag: orgStaffProcedure
       .input(z.object({ flagId: z.number() }))
       .mutation(async ({ input, ctx }) => {
+        const childId = await mod.getChildIdForFlag(input.flagId);
+        if (childId != null) await assertChildInOrg(ctx.user, childId);
         await mod.removeChildFlag(input.flagId);
         await auditAccess(ctx, { action: "delete", resourceType: "child_flag", resourceId: input.flagId });
         return { success: true };
