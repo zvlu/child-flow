@@ -64,6 +64,15 @@ async function assertChildInOrg(user: { openId: string; organizationId: number |
   }
 }
 
+/** Record-level tenant check for non-child entities keyed by their own id. */
+async function assertRecordInOrg(user: { openId: string; organizationId: number | null }, kind: mod.OrgRecordKind, id: number) {
+  if (isPlatformOwner(user.openId)) return;
+  const orgId = await mod.getRecordOrgId(kind, id);
+  if (orgId == null || orgId !== user.organizationId) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "You don't have access to that record." });
+  }
+}
+
 /** Block creation when it would push the org past its plan's staff limit. */
 async function assertStaffCapacity(organizationId: number, adding: number) {
   const usage = await getOrganizationUsage(organizationId);
@@ -433,7 +442,8 @@ export const appRouter = router({
       }),
     contacts: staffProcedure
       .input(z.number())
-      .query(async ({ input: familyId }) => {
+      .query(async ({ input: familyId, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", familyId);
         return mod.getFamilyContacts(familyId);
       }),
   }),
@@ -625,6 +635,7 @@ export const appRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
+        await assertRecordInOrg(ctx.user, "staff", id);
         await auditAccess(ctx, { action: "update", resourceType: "staff", resourceId: id });
         return mod.updateStaff(id, data);
       }),
@@ -670,13 +681,16 @@ export const appRouter = router({
       }),
     roster: staffProcedure
       .input(z.number())
-      .query(async ({ input: classroomId }) => {
+      .query(async ({ input: classroomId, ctx }) => {
+        await assertRecordInOrg(ctx.user, "classroom", classroomId);
         return mod.getClassroomRoster(classroomId);
       }),
     // Move a child between rooms (null classroomId = unassign).
     assignChild: orgStaffProcedure
       .input(z.object({ childId: z.number(), classroomId: z.number().nullable() }))
       .mutation(async ({ input, ctx }) => {
+        await assertChildInOrg(ctx.user, input.childId);
+        if (input.classroomId != null) await assertRecordInOrg(ctx.user, "classroom", input.classroomId);
         await mod.assignChildToClassroom(input.childId, input.classroomId);
         await auditAccess(ctx, {
           action: "update",
@@ -778,13 +792,15 @@ export const appRouter = router({
           location: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
+        await assertRecordInOrg(ctx.user, "calendarEvent", id);
         return mod.updateCalendarEvent(id, data);
       }),
     delete: staffProcedure
       .input(z.number())
-      .mutation(async ({ input: id }) => {
+      .mutation(async ({ input: id, ctx }) => {
+        await assertRecordInOrg(ctx.user, "calendarEvent", id);
         return mod.deleteCalendarEvent(id);
       }),
   }),
@@ -837,7 +853,8 @@ export const appRouter = router({
       }),
     delete: staffProcedure
       .input(z.number())
-      .mutation(async ({ input: id }) => {
+      .mutation(async ({ input: id, ctx }) => {
+        await assertRecordInOrg(ctx.user, "document", id);
         return mod.deleteDocument(id);
       }),
   }),
@@ -866,7 +883,8 @@ export const appRouter = router({
       }),
     sign: orgStaffProcedure
       .input(z.object({ id: z.number(), signedBy: z.string().min(1) }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "digitalDocument", input.id);
         return mod.signDigitalDocument(input.id, input.signedBy);
       }),
   }),
@@ -922,7 +940,8 @@ export const appRouter = router({
       }),
     items: staffProcedure
       .input(z.number())
-      .query(async ({ input: mealPlanId }) => {
+      .query(async ({ input: mealPlanId, ctx }) => {
+        await assertRecordInOrg(ctx.user, "mealPlan", mealPlanId);
         return mod.getMealItems(mealPlanId);
       }),
     createPlan: orgStaffProcedure
@@ -959,6 +978,7 @@ export const appRouter = router({
           });
           throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
         }
+        await assertRecordInOrg(ctx.user, "mealPlan", input.id);
         return mod.updateMealPlanStatus(input.id, input.status);
       }),
     cacfpReports: orgStaffProcedure
@@ -976,7 +996,8 @@ export const appRouter = router({
       }),
     clockIn: staffProcedure
       .input(z.number())
-      .mutation(async ({ input: staffId }) => {
+      .mutation(async ({ input: staffId, ctx }) => {
+        await assertRecordInOrg(ctx.user, "staff", staffId);
         return mod.clockIn(staffId);
       }),
     clockOut: staffProcedure
@@ -1018,7 +1039,8 @@ export const appRouter = router({
       }),
     dismiss: staffProcedure
       .input(z.number())
-      .mutation(async ({ input: id }) => {
+      .mutation(async ({ input: id, ctx }) => {
+        await assertRecordInOrg(ctx.user, "aiInsight", id);
         return mod.dismissAiInsight(id);
       }),
   }),
@@ -1076,12 +1098,14 @@ export const appRouter = router({
           description: z.string().min(1),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        await assertChildInOrg(ctx.user, input.childId);
         return mod.createActivityLog(input);
       }),
     notifications: staffProcedure
       .input(z.number())
-      .query(async ({ input: familyId }) => {
+      .query(async ({ input: familyId, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", familyId);
         return mod.getParentNotifications(familyId);
       }),
     markRead: staffProcedure
@@ -1112,7 +1136,8 @@ export const appRouter = router({
       }),
     run: staffProcedure
       .input(z.number())
-      .mutation(async ({ input: reportId }) => {
+      .mutation(async ({ input: reportId, ctx }) => {
+        await assertRecordInOrg(ctx.user, "report", reportId);
         return mod.runCustomReport(reportId);
       }),
   }),

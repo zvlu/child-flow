@@ -135,6 +135,29 @@ export async function getChildIdForFlag(flagId: number): Promise<number | null> 
   return row?.childId ?? null;
 }
 
+// Record-id → owning organization, for tenant checks on routes the org-scope
+// middleware can't see (their input is a record id, not an org id). Only tables
+// with a direct organizationId column are listed here.
+const ORG_RECORD_TABLES = {
+  family: families,
+  classroom: classrooms,
+  calendarEvent: calendarEvents,
+  document: documents,
+  digitalDocument: digitalDocuments,
+  mealPlan: mealPlans,
+  report: customReports,
+  aiInsight: aiInsights,
+  staff: staff,
+} as const;
+export type OrgRecordKind = keyof typeof ORG_RECORD_TABLES;
+
+export async function getRecordOrgId(kind: OrgRecordKind, id: number): Promise<number | null> {
+  const db = await requireDb();
+  const table = ORG_RECORD_TABLES[kind] as unknown as { organizationId: typeof families.organizationId; id: typeof families.id };
+  const [row] = await db.select({ organizationId: table.organizationId }).from(table as any).where(eq(table.id, id)).limit(1);
+  return row?.organizationId ?? null;
+}
+
 /**
  * Move a child to a classroom (or unassign with null). Ends any active
  * assignment first, so a child is only ever in one room at a time.
