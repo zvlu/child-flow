@@ -64,8 +64,54 @@ const requireRole = (roles: Array<User["role"]>) =>
     });
   });
 
+/**
+ * Tenant isolation. For org-scoped routes, the requested organization (a bare
+ * numeric input that IS the org id, or an `organizationId` field on an object
+ * input) must match the signed-in user's organization. The platform owner is
+ * exempt (manages every org). Denied attempts are audit-logged.
+ *
+ * Apply ONLY to routes whose numeric/`organizationId` input is an org id — not
+ * to routes whose bare number is a record id (childId, familyId, …).
+ */
+const enforceOrgScope = t.middleware(async ({ ctx, next, getRawInput, path }) => {
+  if (!ctx.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+  }
+  if (!isPlatformOwner(ctx.user.openId)) {
+    let requestedOrg: number | undefined;
+    try {
+      const raw = await getRawInput();
+      if (typeof raw === "number") requestedOrg = raw;
+      else if (raw && typeof raw === "object" && typeof (raw as Record<string, unknown>).organizationId === "number") {
+        requestedOrg = (raw as Record<string, number>).organizationId;
+      }
+    } catch {
+      /* no input */
+    }
+    if (requestedOrg !== undefined && ctx.user.organizationId !== requestedOrg) {
+      await insertAuditLog({
+        userId: ctx.user.id,
+        actorOpenId: ctx.user.openId,
+        action: "access_denied",
+        resourceType: "org_scope",
+        resourceId: path,
+        ipAddress: clientIpFromReq(ctx.req),
+        detail: `userOrg=${ctx.user.organizationId} requested=${requestedOrg}`,
+      });
+      throw new TRPCError({ code: "FORBIDDEN", message: "You don't have access to that organization." });
+    }
+  }
+  return next({ ctx: { ...ctx, user: ctx.user } });
+});
+
 /** Program administration: staff management, bulk operations. */
 export const adminProcedure = t.procedure.use(requireRole(["admin"]));
+
+/** Staff/admin, additionally tenant-scoped: the org in the input must be the user's. */
+export const orgStaffProcedure = t.procedure.use(requireRole(["admin", "staff"])).use(enforceOrgScope);
+
+/** Admin, additionally tenant-scoped. */
+export const orgAdminProcedure = t.procedure.use(requireRole(["admin"])).use(enforceOrgScope);
 
 /**
  * Platform owner (super-admin) gate for cross-organization management. Denied

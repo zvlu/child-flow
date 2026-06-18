@@ -2,7 +2,7 @@ import { COOKIE_NAME, NOT_ADMIN_ERR_MSG } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router, staffProcedure, adminProcedure, superAdminProcedure } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router, staffProcedure, adminProcedure, superAdminProcedure, orgStaffProcedure, orgAdminProcedure } from "./_core/trpc";
 import { isPlatformOwner } from "./_core/env";
 import { auditAccess } from "./_core/audit";
 import { hashPassword, verifyPassword } from "./_core/password";
@@ -164,13 +164,13 @@ export const appRouter = router({
         return getOrganizationByAgencyId(input);
       }),
     // Single organization by id — backs the editable Program settings panel.
-    get: staffProcedure
+    get: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: id }) => {
         return getOrganizationById(id);
       }),
     // Live enrollment/staff counts vs plan limits — backs the Plan & Usage card.
-    usage: staffProcedure
+    usage: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: id }) => {
         return getOrganizationUsage(id);
@@ -211,7 +211,7 @@ export const appRouter = router({
         return { success: true };
       }),
     // Persist the editable program profile (admin only).
-    update: adminProcedure
+    update: orgAdminProcedure
       .input(
         z.object({
           id: z.number(),
@@ -228,6 +228,11 @@ export const appRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
+        // Org id is the `id` field here (not `organizationId`), so the scope
+        // middleware can't auto-check it — enforce explicitly.
+        if (!isPlatformOwner(ctx.user.openId) && ctx.user.organizationId !== id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have access to that organization." });
+        }
         // Normalize empty director email to null so we don't store "".
         if (data.directorEmail === "") data.directorEmail = null;
         await updateOrganization(id, data);
@@ -237,7 +242,7 @@ export const appRouter = router({
   }),
 
   children: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return getOrganizationChildren(organizationId);
@@ -248,7 +253,7 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "read", resourceType: "child", resourceId: childId });
         return getChildById(childId);
       }),
-    create: staffProcedure
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -268,7 +273,7 @@ export const appRouter = router({
         return result;
       }),
     // CSV bulk import: create many children at once from an uploaded sheet.
-    bulkImport: staffProcedure
+    bulkImport: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -300,7 +305,7 @@ export const appRouter = router({
       .query(async ({ input: familyId }) => {
         return getFamilySiblings(familyId);
       }),
-    update: staffProcedure
+    update: orgStaffProcedure
       .input(
         z.object({
           id: z.number(),
@@ -317,18 +322,18 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "update", resourceType: "child", resourceId: id });
         return mod.updateChild(id, data);
       }),
-    classroomMap: staffProcedure
+    classroomMap: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getChildClassroomMap(organizationId);
       }),
     // Color-coded safety flags for every child in the org.
-    flags: staffProcedure
+    flags: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getChildFlags(organizationId);
       }),
-    addFlag: staffProcedure
+    addFlag: orgStaffProcedure
       .input(
         z.object({
           childId: z.number(),
@@ -342,7 +347,7 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "create", resourceType: "child_flag", resourceId: input.childId, detail: `${input.type}:${input.label}` });
         return { success: true };
       }),
-    removeFlag: staffProcedure
+    removeFlag: orgStaffProcedure
       .input(z.object({ flagId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await mod.removeChildFlag(input.flagId);
@@ -352,12 +357,12 @@ export const appRouter = router({
   }),
 
   families: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getOrganizationFamilies(organizationId);
       }),
-    create: staffProcedure
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -376,7 +381,7 @@ export const appRouter = router({
       }),
     // Parent onboarding: generate a one-time code a parent uses in the family
     // app to create an account scoped to this family.
-    createInvitation: staffProcedure
+    createInvitation: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -396,7 +401,7 @@ export const appRouter = router({
         });
         return invitation;
       }),
-    invitations: staffProcedure
+    invitations: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return listFamilyInvitations(organizationId);
@@ -411,12 +416,12 @@ export const appRouter = router({
   // Enrollment applications / waitlist. Triage prospective children and, on
   // approval, enroll them (creates real family + child records).
   enrollment: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getEnrollmentApplications(organizationId);
       }),
-    create: staffProcedure
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -443,7 +448,7 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "create", resourceType: "enrollment_application", detail: `org:${input.organizationId}` });
         return result;
       }),
-    setStatus: staffProcedure
+    setStatus: orgStaffProcedure
       .input(
         z.object({
           id: z.number(),
@@ -459,7 +464,7 @@ export const appRouter = router({
         return { success: true };
       }),
     // Approve & enroll: materialize the application into family + child records.
-    enroll: staffProcedure
+    enroll: orgStaffProcedure
       .input(z.object({ id: z.number(), organizationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await assertChildCapacity(input.organizationId, 1);
@@ -471,12 +476,12 @@ export const appRouter = router({
 
   // In-kind (non-federal share) contributions toward the Head Start match.
   inKind: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getInKindContributions(organizationId);
       }),
-    create: staffProcedure
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -502,7 +507,7 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "create", resourceType: "in_kind", detail: `${input.type}:${input.value}` });
         return result;
       }),
-    delete: staffProcedure
+    delete: orgStaffProcedure
       .input(z.object({ id: z.number(), organizationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await mod.deleteInKindContribution(input.id, input.organizationId);
@@ -556,13 +561,13 @@ export const appRouter = router({
   }),
 
   staff: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return getOrganizationStaff(organizationId);
       }),
     // Creating/modifying staff and their roles is an administrative action.
-    create: adminProcedure
+    create: orgAdminProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -580,7 +585,7 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "create", resourceType: "staff", detail: `org:${input.organizationId}` });
         return result;
       }),
-    update: adminProcedure
+    update: orgAdminProcedure
       .input(
         z.object({
           id: z.number(),
@@ -603,12 +608,12 @@ export const appRouter = router({
   // Admin-defined staff role labels (e.g. "Family Advocate"). These are display
   // labels mapped to a fixed access tier — they never widen the RBAC enum.
   roles: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getCustomRoles(organizationId);
       }),
-    create: adminProcedure
+    create: orgAdminProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -623,7 +628,7 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "create", resourceType: "custom_role", resourceId: result.id, detail: `${input.name}:${input.accessLevel}` });
         return result;
       }),
-    delete: adminProcedure
+    delete: orgAdminProcedure
       .input(z.object({ id: z.number(), organizationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await mod.deleteCustomRole(input.id, input.organizationId);
@@ -633,7 +638,7 @@ export const appRouter = router({
   }),
 
   classrooms: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getOrganizationClassrooms(organizationId);
@@ -644,7 +649,7 @@ export const appRouter = router({
         return mod.getClassroomRoster(classroomId);
       }),
     // Move a child between rooms (null classroomId = unassign).
-    assignChild: staffProcedure
+    assignChild: orgStaffProcedure
       .input(z.object({ childId: z.number(), classroomId: z.number().nullable() }))
       .mutation(async ({ input, ctx }) => {
         await mod.assignChildToClassroom(input.childId, input.classroomId);
@@ -659,7 +664,7 @@ export const appRouter = router({
   }),
 
   attendance: router({
-    getByDate: staffProcedure
+    getByDate: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -669,7 +674,7 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return getAttendanceByDate(input.organizationId, input.date);
       }),
-    getRange: staffProcedure
+    getRange: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -680,7 +685,7 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return mod.getAttendanceRange(input.organizationId, input.start, input.end);
       }),
-    save: staffProcedure
+    save: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -702,7 +707,7 @@ export const appRouter = router({
   }),
 
   dashboard: router({
-    stats: staffProcedure
+    stats: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getDashboardStats(organizationId);
@@ -715,12 +720,12 @@ export const appRouter = router({
   }),
 
   calendar: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getCalendarEvents(organizationId);
       }),
-    create: staffProcedure
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -737,7 +742,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return mod.createCalendarEvent(input);
       }),
-    update: staffProcedure
+    update: orgStaffProcedure
       .input(
         z.object({
           id: z.number(),
@@ -760,12 +765,12 @@ export const appRouter = router({
   }),
 
   notes: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
       .query(async ({ input }) => {
         return mod.getStudentNotes(input.organizationId, input.childId);
       }),
-    create: staffProcedure
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -783,12 +788,12 @@ export const appRouter = router({
   }),
 
   documents: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
       .query(async ({ input }) => {
         return mod.getDocuments(input.organizationId, input.childId);
       }),
-    create: staffProcedure
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -813,12 +818,12 @@ export const appRouter = router({
   }),
 
   digitalDocuments: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getDigitalDocuments(organizationId);
       }),
-    create: staffProcedure
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -834,7 +839,7 @@ export const appRouter = router({
           expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined,
         });
       }),
-    sign: staffProcedure
+    sign: orgStaffProcedure
       .input(z.object({ id: z.number(), signedBy: z.string().min(1) }))
       .mutation(async ({ input }) => {
         return mod.signDigitalDocument(input.id, input.signedBy);
@@ -842,13 +847,13 @@ export const appRouter = router({
   }),
 
   billing: router({
-    invoices: staffProcedure
+    invoices: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getInvoices(organizationId);
       }),
     // Financial mutations are administrative (segregation of duties).
-    createInvoice: adminProcedure
+    createInvoice: orgAdminProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -864,12 +869,12 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "create", resourceType: "invoice", detail: `family:${input.familyId}` });
         return mod.createInvoice({ ...input, dueDate: new Date(input.dueDate) });
       }),
-    payments: staffProcedure
+    payments: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getPayments(organizationId);
       }),
-    recordPayment: adminProcedure
+    recordPayment: orgAdminProcedure
       .input(
         z.object({
           invoiceId: z.number(),
@@ -885,7 +890,7 @@ export const appRouter = router({
   }),
 
   meals: router({
-    plans: staffProcedure
+    plans: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getMealPlans(organizationId);
@@ -895,7 +900,7 @@ export const appRouter = router({
       .query(async ({ input: mealPlanId }) => {
         return mod.getMealItems(mealPlanId);
       }),
-    createPlan: staffProcedure
+    createPlan: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -915,7 +920,7 @@ export const appRouter = router({
         const { items, ...plan } = input;
         return mod.createMealPlan({ ...plan, weekStartDate: new Date(plan.weekStartDate) }, items);
       }),
-    updatePlanStatus: staffProcedure
+    updatePlanStatus: orgStaffProcedure
       .input(z.object({ id: z.number(), status: z.enum(["draft", "approved", "served"]) }))
       .mutation(async ({ input, ctx }) => {
         // CACFP plan APPROVAL is an administrative sign-off; staff may still
@@ -931,7 +936,7 @@ export const appRouter = router({
         }
         return mod.updateMealPlanStatus(input.id, input.status);
       }),
-    cacfpReports: staffProcedure
+    cacfpReports: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getCacfpReports(organizationId);
@@ -939,7 +944,7 @@ export const appRouter = router({
   }),
 
   staffOps: router({
-    timeClock: staffProcedure
+    timeClock: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), sinceDays: z.number().optional() }))
       .query(async ({ input }) => {
         return mod.getTimeClockEntries(input.organizationId, input.sinceDays);
@@ -954,13 +959,13 @@ export const appRouter = router({
       .mutation(async ({ input: entryId }) => {
         return mod.clockOut(entryId);
       }),
-    certifications: staffProcedure
+    certifications: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getCertifications(organizationId);
       }),
     // Certification (HR training) records are administrative.
-    createCertification: adminProcedure
+    createCertification: orgAdminProcedure
       .input(
         z.object({
           staffId: z.number(),
@@ -981,7 +986,7 @@ export const appRouter = router({
   }),
 
   aiInsights: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), includeDismissed: z.boolean().optional() }))
       .query(async ({ input }) => {
         return mod.getAiInsights(input.organizationId, input.includeDismissed);
@@ -994,13 +999,13 @@ export const appRouter = router({
   }),
 
   bulkActions: router({
-    logs: staffProcedure
+    logs: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getBulkActionLogs(organizationId);
       }),
     // Mass mutation across an entire classroom roster — restricted to admins.
-    bulkAttendance: adminProcedure
+    bulkAttendance: orgAdminProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -1032,12 +1037,12 @@ export const appRouter = router({
   }),
 
   parentPortal: router({
-    activities: staffProcedure
+    activities: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
       .query(async ({ input }) => {
         return mod.getActivityLogs(input.organizationId, input.childId);
       }),
-    logActivity: staffProcedure
+    logActivity: orgStaffProcedure
       .input(
         z.object({
           childId: z.number(),
@@ -1062,12 +1067,12 @@ export const appRouter = router({
   }),
 
   reportBuilder: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getCustomReports(organizationId);
       }),
-    create: staffProcedure
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -1088,7 +1093,7 @@ export const appRouter = router({
   }),
 
   health: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
       .query(async ({ input, ctx }) => {
         await auditAccess(ctx, {
@@ -1099,7 +1104,7 @@ export const appRouter = router({
         });
         return getHealthRecords(input.organizationId, input.childId);
       }),
-    create: staffProcedure
+    create: orgStaffProcedure
       .input(z.any()) // Using any for brevity in this step, ideally use Zod schema matching InsertHealthRecord
       .mutation(async ({ input, ctx }) => {
         const result = await createHealthRecord(input);
@@ -1110,7 +1115,7 @@ export const appRouter = router({
         });
         return result;
       }),
-    followUps: staffProcedure
+    followUps: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), dueWithinDays: z.number().min(1).max(365).optional() }))
       .query(async ({ input }) => {
         return getHealthFollowUpAlerts(input.organizationId, input.dueWithinDays ?? 30);
@@ -1118,12 +1123,12 @@ export const appRouter = router({
   }),
 
   familyServices: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), familyId: z.number().optional() }))
       .query(async ({ input }) => {
         return getFamilyServices(input.organizationId, input.familyId);
       }),
-    create: staffProcedure
+    create: orgStaffProcedure
       .input(z.any())
       .mutation(async ({ input }) => {
         return createFamilyService(input);
@@ -1131,7 +1136,7 @@ export const appRouter = router({
   }),
 
   messaging: router({
-    send: staffProcedure
+    send: orgStaffProcedure
       .input(z.object({
         organizationId: z.number(),
         recipientId: z.number(),
@@ -1143,7 +1148,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return await CommunicationService.sendMessage(input);
       }),
-    broadcast: staffProcedure
+    broadcast: orgStaffProcedure
       .input(z.object({
         organizationId: z.number(),
         content: z.string(),
@@ -1154,7 +1159,7 @@ export const appRouter = router({
         console.log(`[Broadcast] Sending to organization ${input.organizationId} via ${input.channels.join(', ')}`);
         return { success: true, count: 150 }; // Mock count
       }),
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), recipientId: z.number().optional() }))
       .query(async ({ input }) => {
         return await getCommunicationLogs(input.organizationId, input.recipientId);
@@ -1162,12 +1167,12 @@ export const appRouter = router({
   }),
 
   education: router({
-    list: staffProcedure
+    list: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
       .query(async ({ input }) => {
         return await getEducationRecords(input.organizationId, input.childId);
       }),
-    create: staffProcedure
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -1188,13 +1193,13 @@ export const appRouter = router({
   }),
 
   compliance: router({
-    getPir: staffProcedure
+    getPir: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), year: z.string() }))
       .query(async ({ input }) => {
         return await getPirData(input.organizationId, input.year);
       }),
     // PIR is federal reporting data — edits are administrative.
-    setPirValue: adminProcedure
+    setPirValue: orgAdminProcedure
       .input(
         z.object({
           organizationId: z.number(),
