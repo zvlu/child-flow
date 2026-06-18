@@ -5,25 +5,35 @@ import {
   MessageSquare, type LucideIcon,
 } from "lucide-react";
 
-export type NavItem = { path: string; label: string; icon: LucideIcon };
+export type NavRole = "admin" | "staff" | "parent";
+/**
+ * `roles` controls who sees the item:
+ *   - omitted        → admin + staff (the default for program-work items)
+ *   - ["admin"]      → admin only (financials, compliance, bulk ops)
+ *   - includes "parent" → also visible to family/parent accounts
+ */
+export type NavItem = { path: string; label: string; icon: LucideIcon; roles?: NavRole[] };
 export type NavSection = { title: string; items: NavItem[] };
 
+const PARENT_OK: NavRole[] = ["admin", "staff", "parent"];
+const ADMIN_ONLY: NavRole[] = ["admin"];
+
 /**
- * Canonical navigation. These are the *defaults*; a user's saved preferences
- * (users.settings.navigation) reorder and hide items on top of these, and
- * "Reset to default" simply clears those preferences.
+ * Canonical navigation. These are the *defaults*; role filtering applies first,
+ * then a user's saved preferences (users.settings.navigation) reorder and hide
+ * items on top, and "Reset to default" simply clears those preferences.
  */
 export const TOP_NAV_ITEMS: NavItem[] = [
   { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
-  { path: "/communication", label: "Communication", icon: MessageSquare },
-  { path: "/calendar", label: "Calendar", icon: CalendarDays },
+  { path: "/communication", label: "Communication", icon: MessageSquare, roles: PARENT_OK },
+  { path: "/calendar", label: "Calendar", icon: CalendarDays, roles: PARENT_OK },
   { path: "/reports", label: "Reports", icon: FileText },
   { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
   { path: "/performance", label: "Performance Panel", icon: BarChart3 },
-  { path: "/billing", label: "Billing", icon: DollarSign },
+  { path: "/billing", label: "Billing", icon: DollarSign, roles: ADMIN_ONLY },
   { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
   { path: "/staff-operations", label: "Staff Operations", icon: Clock },
-  { path: "/bulk-actions", label: "Bulk Actions", icon: Layers },
+  { path: "/bulk-actions", label: "Bulk Actions", icon: Layers, roles: ADMIN_ONLY },
 ];
 
 /** How many *visible* top-nav items render inline before the rest collapse into "More". */
@@ -33,7 +43,7 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
   {
     title: "Core",
     items: [
-      { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: PARENT_OK },
       { path: "/children", label: "Children", icon: Baby },
       { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
       { path: "/staff", label: "Staff", icon: UserCog },
@@ -46,21 +56,21 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
     items: [
       { path: "/enrollment", label: "Enrollment", icon: BookOpen },
       { path: "/health", label: "Health Records", icon: Heart },
-      { path: "/calendar", label: "Calendar", icon: CalendarDays },
-      { path: "/documents", label: "Documents", icon: FileText },
+      { path: "/calendar", label: "Calendar", icon: CalendarDays, roles: PARENT_OK },
+      { path: "/documents", label: "Documents", icon: FileText, roles: PARENT_OK },
       { path: "/digital-documents", label: "E-Signatures", icon: FileSignature },
       { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
-      { path: "/bulk-actions", label: "Bulk Actions", icon: Layers },
-      { path: "/compliance", label: "Compliance", icon: ShieldCheck },
+      { path: "/bulk-actions", label: "Bulk Actions", icon: Layers, roles: ADMIN_ONLY },
+      { path: "/compliance", label: "Compliance", icon: ShieldCheck, roles: ADMIN_ONLY },
     ],
   },
   {
     title: "Business",
     items: [
-      { path: "/billing", label: "Billing", icon: DollarSign },
+      { path: "/billing", label: "Billing", icon: DollarSign, roles: ADMIN_ONLY },
       { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
       { path: "/staff-operations", label: "Staff Operations", icon: Clock },
-      { path: "/parent-portal", label: "Parent Portal", icon: Users },
+      { path: "/parent-portal", label: "Parent Portal", icon: Users, roles: PARENT_OK },
     ],
   },
   {
@@ -70,7 +80,7 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
       { path: "/reports", label: "Reports", icon: FileText },
       { path: "/report-builder", label: "Report Builder", icon: Zap },
       { path: "/ai-insights", label: "AI Insights", icon: Zap },
-      { path: "/settings", label: "Settings", icon: Settings },
+      { path: "/settings", label: "Settings", icon: Settings, roles: PARENT_OK },
     ],
   },
 ];
@@ -78,6 +88,11 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
 /** Per-surface customization: a desired path order and a set of hidden paths. */
 export type NavSurfacePrefs = { order?: string[]; hidden?: string[] };
 export type NavPreferences = { topNav?: NavSurfacePrefs; sideNav?: NavSurfacePrefs };
+
+/** Whether a role may see an item. No `roles` → admin + staff (not parent). */
+export function visibleToRole(item: NavItem, role: NavRole): boolean {
+  return item.roles ? item.roles.includes(role) : role !== "parent";
+}
 
 /**
  * Stable sort by the user's saved order. Items missing from `order` keep their
@@ -95,24 +110,40 @@ export function sortByOrder<T extends { path: string }>(items: T[], order: strin
     .map(({ item }) => item);
 }
 
-/** Effective top-nav items after applying hide + order preferences. */
-export function applyTopNav(prefs: NavPreferences | null | undefined): NavItem[] {
-  const hidden = new Set(prefs?.topNav?.hidden ?? []);
-  return sortByOrder(TOP_NAV_ITEMS.filter((i) => !hidden.has(i.path)), prefs?.topNav?.order);
+/** Canonical top-nav items visible to a role (ignores prefs) — for the settings UI. */
+export function topNavForRole(role: NavRole): NavItem[] {
+  return TOP_NAV_ITEMS.filter((i) => visibleToRole(i, role));
 }
 
-/**
- * Effective side-nav sections after applying hide + order. Sorting is global
- * (a single order array) but each section only contains its own items, so items
- * stay within their section while honoring the user's order. Empty sections drop.
- */
-export function applySideNav(prefs: NavPreferences | null | undefined): NavSection[] {
-  const hidden = new Set(prefs?.sideNav?.hidden ?? []);
-  const order = prefs?.sideNav?.order;
+/** Canonical side-nav sections visible to a role (ignores prefs) — for the settings UI. */
+export function sideNavForRole(role: NavRole): NavSection[] {
   return SIDE_NAV_SECTIONS
-    .map((section) => ({ ...section, items: sortByOrder(section.items.filter((i) => !hidden.has(i.path)), order) }))
+    .map((section) => ({ ...section, items: section.items.filter((i) => visibleToRole(i, role)) }))
     .filter((section) => section.items.length > 0);
 }
 
-/** All side-nav items, ignoring preferences — used for breadcrumb label lookup. */
+/** Effective top-nav items after applying role visibility, then hide + order. */
+export function applyTopNav(prefs: NavPreferences | null | undefined, role: NavRole): NavItem[] {
+  const hidden = new Set(prefs?.topNav?.hidden ?? []);
+  const base = TOP_NAV_ITEMS.filter((i) => visibleToRole(i, role) && !hidden.has(i.path));
+  return sortByOrder(base, prefs?.topNav?.order);
+}
+
+/**
+ * Effective side-nav sections after applying role visibility, then hide + order.
+ * Sorting is global (a single order array) but each section only contains its own
+ * items, so items stay within their section while honoring the user's order.
+ */
+export function applySideNav(prefs: NavPreferences | null | undefined, role: NavRole): NavSection[] {
+  const hidden = new Set(prefs?.sideNav?.hidden ?? []);
+  const order = prefs?.sideNav?.order;
+  return SIDE_NAV_SECTIONS
+    .map((section) => ({
+      ...section,
+      items: sortByOrder(section.items.filter((i) => visibleToRole(i, role) && !hidden.has(i.path)), order),
+    }))
+    .filter((section) => section.items.length > 0);
+}
+
+/** All side-nav items, ignoring preferences/role — used for breadcrumb label lookup. */
 export const ALL_SIDE_NAV_ITEMS: NavItem[] = SIDE_NAV_SECTIONS.flatMap((s) => s.items);

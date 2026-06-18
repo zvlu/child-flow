@@ -73,8 +73,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
   // Apply the signed-in user's saved layout (hide + reorder); falls back to
   // app defaults when there are no preferences.
   const navPrefs = (user as any)?.settings?.navigation ?? null;
-  const effectiveTopNav = applyTopNav(navPrefs);
-  const effectiveSideSections = applySideNav(navPrefs);
+  const navRole = ((user as any)?.role ?? "staff") as "admin" | "staff" | "parent";
+  const effectiveTopNav = applyTopNav(navPrefs, navRole);
+  const effectiveSideSections = applySideNav(navPrefs, navRole);
   const topNavPrimaryItems = effectiveTopNav.slice(0, TOP_NAV_PRIMARY_COUNT);
   const topNavOverflowItems = effectiveTopNav.slice(TOP_NAV_PRIMARY_COUNT);
 

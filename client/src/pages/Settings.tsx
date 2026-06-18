@@ -16,8 +16,8 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
 import {
-  TOP_NAV_ITEMS, SIDE_NAV_SECTIONS, TOP_NAV_PRIMARY_COUNT, sortByOrder,
-  type NavItem, type NavSection,
+  TOP_NAV_PRIMARY_COUNT, sortByOrder, topNavForRole, sideNavForRole,
+  type NavItem, type NavSection, type NavRole,
 } from "@/config/nav";
 
 const roleLabel: Record<string, string> = { admin: "Administrator", staff: "Staff", parent: "Parent" };
@@ -125,7 +125,7 @@ export default function Settings() {
           {loading ? (
             <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : (
-            <NavigationSettings key={(user as any)?.id ?? "anon"} settings={user?.settings} onSaved={refresh} disabled={!user} />
+            <NavigationSettings key={(user as any)?.id ?? "anon"} settings={user?.settings} role={((user as any)?.role ?? "staff") as NavRole} onSaved={refresh} disabled={!user} />
           )}
         </TabsContent>
 
@@ -718,15 +718,18 @@ function reorder<T>(arr: T[], idx: number, dir: -1 | 1): T[] {
   return copy;
 }
 
-function NavigationSettings({ settings, onSaved, disabled }: { settings: any; onSaved: () => Promise<void>; disabled: boolean }) {
+function NavigationSettings({ settings, role, onSaved, disabled }: { settings: any; role: NavRole; onSaved: () => Promise<void>; disabled: boolean }) {
   const nav = settings?.navigation;
+  // Only the items this role can actually see are customizable.
+  const roleTop = topNavForRole(role);
+  const roleSections = sideNavForRole(role);
 
   // Local working copy: full item lists in the saved order (hidden items kept so
   // they can be re-enabled), plus the hidden sets.
-  const [topItems, setTopItems] = useState<NavItem[]>(() => sortByOrder(TOP_NAV_ITEMS, nav?.topNav?.order));
+  const [topItems, setTopItems] = useState<NavItem[]>(() => sortByOrder(roleTop, nav?.topNav?.order));
   const [topHidden, setTopHidden] = useState<Set<string>>(() => new Set<string>(nav?.topNav?.hidden ?? []));
   const [sideSections, setSideSections] = useState<NavSection[]>(
-    () => SIDE_NAV_SECTIONS.map(s => ({ ...s, items: sortByOrder(s.items, nav?.sideNav?.order) }))
+    () => roleSections.map(s => ({ ...s, items: sortByOrder(s.items, nav?.sideNav?.order) }))
   );
   const [sideHidden, setSideHidden] = useState<Set<string>>(() => new Set<string>(nav?.sideNav?.hidden ?? []));
 
@@ -742,9 +745,9 @@ function NavigationSettings({ settings, onSaved, disabled }: { settings: any; on
 
   // Compare current working copy to what's saved to drive the Save button.
   const savedSerialized = JSON.stringify({
-    t: sortByOrder(TOP_NAV_ITEMS, nav?.topNav?.order).map(i => i.path),
+    t: sortByOrder(roleTop, nav?.topNav?.order).map(i => i.path),
     th: [...(nav?.topNav?.hidden ?? [])].sort(),
-    s: SIDE_NAV_SECTIONS.flatMap(s => sortByOrder(s.items, nav?.sideNav?.order)).map(i => i.path),
+    s: roleSections.flatMap(s => sortByOrder(s.items, nav?.sideNav?.order)).map(i => i.path),
     sh: [...(nav?.sideNav?.hidden ?? [])].sort(),
   });
   const currentSerialized = JSON.stringify({
@@ -763,9 +766,9 @@ function NavigationSettings({ settings, onSaved, disabled }: { settings: any; on
   };
 
   const reset = () => {
-    setTopItems(sortByOrder(TOP_NAV_ITEMS, undefined));
+    setTopItems(topNavForRole(role));
     setTopHidden(new Set());
-    setSideSections(SIDE_NAV_SECTIONS.map(s => ({ ...s })));
+    setSideSections(sideNavForRole(role).map(s => ({ ...s })));
     setSideHidden(new Set());
     // Persist the cleared state (server drops the navigation key -> defaults).
     save.mutate({ navigation: {} });
