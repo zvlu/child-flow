@@ -395,6 +395,48 @@ export const appRouter = router({
       }),
   }),
 
+  // In-kind (non-federal share) contributions toward the Head Start match.
+  inKind: router({
+    list: staffProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId }) => {
+        return mod.getInKindContributions(organizationId);
+      }),
+    create: staffProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          type: z.enum(["volunteer", "goods", "services", "facility", "other"]),
+          contributor: z.string().trim().min(1).max(200),
+          description: z.string().trim().max(500).optional(),
+          date: z.date(),
+          hours: z.number().min(0).max(100000).optional(),
+          value: z.number().min(0).max(100000000),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const result = await mod.createInKindContribution({
+          organizationId: input.organizationId,
+          type: input.type,
+          contributor: input.contributor,
+          description: input.description ?? null,
+          date: input.date,
+          hours: input.hours != null ? String(input.hours) : null,
+          value: String(input.value),
+          recordedBy: ctx.user.id,
+        });
+        await auditAccess(ctx, { action: "create", resourceType: "in_kind", detail: `${input.type}:${input.value}` });
+        return result;
+      }),
+    delete: staffProcedure
+      .input(z.object({ id: z.number(), organizationId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await mod.deleteInKindContribution(input.id, input.organizationId);
+        await auditAccess(ctx, { action: "delete", resourceType: "in_kind", resourceId: input.id });
+        return { success: true };
+      }),
+  }),
+
   staff: router({
     list: staffProcedure
       .input(z.number())

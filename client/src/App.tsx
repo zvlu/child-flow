@@ -30,6 +30,7 @@ import { MealPlanning } from "./pages/MealPlanning";
 import { StaffOperations } from "./pages/StaffOperations";
 import { ReportBuilder } from "./pages/ReportBuilder";
 import { ActionQueue } from "./pages/ActionQueue";
+import InKind from "./pages/InKind";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
@@ -82,6 +83,13 @@ function Router() {
         {() => (
           <AppLayout>
             <Enrollment />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/in-kind">
+        {() => (
+          <AppLayout>
+            <InKind />
           </AppLayout>
         )}
       </Route>

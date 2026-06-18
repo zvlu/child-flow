@@ -256,6 +256,29 @@ export type EnrollmentApplication = typeof enrollmentApplications.$inferSelect;
 export type InsertEnrollmentApplication = typeof enrollmentApplications.$inferInsert;
 
 /**
+ * In-kind (non-federal share) contributions: volunteer time, donated goods,
+ * services, or facility use. Head Start programs must document a non-federal
+ * match (typically 20%); `value` is the dollar amount counted toward it.
+ */
+export const inKindContributions = mysqlTable("in_kind_contributions", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  type: mysqlEnum("type", ["volunteer", "goods", "services", "facility", "other"]).notNull(),
+  contributor: varchar("contributor", { length: 200 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  date: timestamp("date").notNull(),
+  /** Volunteer hours, when type = volunteer. */
+  hours: decimal("hours", { precision: 7, scale: 2 }),
+  /** Dollar value counted toward the non-federal match. */
+  value: decimal("value", { precision: 12, scale: 2 }).notNull(),
+  recordedBy: int("recordedBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type InKindContribution = typeof inKindContributions.$inferSelect;
+export type InsertInKindContribution = typeof inKindContributions.$inferInsert;
+
+/**
  * One-time invitation codes that let a parent create a family-app account
  * bound to a specific family. Staff generate these; the family onboarding flow
  * (verify-code → register) consumes them. A code is single-use and expires.

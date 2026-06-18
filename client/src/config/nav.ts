@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, ClipboardCheck, Heart, Home, UserCog, BarChart3,
   ShieldCheck, Settings, Baby, BookOpen, FileText, CalendarDays, DollarSign,
   UtensilsCrossed, Clock, FileSignature, Layers, School, AlertTriangle, Zap,
-  MessageSquare, type LucideIcon,
+  MessageSquare, HandHeart, type LucideIcon,
 } from "lucide-react";
 
 export type NavRole = "admin" | "staff" | "parent";
@@ -68,6 +68,7 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
     title: "Business",
     items: [
       { path: "/billing", label: "Billing", icon: DollarSign, roles: ADMIN_ONLY },
+      { path: "/in-kind", label: "In-Kind", icon: HandHeart },
       { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
       { path: "/staff-operations", label: "Staff Operations", icon: Clock },
       { path: "/parent-portal", label: "Parent Portal", icon: Users, roles: PARENT_OK },

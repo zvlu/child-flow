@@ -92,6 +92,13 @@
       "when": 1781722315155,
       "tag": "0012_flippant_wiccan",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1781784623065,
+      "tag": "0013_bizarre_jackpot",
+      "breakpoints": true
     }
   ]
 }

@@ -18,6 +18,7 @@ import {
   InsertActivityLog, InsertAttendance,
   customRoles, InsertCustomRole,
   enrollmentApplications, InsertEnrollmentApplication,
+  inKindContributions, InsertInKindContribution,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -307,6 +308,31 @@ export async function enrollApplication(id: number, organizationId: number) {
     .where(eq(enrollmentApplications.id, id));
 
   return { childId, familyId, alreadyEnrolled: false };
+}
+
+// ==================== IN-KIND CONTRIBUTIONS ====================
+
+export async function getInKindContributions(organizationId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(inKindContributions)
+    .where(eq(inKindContributions.organizationId, organizationId))
+    .orderBy(desc(inKindContributions.date));
+}
+
+export async function createInKindContribution(data: InsertInKindContribution) {
+  const db = await requireDb();
+  const [result] = await db.insert(inKindContributions).values(data);
+  return { id: result.insertId };
+}
+
+export async function deleteInKindContribution(id: number, organizationId: number) {
+  const db = await requireDb();
+  await db
+    .delete(inKindContributions)
+    .where(and(eq(inKindContributions.id, id), eq(inKindContributions.organizationId, organizationId)));
+  return { success: true };
 }
 
 // ==================== STUDENT NOTES ====================
