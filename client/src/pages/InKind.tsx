@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Glossary } from "@/components/Glossary";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -46,9 +47,35 @@ export default function InKind() {
     onError: (e) => toast.error(e.message || "Could not save contribution"),
   });
   const del = trpc.inKind.delete.useMutation({
-    onSuccess: async () => { await utils.inKind.list.invalidate(orgId); toast.success("Contribution removed"); },
     onError: (e) => toast.error(e.message || "Could not remove"),
   });
+  // Bare create used only to re-add a row after an "Undo" — no dialog/toast side effects.
+  const restore = trpc.inKind.create.useMutation({
+    onSuccess: async () => { await utils.inKind.list.invalidate(orgId); },
+  });
+
+  // Delete is recoverable: remove immediately, then offer an Undo that re-adds it.
+  const removeRow = (r: (typeof rows)[number]) => {
+    del.mutate({ id: r.id, organizationId: orgId }, {
+      onSuccess: async () => {
+        await utils.inKind.list.invalidate(orgId);
+        toast.success("Contribution removed", {
+          action: {
+            label: "Undo",
+            onClick: () => restore.mutate({
+              organizationId: orgId,
+              type: r.type as any,
+              contributor: r.contributor,
+              description: r.description ?? undefined,
+              date: new Date(r.date as any),
+              hours: r.hours != null ? Number(r.hours) : undefined,
+              value: Number(r.value),
+            }),
+          },
+        });
+      },
+    });
+  };
 
   const set = (k: keyof typeof BLANK) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -94,7 +121,7 @@ export default function InKind() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2"><HandHeart className="h-6 w-6 text-primary" />In-Kind Contributions</h1>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2"><HandHeart className="h-6 w-6 text-primary" />In-Kind Contributions <Glossary term="IN-KIND" /></h1>
           <p className="text-muted-foreground text-sm mt-0.5">Track volunteer time and donations toward the non-federal (20%) match</p>
         </div>
         <div className="flex items-center gap-2">
@@ -187,7 +214,7 @@ export default function InKind() {
                       <td className="px-4 py-3 text-sm text-right font-semibold">{usd(Number(r.value))}</td>
                       <td className="px-4 py-3 text-right">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" disabled={del.isPending}
-                          onClick={() => del.mutate({ id: r.id, organizationId: orgId })} aria-label="Delete contribution">
+                          onClick={() => removeRow(r)} aria-label="Delete contribution">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </td>

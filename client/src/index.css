@@ -132,15 +132,24 @@
   }
   
   /*
-   * Sleek pill look for action buttons. Excludes role-based controls that are
-   * <button> elements but need their own internal geometry — a Switch/Checkbox/
-   * Radio/Tab/Select-trigger must NOT get 24px side padding or the moving parts
-   * get squeezed out of the track (see Switch thumb).
+   * Sleek pill *radius* for action buttons. We intentionally do NOT force side
+   * padding here: every filled button either uses the <Button> component (which
+   * carries its own px) or sets its own padding, so a global 24px override only
+   * harmed the buttons that want NO padding — icon-only buttons (stretched into
+   * ovals) and inline text links (detached from their sentence). Letting each
+   * button keep its own padding makes icon buttons square (→ circle via the
+   * radius) and links sit flush, while text buttons stay pills as before.
+   *
+   * Principle: only force the pill on buttons that DON'T pick their own radius.
+   * The <Button> component's default is `rounded-lg`, so that's what gets
+   * pill-ified; any button that explicitly asks for a *different* radius
+   * (rounded-none/sm/md/xl/2xl) clearly wants that shape and is left alone —
+   * cards, tabs, calendar chips, the flat "More" nav tab, etc. Also excludes
+   * role-based controls (Switch/Checkbox/Radio/Tab/Select-trigger) whose moving
+   * parts must keep their own geometry (see Switch thumb).
    */
-  button:not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([role="tab"]):not([role="combobox"]):not([data-icon-button]), .btn, [class*="Button"] {
+  button:not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([role="tab"]):not([role="combobox"]):not([data-icon-button]):not([class*="rounded-none"]):not([class*="rounded-sm"]):not([class*="rounded-md"]):not([class*="rounded-xl"]):not([class*="rounded-2xl"]), .btn, [class*="Button"] {
     border-radius: 9999px !important;
-    padding-left: 1.5rem !important;
-    padding-right: 1.5rem !important;
   }
   
   input, select, textarea, [class*="Input"] {
@@ -193,4 +202,49 @@
 }
 ::-webkit-scrollbar-thumb {
   @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/30 transition-colors;
+}
+
+/*
+ * Dark-mode status colors. Status pills/badges across the app use light pastel
+ * utilities (bg-{c}-100 text-{c}-700). On dark cards those read as too-bright,
+ * out-of-place chips. Here we remap the pastel families *only in dark mode* the
+ * way a proper dark theme should: -50/-100 fills become a subtle translucent
+ * tint of the hue, and -600/700/800 text lightens to the -300 shade so it stays
+ * legible. Unlayered (beats Tailwind's layered utilities); light mode untouched.
+ */
+.dark .bg-green-50, .dark .bg-green-100 { background-color: color-mix(in oklab, #22c55e 16%, transparent); }
+.dark .bg-emerald-50, .dark .bg-emerald-100 { background-color: color-mix(in oklab, #10b981 16%, transparent); }
+.dark .bg-red-50, .dark .bg-red-100 { background-color: color-mix(in oklab, #ef4444 16%, transparent); }
+.dark .bg-rose-50, .dark .bg-rose-100 { background-color: color-mix(in oklab, #f43f5e 16%, transparent); }
+.dark .bg-amber-50, .dark .bg-amber-100 { background-color: color-mix(in oklab, #f59e0b 16%, transparent); }
+.dark .bg-yellow-50, .dark .bg-yellow-100 { background-color: color-mix(in oklab, #eab308 16%, transparent); }
+.dark .bg-orange-50, .dark .bg-orange-100 { background-color: color-mix(in oklab, #f97316 16%, transparent); }
+.dark .bg-blue-50, .dark .bg-blue-100 { background-color: color-mix(in oklab, #3b82f6 16%, transparent); }
+.dark .bg-indigo-50, .dark .bg-indigo-100 { background-color: color-mix(in oklab, #6366f1 16%, transparent); }
+.dark .bg-purple-50, .dark .bg-purple-100 { background-color: color-mix(in oklab, #a855f7 16%, transparent); }
+.dark .bg-pink-50, .dark .bg-pink-100 { background-color: color-mix(in oklab, #ec4899 16%, transparent); }
+
+.dark .text-green-600, .dark .text-green-700, .dark .text-green-800 { color: #86efac; }
+.dark .text-emerald-600, .dark .text-emerald-700, .dark .text-emerald-800 { color: #6ee7b7; }
+.dark .text-red-600, .dark .text-red-700, .dark .text-red-800 { color: #fca5a5; }
+.dark .text-rose-600, .dark .text-rose-700, .dark .text-rose-800 { color: #fda4af; }
+.dark .text-amber-600, .dark .text-amber-700, .dark .text-amber-800 { color: #fcd34d; }
+.dark .text-yellow-600, .dark .text-yellow-700, .dark .text-yellow-800 { color: #fde047; }
+.dark .text-orange-600, .dark .text-orange-700, .dark .text-orange-800 { color: #fdba74; }
+.dark .text-blue-600, .dark .text-blue-700, .dark .text-blue-800 { color: #93c5fd; }
+.dark .text-indigo-600, .dark .text-indigo-700, .dark .text-indigo-800 { color: #a5b4fc; }
+.dark .text-purple-600, .dark .text-purple-700, .dark .text-purple-800 { color: #d8b4fe; }
+.dark .text-pink-600, .dark .text-pink-700, .dark .text-pink-800 { color: #f9a8d4; }
+
+.dark .border-green-200 { border-color: color-mix(in oklab, #22c55e 30%, transparent); }
+.dark .border-red-200 { border-color: color-mix(in oklab, #ef4444 30%, transparent); }
+.dark .border-amber-200 { border-color: color-mix(in oklab, #f59e0b 30%, transparent); }
+.dark .border-blue-200 { border-color: color-mix(in oklab, #3b82f6 30%, transparent); }
+
+/* Print-to-PDF: when a report is being printed, show only that report. */
+@media print {
+  body * { visibility: hidden !important; }
+  .pir-print-active, .pir-print-active * { visibility: visible !important; }
+  .pir-print-active { position: absolute !important; inset: 0 !important; padding: 0 !important; }
+  .pir-no-print { display: none !important; }
 }

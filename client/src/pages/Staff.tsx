@@ -138,7 +138,7 @@ export default function Staff() {
     const matchesSearch =
       name.includes(q) ||
       (s.position ?? "").toLowerCase().includes(q) ||
-      (roleLabels[s.role] ?? s.role).toLowerCase().includes(q);
+      (roleLabels[s.role ?? "teacher"] ?? s.role ?? "").toLowerCase().includes(q);
     const matchesRole = roleFilter === "all" || s.role === roleFilter;
     return matchesSearch && matchesRole;
   });
@@ -152,7 +152,7 @@ export default function Staff() {
       email: member.email ?? "",
       phone: member.phone ?? "",
       position: member.position ?? "",
-      role: member.role,
+      role: member.role ?? "teacher",
     });
     setEditId(member.id);
   };
@@ -326,8 +326,8 @@ export default function Staff() {
                             )}
                           </div>
                           <div className="flex items-center gap-1.5 mt-1">
-                            <Badge className={`text-xs ${roleColors[member.role] || "bg-gray-100 text-gray-700"} hover:bg-opacity-100`}>
-                              {member.position || roleLabels[member.role] || member.role}
+                            <Badge className={`text-xs ${roleColors[member.role ?? "teacher"] || "bg-gray-100 text-gray-700"} hover:bg-opacity-100`}>
+                              {member.position || roleLabels[member.role ?? "teacher"] || member.role}
                             </Badge>
                             {member.isActive !== 1 && (
                               <Badge variant="outline" className="text-xs text-muted-foreground">Inactive</Badge>

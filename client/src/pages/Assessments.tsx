@@ -13,6 +13,7 @@ import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { objectsToCsv, downloadCsv } from "@/lib/csv";
 import { dateInputToLocal } from "@/lib/date";
+import { Glossary } from "@/components/Glossary";
 
 const DRDP_DOMAINS = [
   { code: "ATL-REG", label: "Approaches to Learning–Self-Regulation" },
@@ -114,7 +115,7 @@ export default function Assessments() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2"><ClipboardList className="h-6 w-6 text-primary" />Child Assessments</h1>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2"><ClipboardList className="h-6 w-6 text-primary" />Child Assessments <Glossary term="DRDP" /></h1>
           <p className="text-muted-foreground text-sm mt-0.5">DRDP developmental assessments and progress by domain</p>
         </div>
         <div className="flex items-center gap-2">

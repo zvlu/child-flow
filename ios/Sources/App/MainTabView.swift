@@ -33,6 +33,54 @@ struct AppMenuSheet: View {
             ScrollView {
                 VStack(spacing: 28) {
 
+                    // Daily Reports / Moments
+                    MenuSection(title: "Daily") {
+                        ModuleCard(
+                            label: "Daily Reports",
+                            subtitle: "Log meals, naps & moments",
+                            icon: "sparkles",
+                            color: .cfPrimary,
+                            bgColor: .cfPrimaryLight,
+                            destination: AnyView(DailyReportsView())
+                        )
+                    }
+
+                    // Curriculum & Funding
+                    MenuSection(title: "Curriculum & Funding") {
+                        ModuleCard(
+                            label: "Lesson Planning",
+                            subtitle: "Weekly plans by classroom",
+                            icon: "book.fill",
+                            color: .cfPrimary,
+                            bgColor: .cfPrimaryLight,
+                            destination: AnyView(LessonPlanningView())
+                        )
+                        ModuleCard(
+                            label: "Assessments",
+                            subtitle: "Screenings & developmental records",
+                            icon: "checklist",
+                            color: .cfChildren,
+                            bgColor: .cfChildrenBg,
+                            destination: AnyView(AssessmentsView())
+                        )
+                        ModuleCard(
+                            label: "Portfolios",
+                            subtitle: "Each child's growth over time",
+                            icon: "folder.fill",
+                            color: .cfGoals,
+                            bgColor: Color(hex: "ECFEFF"),
+                            destination: AnyView(PortfoliosView())
+                        )
+                        ModuleCard(
+                            label: "Subsidies",
+                            subtitle: "Agency funding & co-pays",
+                            icon: "building.columns.fill",
+                            color: .cfAccent,
+                            bgColor: .cfAccentLight,
+                            destination: AnyView(SubsidiesView())
+                        )
+                    }
+
                     // Families & Engagement
                     MenuSection(title: "Families") {
                         ModuleCard(
@@ -103,13 +151,21 @@ struct AppMenuSheet: View {
 
                     // Health & Nutrition
                     MenuSection(title: "Health & Nutrition") {
-                        ModuleCardWide(
+                        ModuleCard(
                             label: "CACFP & Nutrition Forms",
                             subtitle: "Meal preferences, infant formula, medical statements",
                             icon: "fork.knife",
                             color: .cfAccent,
                             bgColor: .cfAccentLight,
                             destination: AnyView(NutritionFormsView())
+                        )
+                        ModuleCard(
+                            label: "Meal Plans",
+                            subtitle: "Weekly menus by classroom",
+                            icon: "carrot.fill",
+                            color: .cfAccent,
+                            bgColor: .cfAccentLight,
+                            destination: AnyView(MealsView())
                         )
                     }
 
@@ -147,6 +203,14 @@ struct AppMenuSheet: View {
                             destination: AnyView(StaffView())
                         )
                         ModuleCard(
+                            label: "Calendar",
+                            subtitle: "Program events & holidays",
+                            icon: "calendar",
+                            color: .cfChildren,
+                            bgColor: .cfChildrenBg,
+                            destination: AnyView(CalendarView())
+                        )
+                        ModuleCard(
                             label: "Compliance",
                             subtitle: "PIR & checklists",
                             icon: "checkmark.seal.fill",
@@ -161,6 +225,14 @@ struct AppMenuSheet: View {
                             color: .cfCompliance,
                             bgColor: .cfComplianceBg,
                             destination: AnyView(ReportsView())
+                        )
+                        ModuleCard(
+                            label: "Staff Activity",
+                            subtitle: "Advocate workload & contacts",
+                            icon: "person.2.badge.gearshape.fill",
+                            color: .cfPrimary,
+                            bgColor: .cfPrimaryLight,
+                            destination: AnyView(StaffActivityView())
                         )
                     }
 

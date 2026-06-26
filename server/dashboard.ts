@@ -40,12 +40,12 @@ export type DashboardAlert = { id: string; title: string; description: string; t
  * dashboard.alerts tRPC query (web notification bell). Returns null if the DB
  * is unavailable.
  */
-export async function computeDashboard() {
+export async function computeDashboard(organizationId: number | null) {
     const db = await getDb();
     if (!db) return null;
 
-    // Single-program deployment: use the first organization.
-    const [org] = await db.select().from(organizations).limit(1);
+    // Scope to the caller's organization; no first-org fallback.
+    const org = organizationId != null ? { id: organizationId } : null;
     if (!org) {
       return { stats: { totalEnrolled: 0, attendanceRate: 0, healthDue: 0, complianceScore: 0 }, alerts: [] as DashboardAlert[] };
     }
@@ -235,7 +235,7 @@ export function registerDashboardRoutes(app: Express) {
       res.status(401).json({ error: "Please sign in again" });
       return;
     }
-    const data = await computeDashboard();
+    const data = await computeDashboard(user.organizationId);
     if (!data) {
       res.status(500).json({ error: "Database not available" });
       return;

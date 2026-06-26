@@ -1,4 +1,4 @@
-import { date, decimal, int, json, mediumtext, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { date, decimal, int, json, mediumtext, mysqlEnum, mysqlTable, text, timestamp, unique, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -379,7 +379,7 @@ export const familyServices = mysqlTable("family_services", {
   id: int("id").autoincrement().primaryKey(),
   familyId: int("familyId").notNull().references(() => families.id),
   organizationId: int("organizationId").notNull().references(() => organizations.id),
-  type: mysqlEnum("type", ["home_visit", "office_visit", "phone_call", "email", "referral", "other"]).notNull(),
+  type: mysqlEnum("type", ["home_visit", "office_visit", "phone_call", "email", "referral", "coordinated_services", "monthly_contact", "other"]).notNull(),
   serviceDate: timestamp("serviceDate").notNull(),
   description: text("description").notNull(),
   outcome: text("outcome"),
@@ -521,21 +521,97 @@ export type EducationRecord = typeof educationRecords.$inferSelect;
 export type InsertEducationRecord = typeof educationRecords.$inferInsert;
 
 /**
- * PIR (Program Information Report) table for federal reporting data.
+ * PIR (Program Information Report) value store — one row per answered field.
+ * The federal annual report (OMB 0970-0427). Question definitions live in
+ * pirQuestions; report lifecycle in pirReports.
  */
 export const pirData = mysqlTable("pir_data", {
   id: int("id").autoincrement().primaryKey(),
   organizationId: int("organizationId").notNull().references(() => organizations.id),
   year: varchar("year", { length: 9 }).notNull(), // e.g., "2024-2025"
   section: varchar("section", { length: 100 }).notNull(), // e.g., "Section A: Enrollment"
-  questionId: varchar("questionId", { length: 50 }).notNull(),
+  /**
+   * The PIR field this value answers. Matches pirQuestions.code (the catalog
+   * slug, e.g. "program_information.enrollment.funded_enrollment"). Widened to
+   * 120 chars so the full catalog code fits; legacy free-text ids still work.
+   */
+  questionId: varchar("questionId", { length: 120 }).notNull(),
   value: text("value").notNull(),
+  /**
+   * The report envelope this value belongs to (pirReports.id). Null for values
+   * recorded before a report row existed; backfill by (organizationId, year).
+   */
+  reportId: int("reportId").references(() => pirReports.id),
   updatedBy: int("updatedBy").references(() => staff.id),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type PirData = typeof pirData.$inferSelect;
 export type InsertPirData = typeof pirData.$inferInsert;
+
+/**
+ * One PIR submission envelope per program per reporting year. Groups the
+ * individual pir_data values and tracks the draft → submitted → accepted
+ * lifecycle. Org-scoped like every other tenant table; unique per
+ * (organizationId, year) so a program has exactly one report per year.
+ */
+export const pirReports = mysqlTable("pir_reports", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  /** Reporting year, e.g. "2024-2025" — matches pir_data.year. */
+  year: varchar("year", { length: 9 }).notNull(),
+  status: mysqlEnum("status", ["draft", "submitted", "accepted"]).default("draft").notNull(),
+  /** staff.id who submitted (mirrors pir_data.updatedBy); null while a draft. */
+  submittedBy: int("submittedBy").references(() => staff.id),
+  submittedAt: timestamp("submittedAt"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  orgYear: unique("pir_reports_org_year").on(t.organizationId, t.year),
+}));
+
+export type PirReport = typeof pirReports.$inferSelect;
+export type InsertPirReport = typeof pirReports.$inferInsert;
+
+/**
+ * Canonical catalog of PIR fields, seeded from docs/pir/pir-catalog.json via
+ * scripts/seed-pir-questions.ts. Reference data shared across ALL orgs — NOT
+ * tenant-scoped. pir_data.questionId references `code` here.
+ *
+ * NOTE: `code` slugs and `sortOrder` are app-internal, not official OMB
+ * question numbers. Reconcile against the official form PDF before treating the
+ * catalog as complete (see docs/pir/PIR_REFERENCE.md).
+ */
+export const pirQuestions = mysqlTable("pir_questions", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Stable catalog slug, e.g. "child_family_services.bmi.obese". Unique. */
+  code: varchar("code", { length: 120 }).notNull().unique(),
+  /** Section id slug, e.g. "child_family_services". */
+  sectionId: varchar("sectionId", { length: 48 }).notNull(),
+  /** Human section title, e.g. "Section C — Child and Family Services". */
+  section: varchar("section", { length: 120 }).notNull(),
+  /** Subsection id slug, e.g. "bmi" (null for section-level fields). */
+  subsectionId: varchar("subsectionId", { length: 64 }),
+  /** Human subsection title. */
+  subsection: varchar("subsection", { length: 200 }),
+  label: varchar("label", { length: 400 }).notNull(),
+  valueType: mysqlEnum("valueType", ["integer", "percent", "boolean", "enum", "text"]).default("integer").notNull(),
+  subject: mysqlEnum("subject", ["child", "family", "staff", "program", "grant"]).notNull(),
+  /** Allowed choices when valueType = enum. Null otherwise. */
+  options: json("options").$type<string[]>(),
+  /** "enrollment" / "eoy" for fields reported at both points in time; null otherwise. */
+  paired: mysqlEnum("paired", ["enrollment", "eoy"]),
+  note: text("note"),
+  /** Display order across the whole catalog. */
+  sortOrder: int("sortOrder").default(0).notNull(),
+  isActive: int("isActive").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PirQuestion = typeof pirQuestions.$inferSelect;
+export type InsertPirQuestion = typeof pirQuestions.$inferInsert;
 
 /**
  * Classrooms table for organizing children by classroom.
@@ -758,6 +834,12 @@ export const activityLogs = mysqlTable("activityLogs", {
   staffId: int("staffId").notNull().references(() => staff.id),
   activityType: mysqlEnum("activityType", ["meal", "nap", "diaper", "activity", "note", "photo"]).notNull(),
   description: text("description"),
+  /**
+   * Optional media for a moment. With the storage proxy configured this is a
+   * small public URL; in dev it falls back to a client-resized image data URL.
+   */
+  mediaUrl: mediumtext("mediaUrl"),
+  mediaType: mysqlEnum("mediaType", ["image", "video"]),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -820,6 +902,111 @@ export const mealItems = mysqlTable("mealItems", {
 
 export type MealItem = typeof mealItems.$inferSelect;
 export type InsertMealItem = typeof mealItems.$inferInsert;
+
+// ==================== LESSON PLANNING & CURRICULUM ====================
+/**
+ * Weekly lesson plan for one classroom (Lillio-style curriculum planning).
+ * Holds the week's theme; individual activities live in lessonActivities.
+ */
+export const lessonPlans = mysqlTable("lesson_plans", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  classroomId: int("classroomId").notNull().references(() => classrooms.id),
+  weekStartDate: date("weekStartDate").notNull(),
+  title: varchar("title", { length: 255 }),
+  theme: varchar("theme", { length: 255 }),
+  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  createdBy: int("createdBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type LessonPlan = typeof lessonPlans.$inferSelect;
+export type InsertLessonPlan = typeof lessonPlans.$inferInsert;
+
+/**
+ * One planned activity within a lesson plan, scheduled to a weekday and tagged
+ * with the developmental domain it targets (aligned to ELOF-style domains).
+ */
+export const lessonActivities = mysqlTable("lesson_activities", {
+  id: int("id").autoincrement().primaryKey(),
+  lessonPlanId: int("lessonPlanId").notNull().references(() => lessonPlans.id),
+  dayOfWeek: mysqlEnum("dayOfWeek", ["monday", "tuesday", "wednesday", "thursday", "friday"]).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  /** Developmental domain this activity targets. */
+  domain: mysqlEnum("domain", ["social_emotional", "language_literacy", "cognition", "physical", "creative_arts", "approaches_to_learning"]),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type LessonActivity = typeof lessonActivities.$inferSelect;
+export type InsertLessonActivity = typeof lessonActivities.$inferInsert;
+
+// ==================== CHILD PORTFOLIOS ====================
+/**
+ * A developmental portfolio entry — a curated observation/work sample for one
+ * child, tagged with the developmental domain it documents (Lillio-style
+ * portfolios). Builds a timeline of a child's growth over the year.
+ */
+export const portfolioEntries = mysqlTable("portfolio_entries", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  childId: int("childId").notNull().references(() => children.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  observation: text("observation"),
+  domain: mysqlEnum("domain", ["social_emotional", "language_literacy", "cognition", "physical", "creative_arts", "approaches_to_learning"]),
+  /** Optional photo/work-sample URL (upload pipeline TBD). */
+  mediaUrl: text("mediaUrl"),
+  observedAt: date("observedAt"),
+  createdBy: int("createdBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PortfolioEntry = typeof portfolioEntries.$inferSelect;
+export type InsertPortfolioEntry = typeof portfolioEntries.$inferInsert;
+
+// ==================== SUBSIDY TRACKING ====================
+/**
+ * A child-care subsidy/voucher for a family — the funding agency, the
+ * authorized amount, the family's co-pay, and the coverage window. Tracked
+ * alongside Billing so staff see who's subsidized and what families owe.
+ */
+export const subsidies = mysqlTable("subsidies", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id),
+  agencyName: varchar("agencyName", { length: 200 }).notNull(),
+  /** Case/authorization number from the subsidy agency. */
+  caseNumber: varchar("caseNumber", { length: 100 }),
+  authorizedAmount: decimal("authorizedAmount", { precision: 10, scale: 2 }),
+  copayAmount: decimal("copayAmount", { precision: 10, scale: 2 }),
+  startDate: date("startDate"),
+  endDate: date("endDate"),
+  status: mysqlEnum("status", ["active", "pending", "expired"]).default("active").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Subsidy = typeof subsidies.$inferSelect;
+export type InsertSubsidy = typeof subsidies.$inferInsert;
+
+// ==================== PUSH NOTIFICATIONS ====================
+/**
+ * A device's push token (APNs/FCM) for one user. Sending to a family resolves
+ * the parent user(s) for that family and pushes to all their devices.
+ */
+export const deviceTokens = mysqlTable("device_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  platform: mysqlEnum("platform", ["ios", "android", "web"]).default("ios").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type DeviceToken = typeof deviceTokens.$inferSelect;
+export type InsertDeviceToken = typeof deviceTokens.$inferInsert;
 
 export const cacfpReports = mysqlTable("cacfpReports", {
   id: int("id").autoincrement().primaryKey(),

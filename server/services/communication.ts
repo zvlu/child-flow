@@ -1,8 +1,11 @@
 /**
  * Communication Service
- * Handles delivery of SMS and Email notifications.
- * Integrates with external providers (e.g., Twilio for SMS, SendGrid/SES for Email).
+ * Handles delivery of SMS and Email notifications and records every attempt to
+ * the communication log. No real provider is wired yet, so messages are
+ * recorded with status "pending" (queued) rather than falsely reported as
+ * delivered. Set TWILIO/SENDGRID env vars and implement send* to go live.
  */
+import { createCommunicationLog } from "../db";
 
 export interface MessagePayload {
   organizationId: number;
@@ -14,6 +17,11 @@ export interface MessagePayload {
 }
 
 export class CommunicationService {
+  /** Whether a real delivery provider is configured. None yet → false. */
+  static hasProvider(): boolean {
+    return Boolean(process.env.TWILIO_AUTH_TOKEN || process.env.SENDGRID_API_KEY);
+  }
+
   /**
    * Sends an SMS message to a recipient.
    * In production, this would use the Twilio API.
@@ -44,17 +52,26 @@ export class CommunicationService {
   }
 
   /**
-   * Unified method to send a message and log it to the database.
+   * Unified method to send a message and record it to the communication log.
+   * Without a configured provider the row is stored as "pending" (queued) and
+   * `delivered` is false — callers must not claim the message was delivered.
    */
   static async sendMessage(payload: MessagePayload) {
-    let result;
-    if (payload.type === 'sms') {
-      result = await this.sendSMS(payload);
-    } else {
-      result = await this.sendEmail(payload);
+    const delivered = this.hasProvider();
+    let providerMessageId: string | undefined;
+    if (delivered) {
+      const result = payload.type === 'sms' ? await this.sendSMS(payload) : await this.sendEmail(payload);
+      providerMessageId = result.messageId;
     }
-
-    // Here we would also call db.insert(communicationLogs) to track the message
-    return result;
+    const log = await createCommunicationLog({
+      organizationId: payload.organizationId,
+      recipientId: payload.recipientId,
+      type: payload.type,
+      subject: payload.subject ?? null,
+      content: payload.content,
+      status: delivered ? "sent" : "pending",
+      providerMessageId: providerMessageId ?? null,
+    });
+    return { success: true, delivered, status: delivered ? "sent" : "pending", id: log.id };
   }
 }

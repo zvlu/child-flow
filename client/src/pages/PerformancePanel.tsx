@@ -50,16 +50,16 @@ interface PanelCardProps {
 }
 
 const PanelCard = ({ title, children, isEmpty, isLoading, emptyText = "No Data" }: PanelCardProps) => (
-  <Card className="rounded-2xl border-none shadow-sm bg-white h-[260px] flex flex-col overflow-hidden transition-all hover:shadow-md">
+  <Card className="rounded-xl border-none shadow-sm bg-card h-[260px] flex flex-col overflow-hidden transition-all hover:shadow-md">
     <CardHeader className="p-4 pb-0 flex flex-row items-center justify-between space-y-0 flex-shrink-0">
-      <CardTitle className="text-[12px] font-bold text-slate-800 tracking-tight truncate pr-2 uppercase">{title}</CardTitle>
-      <Info className="h-3.5 w-3.5 text-slate-300 cursor-help flex-shrink-0" />
+      <CardTitle className="text-[12px] font-bold text-foreground tracking-tight truncate pr-2 uppercase">{title}</CardTitle>
+      <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help flex-shrink-0" />
     </CardHeader>
     <CardContent className="flex-1 flex flex-col items-center justify-center p-3 overflow-hidden">
       {isLoading ? (
         <RefreshCw className="h-6 w-6 text-slate-200 animate-spin" />
       ) : isEmpty ? (
-        <p className="text-slate-300 text-[11px] font-medium text-center px-4 leading-relaxed">{emptyText}</p>
+        <p className="text-muted-foreground text-[11px] font-medium text-center px-4 leading-relaxed">{emptyText}</p>
       ) : (
         children
       )}
@@ -90,15 +90,15 @@ const DonutChart = ({ completed, total, color, label, subLabel }: { completed: n
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-xl font-bold text-slate-800 leading-none">{completed}</span>
-          <span className="text-[9px] text-slate-400 text-center leading-tight mt-1 font-medium">
+          <span className="text-xl font-bold text-foreground leading-none">{completed}</span>
+          <span className="text-[9px] text-muted-foreground text-center leading-tight mt-1 font-medium">
             of {total}<br/>({percentage}%)
           </span>
         </div>
       </div>
-      <div className="flex gap-3 mt-3 text-[9px] text-slate-500 flex-wrap justify-center font-medium">
+      <div className="flex gap-3 mt-3 text-[9px] text-muted-foreground flex-wrap justify-center font-medium">
         <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} /> {label}: {completed}</div>
-        <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-slate-100" /> {subLabel}: {total - completed}</div>
+        <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-muted" /> {subLabel}: {total - completed}</div>
       </div>
     </div>
   );
@@ -185,7 +185,8 @@ export default function PerformancePanel() {
   const healthStatusData = useMemo(() => {
     const counts = new Map<string, number>();
     for (const rec of healthRecords ?? []) {
-      counts.set(rec.status, (counts.get(rec.status) ?? 0) + 1);
+      const status = rec.status ?? "unknown";
+      counts.set(status, (counts.get(status) ?? 0) + 1);
     }
     return Array.from(counts.entries()).map(([status, value]) => ({
       name: HEALTH_STATUS_META[status]?.label ?? formatTypeLabel(status),
@@ -217,28 +218,28 @@ export default function PerformancePanel() {
   return (
     <div className="h-full flex flex-col bg-[#FBF6EE] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-8 py-4 bg-white border-b border-slate-100 flex-shrink-0">
+      <div className="flex items-center justify-between px-8 py-4 bg-card border-b border-border flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
             <RefreshCw className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-1.5">
-              My Performance Panel (Current) <ChevronDown className="h-4 w-4 text-slate-400" />
+            <h1 className="text-lg font-bold text-foreground flex items-center gap-1.5">
+              My Performance Panel (Current) <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </h1>
-            <p className="text-[11px] text-slate-400 font-medium">Comprehensive program performance tracking</p>
+            <p className="text-[11px] text-muted-foreground font-medium">Comprehensive program performance tracking</p>
           </div>
         </div>
-        <div className="flex items-center gap-6 text-[11px] text-slate-500">
+        <div className="flex items-center gap-6 text-[11px] text-muted-foreground">
           <div className="text-right">
-            <p className="font-bold text-slate-900">2025 - 2026</p>
-            <p className="font-medium text-slate-400">Refreshed Today • {refreshedAt}</p>
+            <p className="font-bold text-foreground">2025 - 2026</p>
+            <p className="font-medium text-muted-foreground">Refreshed Today • {refreshedAt}</p>
           </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="h-10 w-10 border-slate-200 bg-white shadow-sm rounded-xl hover:bg-slate-50">
-                <MoreHorizontal className="h-5 w-5 text-slate-600" />
+              <Button variant="outline" size="icon" className="h-10 w-10 border-border bg-card shadow-sm rounded-xl hover:bg-muted">
+                <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 rounded-xl">
@@ -305,7 +306,7 @@ export default function PerformancePanel() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-2 flex justify-center gap-3 text-[9px] text-slate-400 font-bold flex-wrap">
+              <div className="mt-2 flex justify-center gap-3 text-[9px] text-muted-foreground font-bold flex-wrap">
                 {enrollmentByClassroom.map((c) => (
                   <span key={c.name} className="flex items-center gap-1">
                     <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: c.color }} /> {c.name}: {c.enrolled}/{c.capacity}
@@ -364,7 +365,7 @@ export default function PerformancePanel() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-2 flex justify-center gap-3 text-[9px] text-slate-400 font-bold">
+              <div className="mt-2 flex justify-center gap-3 text-[9px] text-muted-foreground font-bold">
                 <span className="flex items-center gap-1">
                   <div className="h-1.5 w-1.5 rounded-full bg-blue-500" /> Avg:{" "}
                   {attendanceTrend.length > 0
@@ -394,7 +395,7 @@ export default function PerformancePanel() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 px-4 text-[8px] text-slate-500 font-bold">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 px-4 text-[8px] text-muted-foreground font-bold">
                 {healthStatusData.map((e) => (
                   <div key={e.name} className="flex items-center gap-1">
                     <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: e.color }} />

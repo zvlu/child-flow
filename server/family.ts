@@ -22,6 +22,7 @@ import { clientIpFromReq } from "./_core/audit";
 import { hashPassword, verifyPassword } from "./_core/password";
 import { sdk } from "./_core/sdk";
 import { getDb, getHealthFollowUpAlerts, insertAuditLog } from "./db";
+import { getFamilyActivityLogs } from "./moduleDb";
 
 /**
  * Family (parent) account flows for the ChildFlowFamily iOS app.
@@ -524,6 +525,35 @@ export function registerFamilyRoutes(app: Express) {
           type: e.eventType ?? "other",
         }))
     );
+  });
+
+  /**
+   * Authenticated: the family's live Daily Reports feed — every moment logged
+   * for this family's children (meals, naps, activities, photos), newest first.
+   */
+  app.get("/api/family/activity", async (req: Request, res: Response) => {
+    const parent = await requireParent(req);
+    if (!parent) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const rows = await getFamilyActivityLogs(parent.familyId);
+    res.json(rows.map((r) => ({
+      id: String(r.id),
+      childId: String(r.childId),
+      activityType: r.activityType,
+      description: r.description ?? "",
+      mediaUrl: (r as { mediaUrl?: string | null }).mediaUrl ?? null,
+      mediaType: (r as { mediaType?: string | null }).mediaType ?? null,
+      timestamp: r.timestamp.toISOString(),
+      childName: r.childName,
+      staffName: r.staffName,
+    })));
   });
 
   /**

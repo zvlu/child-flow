@@ -11,7 +11,7 @@ import { hashPassword } from "../server/_core/password";
 import {
   users, organizations, families, children, staff, classrooms,
   childClassroomAssignments, staffCaseloads, attendance, healthRecords,
-  familyServices, communicationLogs, educationRecords, pirData, studentNotes,
+  familyServices, communicationLogs, educationRecords, pirData, pirReports, pirQuestions, studentNotes,
   calendarEvents, familyContactAddresses, documents, bulkActionLogs,
   aiInsights, invoices, payments, activityLogs, parentNotifications,
   digitalDocuments, mealPlans, mealItems, cacfpReports, timeClock,
@@ -24,7 +24,7 @@ const TABLES = [
   "parentNotifications", "activityLogs", "payments", "invoices",
   "ai_insights", "bulk_action_logs", "documents", "family_contact_addresses",
   "calendar_events", "student_notes", "staff_caseloads",
-  "child_classroom_assignments", "pir_data", "education_records",
+  "child_classroom_assignments", "pir_data", "pir_reports", "education_records",
   "communication_logs", "family_services", "health_records", "attendance",
   "classrooms", "children", "families", "staff", "organizations", "users",
 ];
@@ -58,7 +58,7 @@ async function main() {
   ]);
   await db.insert(users).values([
     { openId: "dev-test-user", name: "Test Administrator", email: "admin@childflow.org", loginMethod: "email", role: "admin", passwordHash: adminHash },
-    { openId: "user-maria", name: "Maria Lopez", email: "maria.lopez@childflow.org", loginMethod: "email", role: "user", passwordHash: staffHash },
+    { openId: "user-maria", name: "Maria Lopez", email: "maria.lopez@childflow.org", loginMethod: "email", role: "staff", passwordHash: staffHash },
   ]);
   console.log(`  Demo login → admin@childflow.org / ${demoPassword}`);
 
@@ -73,6 +73,10 @@ async function main() {
     maxStaff: 30,
   });
   const ORG = 1;
+  // Bind the seeded staff accounts to the org so tenant scoping resolves to a
+  // real organization (the REST layer no longer falls back to "first org").
+  // Only the two staff users exist at this point, so an unfiltered update is safe.
+  await db.update(users).set({ organizationId: ORG });
 
   console.log("Seeding staff…");
   const staffRows = [
@@ -237,14 +241,60 @@ async function main() {
     { childId: 3, organizationId: ORG, type: "home_visit", title: "Educational Home Visit", description: "Shared at-home literacy activities with family.", assessmentDate: daysAgo(15), recordedBy: 2 },
   ]);
 
-  console.log("Seeding PIR data…");
-  await db.insert(pirData).values([
-    { organizationId: ORG, year: "2025-2026", section: "Section A: Program Information", questionId: "A.1", value: "120", updatedBy: 1 },
-    { organizationId: ORG, year: "2025-2026", section: "Section A: Program Information", questionId: "A.10", value: "118", updatedBy: 1 },
-    { organizationId: ORG, year: "2025-2026", section: "Section B: Program Staff", questionId: "B.1", value: "24", updatedBy: 1 },
-    { organizationId: ORG, year: "2025-2026", section: "Section C: Child Health", questionId: "C.19", value: "112", updatedBy: 7 },
-    { organizationId: ORG, year: "2025-2026", section: "Section C: Child Health", questionId: "C.23", value: "104", updatedBy: 7 },
-  ]);
+  console.log("Seeding PIR reports + data…");
+  // Question *definitions* live in pir_questions (run scripts/seed-pir-questions.ts).
+  // Demo *values* are keyed by catalog code so they appear in the PIR editor/viewer.
+  const pirSectionByCode = new Map(
+    (await db.select({ code: pirQuestions.code, section: pirQuestions.section }).from(pirQuestions))
+      .map((q) => [q.code, q.section] as const),
+  );
+  if (pirSectionByCode.size === 0) {
+    console.warn("  ⚠ pir_questions is empty — run `npx tsx scripts/seed-pir-questions.ts` first so PIR demo values map to the catalog.");
+  }
+  const pirValues: Record<string, string | number> = {
+    "program_information.structure.program_type": "Head Start",
+    "program_information.structure.center_based_count": 96,
+    "program_information.enrollment.funded_enrollment": 120,
+    "program_information.enrollment.total_cumulative_enrollment": 138,
+    "program_information.enrollment.avg_daily_attendance_pct": 89,
+    "program_information.eligibility.income_below_100_poverty": 96,
+    "program_information.age.age_3": 40,
+    "program_information.age.age_4": 78,
+    "program_information.race_ethnicity.hispanic_latino": 71,
+    "program_staff.counts.total_paid_staff": 24,
+    "program_staff.teaching_qualifications.total_teachers": 12,
+    "program_staff.teaching_qualifications.baccalaureate_degree": 9,
+    "program_staff.turnover.departed_during_year": 3,
+    "child_family_services.health_insurance_access.medical_home_eoy": 131,
+    "child_family_services.preventive_care.immunizations_up_to_date": 129,
+    "child_family_services.bmi.healthy_weight": 92,
+    "child_family_services.families.total_families": 132,
+    "child_family_services.family_services.housing_assistance": 14,
+    "child_family_services.disabilities.iep_ifsp_total": 18,
+    "grant_level.grant.total_approved_enrollment": 120,
+    "grant_level.facilities.number_of_centers": 6,
+    "grant_level.facilities.cacfp_participation": "true",
+  };
+  // Current year is a partial, in-progress draft; prior years are finished reports.
+  const pirReportSeed = [
+    { year: "2025-2026", status: "draft" as const, submittedAt: null as Date | null, codes: Object.keys(pirValues).slice(0, 9) },
+    { year: "2024-2025", status: "submitted" as const, submittedAt: daysAgo(120), codes: Object.keys(pirValues) },
+    { year: "2023-2024", status: "accepted" as const, submittedAt: daysAgo(500), codes: Object.keys(pirValues) },
+    { year: "2022-2023", status: "accepted" as const, submittedAt: daysAgo(860), codes: Object.keys(pirValues) },
+  ];
+  for (let i = 0; i < pirReportSeed.length; i++) {
+    const r = pirReportSeed[i];
+    const [res] = await db.insert(pirReports).values({ organizationId: ORG, year: r.year, status: r.status, submittedAt: r.submittedAt });
+    const reportId = res.insertId;
+    const rows = r.codes
+      .filter((code) => pirSectionByCode.has(code))
+      .map((code) => {
+        const raw = pirValues[code];
+        const value = typeof raw === "number" ? String(Math.max(0, raw - i * 2)) : raw;
+        return { organizationId: ORG, year: r.year, section: pirSectionByCode.get(code)!, questionId: code, value, reportId, updatedBy: 1 };
+      });
+    if (rows.length) await db.insert(pirData).values(rows);
+  }
 
   console.log("Seeding student notes…");
   await db.insert(studentNotes).values([

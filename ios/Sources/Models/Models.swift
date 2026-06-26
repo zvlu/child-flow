@@ -246,6 +246,165 @@ struct ComplianceData: Codable {
     let checklistItems: [ComplianceChecklistItem]
 }
 
+// MARK: - PIR (Program Information Report) — federal annual report (OMB 0970-0427)
+
+/// One catalog field plus (in a report context) its saved value.
+struct PIRQuestion: Codable, Identifiable {
+    var id: String { code }
+    let code: String
+    let section: String
+    let subsection: String?
+    let label: String
+    /// "integer" | "percent" | "boolean" | "enum" | "text"
+    let valueType: String
+    let options: [String]?
+    /// "enrollment" | "eoy" | nil — fields reported at both points in time.
+    let paired: String?
+    /// Stored value (nil/"" when unanswered). Present on report fetches.
+    var value: String?
+}
+
+/// Full report for one program year: envelope + catalog ⋈ values.
+struct PIRReportDetail: Codable {
+    let year: String
+    /// "draft" | "submitted" | "accepted"
+    let status: String
+    let submittedAt: Date?
+    let totalQuestions: Int
+    let answeredQuestions: Int
+    var questions: [PIRQuestion]
+}
+
+/// A row in the report history list.
+struct PIRReportSummary: Codable, Identifiable {
+    let id: String
+    let year: String
+    let status: String
+    let submittedAt: Date?
+    let total: Int
+    let answered: Int
+}
+
+// MARK: - Daily Reports / Moments (real-time activity feed)
+
+/// One logged moment: meal, nap, diaper, activity, note, or photo.
+struct ActivityLogItem: Codable, Identifiable {
+    let id: String
+    let childId: String
+    /// "meal" | "nap" | "diaper" | "activity" | "note" | "photo"
+    let activityType: String
+    let description: String
+    let timestamp: Date
+    let childName: String
+    let staffName: String
+    /// Optional image/video URL (real storage URL, or an image data URL in dev).
+    var mediaUrl: String? = nil
+    /// "image" | "video" | nil
+    var mediaType: String? = nil
+}
+
+// MARK: - Lesson Planning
+
+struct LessonPlanSummary: Codable, Identifiable {
+    let id: String
+    let classroomId: String
+    let classroomName: String
+    let weekStartDate: String?
+    let title: String
+    let theme: String
+    let status: String
+}
+
+struct LessonActivityItem: Codable, Identifiable {
+    let id: String
+    let dayOfWeek: String
+    let title: String
+    let description: String
+    let domain: String?
+}
+
+struct LessonPlanDetail: Codable {
+    let id: String
+    let classroomName: String
+    let weekStartDate: String?
+    let title: String
+    let theme: String
+    let status: String
+    let activities: [LessonActivityItem]
+}
+
+// MARK: - Child Portfolios
+
+struct PortfolioEntryItem: Codable, Identifiable {
+    let id: String
+    let childId: String
+    let title: String
+    let observation: String
+    let domain: String?
+    let authorName: String?
+    let observedAt: String?
+}
+
+// MARK: - Assessments (education records)
+
+struct AssessmentItem: Codable, Identifiable {
+    let id: String
+    let childId: String
+    /// "assessment" | "parent_conference" | "home_visit" | "individual_plan"
+    let type: String
+    let title: String
+    let description: String
+    let score: String
+    let domain: String
+    let assessmentDate: String?   // YYYY-MM-DD (kept as string; date-only)
+}
+
+// MARK: - Calendar
+
+struct CalendarEventItem: Codable, Identifiable {
+    let id: String
+    let title: String
+    let description: String
+    let eventType: String
+    let startDate: String   // ISO datetime (kept as string)
+    let endDate: String?
+    let location: String
+    let allDay: Int
+}
+
+// MARK: - Meal plans
+
+struct MealPlanItem: Codable, Identifiable {
+    let id: String
+    let classroomName: String
+    let weekStartDate: String?
+    let status: String
+}
+
+struct MealItemRow: Codable, Identifiable {
+    let id: String
+    let dayOfWeek: String
+    let mealType: String
+    let description: String
+    let servings: Int?
+}
+
+// MARK: - Subsidies
+
+struct SubsidyItem: Codable, Identifiable {
+    let id: String
+    let familyId: String
+    let familyName: String
+    let agencyName: String
+    let caseNumber: String
+    let authorizedAmount: String?
+    let copayAmount: String?
+    let status: String
+    let startDate: String?
+    let endDate: String?
+    let notes: String
+}
+
 // MARK: - Reports
 struct GeneratedReport: Codable, Identifiable {
     let id: String
@@ -487,6 +646,7 @@ struct MonthlyContact: Codable, Identifiable {
         case voicemail   = "Voicemail Attempt"
         case homeVisit   = "Home Visit"
         case email       = "Email"
+        case coordinatedServices = "Coordinated Services"
 
         var icon: String {
             switch self {
@@ -497,6 +657,7 @@ struct MonthlyContact: Codable, Identifiable {
             case .voicemail:  return "phone.badge.waveform.fill"
             case .homeVisit:  return "house.fill"
             case .email:      return "envelope.fill"
+            case .coordinatedServices: return "person.2.fill"
             }
         }
     }
@@ -1117,4 +1278,52 @@ struct ClockInRequest: Codable {
 struct ClockOutRequest: Codable {
     let entryId: String
     let timestamp: Date
+}
+
+// MARK: - Staff Activity Report (family-advocate workload)
+
+/// Per-staff workload over a date range. Mirrors `/api/reports/staff-activity`.
+struct StaffActivityReport: Decodable {
+    let types: [String]
+    let totals: StaffActivityTotals
+    let staff: [StaffActivityRow]
+    let detail: [StaffContactDetail]
+}
+
+struct StaffActivityTotals: Decodable {
+    let total: Int
+    let byType: [String: Int]
+}
+
+struct StaffActivityRow: Decodable, Identifiable {
+    let staffId: String?
+    let name: String
+    let position: String
+    let total: Int
+    let byType: [String: Int]
+    let lastActivity: String?
+    var id: String { staffId ?? name }
+}
+
+struct StaffContactDetail: Decodable, Identifiable {
+    let id: String
+    let type: String
+    let serviceDate: String
+    let familyName: String
+    let description: String
+    let followUpRequired: Bool
+}
+
+/// Display label for a family-contact type key (shared by web + iOS).
+func contactTypeLabel(_ key: String) -> String {
+    switch key {
+    case "home_visit": return "Home Visit"
+    case "office_visit": return "Office Visit"
+    case "phone_call": return "Phone Call"
+    case "email": return "Email"
+    case "referral": return "Referral"
+    case "coordinated_services": return "Coordinated Services"
+    case "monthly_contact": return "Monthly Contact"
+    default: return "Other"
+    }
 }

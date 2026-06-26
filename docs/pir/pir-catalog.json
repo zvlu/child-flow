@@ -1,0 +1,380 @@
+{
+  "meta": {
+    "title": "Head Start Program Information Report (PIR) — field catalog",
+    "ombControlNumber": "0970-0427",
+    "description": "Structured catalog of the federal Head Start/Early Head Start Program Information Report, organized by the four official reporting sections. Built for use as a data model + question seed inside the Sprout/ChildFlow app.",
+    "instrumentsUnderThisOMB": [
+      "Program Information Report (PIR) — annual",
+      "Monthly Enrollment — monthly",
+      "Center Locations and Contacts"
+    ],
+    "officialSources": [
+      "https://headstart.gov/program-data/article/program-information-report-pir",
+      "https://www.govinfo.gov/content/pkg/FR-2025-09-17/html/2025-18012.htm",
+      "https://omb.report/icr/202501-0970-008",
+      "https://omb.report/icr/202306-0970-001/doc/132446901"
+    ],
+    "recentChanges2025": [
+      "Added: primary reasons children with an IEP/IFSP did not receive services",
+      "Added: number of children who had a 504 Plan",
+      "Monthly Enrollment: total children (and EHS pregnant women) on the waiting list on the last operating day of the month"
+    ],
+    "fieldCodeConvention": "section.subsection.field — these are app-internal slugs, NOT official OMB question numbers. Backfill the official C.x / B.x numbers from the form PDF.",
+    "accuracyCaveat": "Section taxonomy and field categories are confirmed against federal sources. Exact field wording, response buckets, and official question numbers are revised each program year — RECONCILE this catalog against the current official PIR form PDF before treating it as complete or authoritative.",
+    "valueTypes": ["integer", "percent", "boolean", "enum", "text"],
+    "subject": ["child", "family", "staff", "program", "grant"]
+  },
+  "sections": [
+    {
+      "id": "program_information",
+      "title": "Section A — Program Information",
+      "subsections": [
+        {
+          "id": "structure",
+          "title": "Program structure & options",
+          "fields": [
+            { "code": "program_information.structure.program_type", "label": "Program type", "type": "enum", "options": ["Head Start", "Early Head Start", "Migrant/Seasonal", "AIAN"], "subject": "program" },
+            { "code": "program_information.structure.center_based_count", "label": "Children in center-based option", "type": "integer", "subject": "program" },
+            { "code": "program_information.structure.home_based_count", "label": "Children in home-based option", "type": "integer", "subject": "program" },
+            { "code": "program_information.structure.family_child_care_count", "label": "Children in family child care option", "type": "integer", "subject": "program" },
+            { "code": "program_information.structure.combination_count", "label": "Children in combination option", "type": "integer", "subject": "program" },
+            { "code": "program_information.structure.locally_designed_count", "label": "Children in locally designed option", "type": "integer", "subject": "program" },
+            { "code": "program_information.structure.weeks_of_operation", "label": "Weeks of planned operation", "type": "integer", "subject": "program" },
+            { "code": "program_information.structure.hours_per_day", "label": "Hours of service per day", "type": "integer", "subject": "program" },
+            { "code": "program_information.structure.days_per_week", "label": "Days of service per week", "type": "integer", "subject": "program" }
+          ]
+        },
+        {
+          "id": "enrollment",
+          "title": "Funded & cumulative enrollment",
+          "fields": [
+            { "code": "program_information.enrollment.funded_enrollment", "label": "Funded enrollment", "type": "integer", "subject": "program" },
+            { "code": "program_information.enrollment.total_cumulative_enrollment", "label": "Total cumulative enrollment", "type": "integer", "subject": "program" },
+            { "code": "program_information.enrollment.actual_enrollment", "label": "Actual enrollment (point-in-time)", "type": "integer", "subject": "program" },
+            { "code": "program_information.enrollment.avg_monthly_enrollment_pct", "label": "Average monthly enrollment as % of funded", "type": "percent", "subject": "program" },
+            { "code": "program_information.enrollment.avg_daily_attendance_pct", "label": "Average daily attendance as % of actual", "type": "percent", "subject": "program" }
+          ]
+        },
+        {
+          "id": "eligibility",
+          "title": "Enrollment by eligibility category",
+          "fields": [
+            { "code": "program_information.eligibility.income_below_100_poverty", "label": "Income below 100% of federal poverty line", "type": "integer", "subject": "child" },
+            { "code": "program_information.eligibility.public_assistance", "label": "Receipt of public assistance (TANF/SSI)", "type": "integer", "subject": "child" },
+            { "code": "program_information.eligibility.foster_care", "label": "Foster children", "type": "integer", "subject": "child" },
+            { "code": "program_information.eligibility.homeless", "label": "Homeless children", "type": "integer", "subject": "child" },
+            { "code": "program_information.eligibility.over_income", "label": "Over income", "type": "integer", "subject": "child" },
+            { "code": "program_information.eligibility.between_100_130_poverty", "label": "Income between 100% and 130% of poverty line", "type": "integer", "subject": "child" }
+          ]
+        },
+        {
+          "id": "age",
+          "title": "Enrollment by age",
+          "fields": [
+            { "code": "program_information.age.under_1", "label": "Under 1 year", "type": "integer", "subject": "child" },
+            { "code": "program_information.age.age_1", "label": "1 year old", "type": "integer", "subject": "child" },
+            { "code": "program_information.age.age_2", "label": "2 years old", "type": "integer", "subject": "child" },
+            { "code": "program_information.age.age_3", "label": "3 years old", "type": "integer", "subject": "child" },
+            { "code": "program_information.age.age_4", "label": "4 years old", "type": "integer", "subject": "child" },
+            { "code": "program_information.age.age_5_and_older", "label": "5 years and older", "type": "integer", "subject": "child" },
+            { "code": "program_information.age.pregnant_women", "label": "Pregnant women served (EHS)", "type": "integer", "subject": "family" }
+          ]
+        },
+        {
+          "id": "tenure",
+          "title": "Length of participation",
+          "fields": [
+            { "code": "program_information.tenure.first_year", "label": "First year in program", "type": "integer", "subject": "child" },
+            { "code": "program_information.tenure.second_year", "label": "Second year in program", "type": "integer", "subject": "child" },
+            { "code": "program_information.tenure.third_or_more_year", "label": "Third year or more in program", "type": "integer", "subject": "child" }
+          ]
+        },
+        {
+          "id": "race_ethnicity",
+          "title": "Race & ethnicity",
+          "fields": [
+            { "code": "program_information.race_ethnicity.hispanic_latino", "label": "Hispanic or Latino origin", "type": "integer", "subject": "child" },
+            { "code": "program_information.race_ethnicity.american_indian_alaska_native", "label": "American Indian / Alaska Native", "type": "integer", "subject": "child" },
+            { "code": "program_information.race_ethnicity.asian", "label": "Asian", "type": "integer", "subject": "child" },
+            { "code": "program_information.race_ethnicity.black_african_american", "label": "Black or African American", "type": "integer", "subject": "child" },
+            { "code": "program_information.race_ethnicity.native_hawaiian_pacific_islander", "label": "Native Hawaiian / Pacific Islander", "type": "integer", "subject": "child" },
+            { "code": "program_information.race_ethnicity.white", "label": "White", "type": "integer", "subject": "child" },
+            { "code": "program_information.race_ethnicity.biracial_multiracial", "label": "Biracial / Multi-racial", "type": "integer", "subject": "child" },
+            { "code": "program_information.race_ethnicity.other_unspecified", "label": "Other / unspecified", "type": "integer", "subject": "child" }
+          ]
+        },
+        {
+          "id": "language",
+          "title": "Primary language & dual language learners",
+          "fields": [
+            { "code": "program_information.language.primary_home_language", "label": "Primary language of family at home", "type": "enum", "options": ["English", "Spanish", "Native Central/South American/Mexican languages", "Caribbean languages", "Middle Eastern/South Asian languages", "East Asian languages", "European/Slavic languages", "African languages", "American Indian/Alaska Native languages", "Other"], "subject": "family" },
+            { "code": "program_information.language.dual_language_learners", "label": "Dual language learners", "type": "integer", "subject": "child" }
+          ]
+        },
+        {
+          "id": "transitions",
+          "title": "Children who left & vacancies",
+          "fields": [
+            { "code": "program_information.transitions.children_who_left", "label": "Children who left the program during the year", "type": "integer", "subject": "child" },
+            { "code": "program_information.transitions.reason_moved", "label": "Left: family moved", "type": "integer", "subject": "child" },
+            { "code": "program_information.transitions.reason_no_longer_eligible", "label": "Left: no longer eligible", "type": "integer", "subject": "child" },
+            { "code": "program_information.transitions.reason_other", "label": "Left: other reason", "type": "integer", "subject": "child" },
+            { "code": "program_information.transitions.vacancies_filled_within_30_days", "label": "Vacancies filled within 30 days", "type": "integer", "subject": "program" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "program_staff",
+      "title": "Section B — Program Staff and Qualifications",
+      "subsections": [
+        {
+          "id": "counts",
+          "title": "Staff & volunteer counts",
+          "fields": [
+            { "code": "program_staff.counts.total_paid_staff", "label": "Total paid staff", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.counts.contracted_staff", "label": "Contracted staff", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.counts.total_volunteers", "label": "Total volunteers", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.counts.current_or_former_parent_volunteers", "label": "Volunteers who are current/former Head Start parents", "type": "integer", "subject": "staff" }
+          ]
+        },
+        {
+          "id": "teaching_qualifications",
+          "title": "Child development / teaching staff qualifications",
+          "fields": [
+            { "code": "program_staff.teaching_qualifications.total_teachers", "label": "Total classroom teachers", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.teaching_qualifications.cda_or_equivalent", "label": "Teachers with CDA or state-awarded equivalent", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.teaching_qualifications.associate_degree", "label": "Teachers with an Associate degree", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.teaching_qualifications.baccalaureate_degree", "label": "Teachers with a Baccalaureate degree", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.teaching_qualifications.advanced_degree", "label": "Teachers with an advanced degree", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.teaching_qualifications.degree_in_ece", "label": "Of those, degree is in early childhood education or related field", "type": "integer", "subject": "staff" }
+          ]
+        },
+        {
+          "id": "assistant_teachers",
+          "title": "Assistant teachers",
+          "fields": [
+            { "code": "program_staff.assistant_teachers.total", "label": "Total assistant teachers", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.assistant_teachers.cda_or_enrolled", "label": "Assistant teachers with CDA or enrolled in a program leading to one", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.assistant_teachers.associate_or_higher", "label": "Assistant teachers with Associate degree or higher", "type": "integer", "subject": "staff" }
+          ]
+        },
+        {
+          "id": "home_visitors_fcc",
+          "title": "Home visitors & family child care providers",
+          "fields": [
+            { "code": "program_staff.home_visitors_fcc.home_visitors_total", "label": "Total home visitors", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.home_visitors_fcc.home_visitors_cda", "label": "Home visitors with CDA in home visiting or equivalent", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.home_visitors_fcc.home_visitors_degree", "label": "Home visitors with Associate/Baccalaureate/Advanced degree", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.home_visitors_fcc.fcc_providers_total", "label": "Total family child care providers", "type": "integer", "subject": "staff" }
+          ]
+        },
+        {
+          "id": "managers",
+          "title": "Coordinators & content-area managers",
+          "fields": [
+            { "code": "program_staff.managers.education_child_development", "label": "Education & child development manager(s)", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.managers.health", "label": "Health services manager(s)", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.managers.mental_health", "label": "Mental health manager/consultant(s)", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.managers.disabilities", "label": "Disabilities services manager(s)", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.managers.family_community_partnership", "label": "Family & community partnership manager(s)", "type": "integer", "subject": "staff" }
+          ]
+        },
+        {
+          "id": "turnover",
+          "title": "Staff turnover",
+          "fields": [
+            { "code": "program_staff.turnover.departed_during_year", "label": "Staff who left during the program year", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.turnover.reason_left_for_other_job", "label": "Departed: left for another job", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.turnover.reason_terminated", "label": "Departed: involuntary termination", "type": "integer", "subject": "staff" },
+            { "code": "program_staff.turnover.positions_vacant_over_3_months", "label": "Positions that remained vacant over 3 months", "type": "integer", "subject": "staff" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "child_family_services",
+      "title": "Section C — Child and Family Services",
+      "subsections": [
+        {
+          "id": "health_insurance_access",
+          "title": "Health insurance & access to care",
+          "fields": [
+            { "code": "child_family_services.health_insurance_access.insured_medicaid_chip_enrollment", "label": "Medicaid/CHIP at enrollment", "type": "integer", "subject": "child", "paired": "enrollment" },
+            { "code": "child_family_services.health_insurance_access.insured_medicaid_chip_eoy", "label": "Medicaid/CHIP at end of year", "type": "integer", "subject": "child", "paired": "eoy" },
+            { "code": "child_family_services.health_insurance_access.uninsured_enrollment", "label": "No health insurance at enrollment", "type": "integer", "subject": "child", "paired": "enrollment" },
+            { "code": "child_family_services.health_insurance_access.uninsured_eoy", "label": "No health insurance at end of year", "type": "integer", "subject": "child", "paired": "eoy" },
+            { "code": "child_family_services.health_insurance_access.medical_home_enrollment", "label": "Continuous accessible medical care (medical home) at enrollment", "type": "integer", "subject": "child", "paired": "enrollment" },
+            { "code": "child_family_services.health_insurance_access.medical_home_eoy", "label": "Continuous accessible medical care (medical home) at end of year", "type": "integer", "subject": "child", "paired": "eoy" },
+            { "code": "child_family_services.health_insurance_access.dental_home_enrollment", "label": "Continuous accessible dental care (dental home) at enrollment", "type": "integer", "subject": "child", "paired": "enrollment" },
+            { "code": "child_family_services.health_insurance_access.dental_home_eoy", "label": "Continuous accessible dental care (dental home) at end of year", "type": "integer", "subject": "child", "paired": "eoy" }
+          ]
+        },
+        {
+          "id": "preventive_care",
+          "title": "Preventive & primary health care",
+          "fields": [
+            { "code": "child_family_services.preventive_care.up_to_date_epsdt", "label": "Up-to-date on a schedule of age-appropriate preventive & primary health care (EPSDT)", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.preventive_care.immunizations_up_to_date", "label": "Up-to-date on all possible immunizations", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.preventive_care.immunizations_exempt", "label": "Exempt from immunizations (state law)", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.preventive_care.received_medical_exam", "label": "Received a professional medical exam", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.preventive_care.received_dental_exam", "label": "Received a professional dental exam", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.preventive_care.needed_dental_treatment", "label": "Diagnosed as needing dental treatment", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.preventive_care.received_dental_treatment", "label": "Received/receiving dental treatment", "type": "integer", "subject": "child" }
+          ]
+        },
+        {
+          "id": "health_conditions",
+          "title": "Health conditions & treatment",
+          "fields": [
+            { "code": "child_family_services.health_conditions.needed_medical_treatment", "label": "Diagnosed as needing medical treatment (any condition)", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.health_conditions.received_medical_treatment", "label": "Received/receiving medical treatment", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.health_conditions.asthma", "label": "Diagnosed with asthma", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.health_conditions.anemia", "label": "Diagnosed with anemia", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.health_conditions.vision_problem", "label": "Diagnosed with a vision problem", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.health_conditions.hearing_problem", "label": "Diagnosed with a hearing problem", "type": "integer", "subject": "child" }
+          ]
+        },
+        {
+          "id": "bmi",
+          "title": "Body Mass Index (BMI) categories",
+          "fields": [
+            { "code": "child_family_services.bmi.underweight", "label": "Underweight", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.bmi.healthy_weight", "label": "Healthy weight", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.bmi.overweight", "label": "Overweight", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.bmi.obese", "label": "Obese", "type": "integer", "subject": "child" }
+          ]
+        },
+        {
+          "id": "mental_health",
+          "title": "Mental health services",
+          "fields": [
+            { "code": "child_family_services.mental_health.consultation_provided", "label": "Children for whom a mental health professional consulted with staff/parents", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.mental_health.referred_for_services", "label": "Children referred for mental health services outside Head Start", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.mental_health.received_services", "label": "Children who received mental health services", "type": "integer", "subject": "child" }
+          ]
+        },
+        {
+          "id": "disabilities",
+          "title": "Disabilities / early intervention services",
+          "fields": [
+            { "code": "child_family_services.disabilities.iep_ifsp_total", "label": "Children with an IEP/IFSP (determined eligible for services)", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.disabilities.received_services", "label": "Children with IEP/IFSP who received special education/early intervention services", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.disabilities.reasons_services_not_received", "label": "Primary reasons children with an IEP/IFSP did not receive services (NEW 2025)", "type": "enum", "options": ["Services not yet started", "Parent declined", "Provider unavailable", "Other"], "subject": "child" },
+            { "code": "child_family_services.disabilities.children_with_504_plan", "label": "Number of children who had a 504 Plan (NEW 2025)", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.disabilities.primary_speech_language", "label": "Primary disability: speech or language impairment", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.disabilities.primary_health_impairment", "label": "Primary disability: health impairment", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.disabilities.primary_intellectual", "label": "Primary disability: intellectual disability", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.disabilities.primary_emotional_disturbance", "label": "Primary disability: serious emotional disturbance", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.disabilities.primary_autism", "label": "Primary disability: autism", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.disabilities.primary_hearing", "label": "Primary disability: hearing impairment / deafness", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.disabilities.primary_visual", "label": "Primary disability: visual impairment / blindness", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.disabilities.primary_orthopedic", "label": "Primary disability: orthopedic impairment", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.disabilities.primary_traumatic_brain_injury", "label": "Primary disability: traumatic brain injury", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.disabilities.primary_multiple", "label": "Primary disability: multiple disabilities", "type": "integer", "subject": "child" },
+            { "code": "child_family_services.disabilities.primary_developmental_delay", "label": "Primary disability: developmental delay / non-categorical", "type": "integer", "subject": "child" }
+          ]
+        },
+        {
+          "id": "education",
+          "title": "Education & school readiness",
+          "fields": [
+            { "code": "child_family_services.education.curriculum_used", "label": "Curriculum/curricula used", "type": "text", "subject": "program" },
+            { "code": "child_family_services.education.assessment_tool", "label": "Child assessment tool(s) used", "type": "text", "subject": "program" },
+            { "code": "child_family_services.education.transitioning_to_kindergarten", "label": "Children who will be entering kindergarten next year", "type": "integer", "subject": "child" }
+          ]
+        },
+        {
+          "id": "families",
+          "title": "Family demographics",
+          "fields": [
+            { "code": "child_family_services.families.total_families", "label": "Total number of families", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.families.two_parent", "label": "Two-parent families", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.families.single_parent", "label": "Single-parent families", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.families.parent_employed", "label": "Families with at least one parent employed", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.families.parent_in_school_or_training", "label": "Parents in job training or school", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.families.parent_ed_less_than_hs", "label": "Parent education: less than high school", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.families.parent_ed_hs_or_ged", "label": "Parent education: high school graduate / GED", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.families.parent_ed_some_college", "label": "Parent education: some college / Associate", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.families.parent_ed_baccalaureate_plus", "label": "Parent education: Baccalaureate or higher", "type": "integer", "subject": "family" }
+          ]
+        },
+        {
+          "id": "family_services",
+          "title": "Family services provided",
+          "note": "Each is a count of families that received the service during the program year.",
+          "fields": [
+            { "code": "child_family_services.family_services.emergency_crisis_intervention", "label": "Emergency / crisis intervention", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.housing_assistance", "label": "Housing assistance", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.mental_health_services", "label": "Mental health services", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.substance_abuse", "label": "Substance abuse prevention / treatment", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.esl_training", "label": "English as a Second Language (ESL) training", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.adult_education", "label": "Adult education (GED, post-secondary)", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.job_training", "label": "Job training", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.child_abuse_neglect", "label": "Child abuse and neglect services", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.domestic_violence", "label": "Domestic violence services", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.child_support", "label": "Child support assistance", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.health_education", "label": "Health education", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.asset_building", "label": "Asset building (financial education, savings)", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.parenting_education", "label": "Parenting education", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.relationship_marriage_education", "label": "Relationship / marriage education", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.family_services.families_receiving_any_service", "label": "Families that received at least one service", "type": "integer", "subject": "family" }
+          ]
+        },
+        {
+          "id": "housing_foster",
+          "title": "Homelessness & foster care",
+          "fields": [
+            { "code": "child_family_services.housing_foster.families_experiencing_homelessness", "label": "Families experiencing homelessness served during the year", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.housing_foster.families_acquired_housing", "label": "Families that acquired housing during enrollment", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.housing_foster.children_in_foster_care", "label": "Children in foster care", "type": "integer", "subject": "child" }
+          ]
+        },
+        {
+          "id": "engagement",
+          "title": "Family engagement & governance",
+          "fields": [
+            { "code": "child_family_services.engagement.home_visits_completed", "label": "Home visits completed (family engagement)", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.engagement.parent_teacher_conferences", "label": "Parent-teacher conferences completed", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.engagement.father_engagement", "label": "Fathers/father figures engaged in program activities", "type": "integer", "subject": "family" },
+            { "code": "child_family_services.engagement.policy_council_parents", "label": "Parents participating in program governance (Policy Council)", "type": "integer", "subject": "family" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grant_level",
+      "title": "Section D — Grant Level Questions",
+      "subsections": [
+        {
+          "id": "grant",
+          "title": "Grant & funding",
+          "fields": [
+            { "code": "grant_level.grant.grant_number", "label": "Grant / award number", "type": "text", "subject": "grant" },
+            { "code": "grant_level.grant.total_approved_enrollment", "label": "Total federally approved enrollment", "type": "integer", "subject": "grant" },
+            { "code": "grant_level.grant.federal_funding", "label": "Total federal funding for the budget period", "type": "integer", "subject": "grant" },
+            { "code": "grant_level.grant.non_federal_share", "label": "Non-federal share (in-kind/match)", "type": "integer", "subject": "grant" },
+            { "code": "grant_level.grant.tta_funds", "label": "Training & technical assistance funds", "type": "integer", "subject": "grant" }
+          ]
+        },
+        {
+          "id": "facilities",
+          "title": "Facilities & sessions",
+          "fields": [
+            { "code": "grant_level.facilities.number_of_centers", "label": "Number of centers operated", "type": "integer", "subject": "grant" },
+            { "code": "grant_level.facilities.number_of_classrooms", "label": "Number of classrooms", "type": "integer", "subject": "grant" },
+            { "code": "grant_level.facilities.double_sessions", "label": "Classrooms operating double sessions", "type": "integer", "subject": "grant" },
+            { "code": "grant_level.facilities.cacfp_participation", "label": "Participates in CACFP (food program)", "type": "boolean", "subject": "grant" }
+          ]
+        },
+        {
+          "id": "waiting_list",
+          "title": "Waiting list (Monthly Enrollment instrument)",
+          "fields": [
+            { "code": "grant_level.waiting_list.children_on_waiting_list", "label": "Total children (and EHS pregnant women) on the waiting list on the last operating day of the month (NEW 2025)", "type": "integer", "subject": "grant" }
+          ]
+        }
+      ]
+    }
+  ]
+}

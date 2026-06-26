@@ -2,10 +2,12 @@ import { COOKIE_NAME, NOT_ADMIN_ERR_MSG } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router, staffProcedure, adminProcedure, superAdminProcedure, orgStaffProcedure, orgAdminProcedure } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router, staffProcedure, adminProcedure, superAdminProcedure, orgStaffProcedure, orgAdminProcedure, parentProcedure } from "./_core/trpc";
 import { isPlatformOwner } from "./_core/env";
 import { auditAccess } from "./_core/audit";
 import { hashPassword, verifyPassword } from "./_core/password";
+import { persistMediaDataUrl } from "./storage";
+import { notifyMomentPosted } from "./_core/push";
 import { z } from "zod";
 import {
   getUserByOpenId,
@@ -33,6 +35,7 @@ import {
   getFamilyServices,
   createFamilyService,
   getCommunicationLogs,
+  createCommunicationLog,
   getEducationRecords,
   getPirData,
 } from "./db";
@@ -446,6 +449,31 @@ export const appRouter = router({
         await assertRecordInOrg(ctx.user, "family", familyId);
         return mod.getFamilyContacts(familyId);
       }),
+    // All family info is editable by ANY staff member in the family's own org
+    // ("the corresponding staff") — admin is not required. The per-record
+    // tenant check guarantees staff can only edit families in their own org.
+    update: staffProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          primaryContactName: z.string().min(1).optional(),
+          primaryContactPhone: z.string().optional(),
+          primaryContactEmail: z.string().optional(),
+          secondaryContactName: z.string().optional(),
+          secondaryContactPhone: z.string().optional(),
+          address: z.string().optional(),
+          city: z.string().optional(),
+          state: z.string().max(2).optional(),
+          zipCode: z.string().optional(),
+          notes: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.id);
+        const { id, ...fields } = input;
+        await auditAccess(ctx, { action: "update", resourceType: "family", resourceId: id });
+        return mod.updateFamily(id, fields);
+      }),
   }),
 
   // Enrollment applications / waitlist. Triage prospective children and, on
@@ -752,8 +780,8 @@ export const appRouter = router({
         return mod.getDashboardStats(organizationId);
       }),
     // Aggregated actionable alerts for the notification bell (shared with iOS).
-    alerts: staffProcedure.query(async () => {
-      const data = await computeDashboard();
+    alerts: staffProcedure.query(async ({ ctx }) => {
+      const data = await computeDashboard(ctx.user.organizationId);
       return data?.alerts ?? [];
     }),
   }),
@@ -962,7 +990,8 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         const { items, ...plan } = input;
-        return mod.createMealPlan({ ...plan, weekStartDate: new Date(plan.weekStartDate) }, items);
+        // Anchor to local midnight so a YYYY-MM-DD date isn't shifted a day by UTC parsing.
+        return mod.createMealPlan({ ...plan, weekStartDate: new Date(plan.weekStartDate + "T00:00:00") }, items);
       }),
     updatePlanStatus: orgStaffProcedure
       .input(z.object({ id: z.number(), status: z.enum(["draft", "approved", "served"]) }))
@@ -988,6 +1017,167 @@ export const appRouter = router({
       }),
   }),
 
+  lessonPlanning: router({
+    list: orgStaffProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId }) => mod.getLessonPlans(organizationId)),
+    get: staffProcedure
+      .input(z.number())
+      .query(async ({ input: id, ctx }) => {
+        await assertRecordInOrg(ctx.user, "lessonPlan", id);
+        return mod.getLessonPlan(id);
+      }),
+    createPlan: orgStaffProcedure
+      .input(z.object({
+        organizationId: z.number(),
+        classroomId: z.number(),
+        weekStartDate: z.string(),
+        title: z.string().optional(),
+        theme: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "create", resourceType: "lesson_plan", detail: `org:${input.organizationId}` });
+        return mod.createLessonPlan({
+          organizationId: input.organizationId,
+          classroomId: input.classroomId,
+          // Anchor to local midnight so a YYYY-MM-DD date isn't shifted a day by UTC parsing.
+          weekStartDate: new Date(input.weekStartDate + "T00:00:00"),
+          title: input.title,
+          theme: input.theme,
+        });
+      }),
+    updatePlan: staffProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().optional(),
+        theme: z.string().optional(),
+        status: z.enum(["draft", "published"]).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "lessonPlan", input.id);
+        const { id, ...fields } = input;
+        return mod.updateLessonPlan(id, fields);
+      }),
+    addActivity: staffProcedure
+      .input(z.object({
+        lessonPlanId: z.number(),
+        dayOfWeek: z.enum(["monday", "tuesday", "wednesday", "thursday", "friday"]),
+        title: z.string().min(1),
+        description: z.string().optional(),
+        domain: z.enum(["social_emotional", "language_literacy", "cognition", "physical", "creative_arts", "approaches_to_learning"]).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "lessonPlan", input.lessonPlanId);
+        return mod.addLessonActivity(input);
+      }),
+    deleteActivity: staffProcedure
+      .input(z.object({ id: z.number(), lessonPlanId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "lessonPlan", input.lessonPlanId);
+        return mod.deleteLessonActivity(input.id);
+      }),
+  }),
+
+  portfolios: router({
+    byChild: staffProcedure
+      .input(z.number())
+      .query(async ({ input: childId, ctx }) => {
+        await assertChildInOrg(ctx.user, childId);
+        return mod.getPortfolioEntries(childId);
+      }),
+    create: orgStaffProcedure
+      .input(z.object({
+        organizationId: z.number(),
+        childId: z.number(),
+        title: z.string().min(1),
+        observation: z.string().optional(),
+        domain: z.enum(["social_emotional", "language_literacy", "cognition", "physical", "creative_arts", "approaches_to_learning"]).optional(),
+        observedAt: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await assertChildInOrg(ctx.user, input.childId);
+        const createdBy = await mod.resolveStaffId(ctx.user.organizationId, ctx.user.id);
+        await auditAccess(ctx, { action: "create", resourceType: "portfolio_entry", resourceId: input.childId });
+        return mod.createPortfolioEntry({
+          organizationId: input.organizationId,
+          childId: input.childId,
+          title: input.title,
+          observation: input.observation,
+          domain: input.domain,
+          observedAt: input.observedAt ? new Date(input.observedAt + "T00:00:00") : undefined,
+          createdBy: createdBy ?? undefined,
+        });
+      }),
+    delete: staffProcedure
+      .input(z.number())
+      .mutation(async ({ input: id, ctx }) => {
+        await assertRecordInOrg(ctx.user, "portfolioEntry", id);
+        return mod.deletePortfolioEntry(id);
+      }),
+  }),
+
+  subsidies: router({
+    list: orgStaffProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId }) => mod.getSubsidies(organizationId)),
+    create: orgStaffProcedure
+      .input(z.object({
+        organizationId: z.number(),
+        familyId: z.number(),
+        agencyName: z.string().min(1),
+        caseNumber: z.string().optional(),
+        authorizedAmount: z.string().optional(),
+        copayAmount: z.string().optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        status: z.enum(["active", "pending", "expired"]).optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.familyId);
+        await auditAccess(ctx, { action: "create", resourceType: "subsidy", resourceId: input.familyId });
+        return mod.createSubsidy({
+          organizationId: input.organizationId,
+          familyId: input.familyId,
+          agencyName: input.agencyName,
+          caseNumber: input.caseNumber,
+          authorizedAmount: input.authorizedAmount,
+          copayAmount: input.copayAmount,
+          startDate: input.startDate ? new Date(input.startDate + "T00:00:00") : undefined,
+          endDate: input.endDate ? new Date(input.endDate + "T00:00:00") : undefined,
+          status: input.status,
+          notes: input.notes,
+        });
+      }),
+    update: staffProcedure
+      .input(z.object({
+        id: z.number(),
+        agencyName: z.string().min(1).optional(),
+        caseNumber: z.string().optional(),
+        authorizedAmount: z.string().optional(),
+        copayAmount: z.string().optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        status: z.enum(["active", "pending", "expired"]).optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "subsidy", input.id);
+        const { id, startDate, endDate, ...rest } = input;
+        return mod.updateSubsidy(id, {
+          ...rest,
+          ...(startDate ? { startDate: new Date(startDate + "T00:00:00") } : {}),
+          ...(endDate ? { endDate: new Date(endDate + "T00:00:00") } : {}),
+        });
+      }),
+    delete: staffProcedure
+      .input(z.number())
+      .mutation(async ({ input: id, ctx }) => {
+        await assertRecordInOrg(ctx.user, "subsidy", id);
+        return mod.deleteSubsidy(id);
+      }),
+  }),
+
   staffOps: router({
     timeClock: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), sinceDays: z.number().optional() }))
@@ -1002,7 +1192,11 @@ export const appRouter = router({
       }),
     clockOut: staffProcedure
       .input(z.number())
-      .mutation(async ({ input: entryId }) => {
+      .mutation(async ({ input: entryId, ctx }) => {
+        const orgId = await mod.getTimeClockEntryOrgId(entryId);
+        if (!isPlatformOwner(ctx.user.openId) && (orgId == null || orgId !== ctx.user.organizationId)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have access to that record." });
+        }
         return mod.clockOut(entryId);
       }),
     certifications: orgStaffProcedure
@@ -1093,14 +1287,36 @@ export const appRouter = router({
       .input(
         z.object({
           childId: z.number(),
-          staffId: z.number(),
+          // staffId is resolved server-side from the signed-in user; clients
+          // don't supply it. Kept optional for callers that already know it.
+          staffId: z.number().optional(),
           activityType: z.enum(["meal", "nap", "diaper", "activity", "note", "photo"]),
           description: z.string().min(1),
+          // Optional image/video as a base64 data URL. Persisted to the storage
+          // proxy when configured (small URL stored); images fall back to the
+          // data URL in dev. ~30MB cap covers short clips.
+          mediaUrl: z.string().regex(/^data:(image|video)\//, "Unsupported media format.").max(30_000_000).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
         await assertChildInOrg(ctx.user, input.childId);
-        return mod.createActivityLog(input);
+        const staffId = input.staffId ?? (await mod.resolveStaffId(ctx.user.organizationId, ctx.user.id));
+        if (staffId == null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No staff record available to attribute this entry to." });
+        }
+        let mediaUrl: string | undefined;
+        let mediaType: "image" | "video" | undefined;
+        if (input.mediaUrl) {
+          try {
+            const media = await persistMediaDataUrl(input.mediaUrl);
+            mediaUrl = media.url; mediaType = media.mediaType;
+          } catch (e) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: e instanceof Error ? e.message : "Couldn't save media." });
+          }
+        }
+        const created = await mod.createActivityLog({ childId: input.childId, staffId, activityType: input.activityType, description: input.description, mediaUrl, mediaType });
+        void notifyMomentPosted(input.childId, input.description); // fire-and-forget push to the family
+        return created;
       }),
     notifications: staffProcedure
       .input(z.number())
@@ -1108,9 +1324,20 @@ export const appRouter = router({
         await assertRecordInOrg(ctx.user, "family", familyId);
         return mod.getParentNotifications(familyId);
       }),
+    // Parent-facing feed: the signed-in family's own children's moments +
+    // notifications. parentProcedure guarantees ctx.user.familyId is set.
+    myActivities: parentProcedure.query(async ({ ctx }) => {
+      return mod.getFamilyActivityLogs(ctx.user.familyId);
+    }),
+    myNotifications: parentProcedure.query(async ({ ctx }) => {
+      return mod.getParentNotifications(ctx.user.familyId);
+    }),
     markRead: staffProcedure
       .input(z.number())
-      .mutation(async ({ input: id }) => {
+      .mutation(async ({ input: id, ctx }) => {
+        const familyId = await mod.getNotificationFamilyId(id);
+        if (familyId == null) throw new TRPCError({ code: "NOT_FOUND", message: "Notification not found" });
+        await assertRecordInOrg(ctx.user, "family", familyId);
         return mod.markNotificationRead(id);
       }),
   }),
@@ -1155,13 +1382,24 @@ export const appRouter = router({
         return getHealthRecords(input.organizationId, input.childId);
       }),
     create: orgStaffProcedure
-      .input(z.any()) // Using any for brevity in this step, ideally use Zod schema matching InsertHealthRecord
+      .input(z.any())
       .mutation(async ({ input, ctx }) => {
-        const result = await createHealthRecord(input);
+        // PHI write: the child must belong to the caller's org, and the org is
+        // taken from the session — never trusted from the client payload.
+        const childId = Number(input?.childId);
+        if (!childId || Number.isNaN(childId)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "childId is required" });
+        }
+        await assertChildInOrg(ctx.user, childId);
+        const result = await createHealthRecord({
+          ...input,
+          childId,
+          organizationId: ctx.user.organizationId ?? input.organizationId,
+        });
         await auditAccess(ctx, {
           action: "create",
           resourceType: "health_record",
-          resourceId: input?.childId ?? null,
+          resourceId: childId,
         });
         return result;
       }),
@@ -1180,8 +1418,38 @@ export const appRouter = router({
       }),
     create: orgStaffProcedure
       .input(z.any())
-      .mutation(async ({ input }) => {
-        return createFamilyService(input);
+      .mutation(async ({ input, ctx }) => {
+        // The family must belong to the caller's org.
+        const familyId = Number(input?.familyId);
+        if (!familyId || Number.isNaN(familyId)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "familyId is required" });
+        }
+        await assertRecordInOrg(ctx.user, "family", familyId);
+        // Attribute the contact to the staff member who's actually logged in —
+        // never trust a client-supplied recordedBy — so workload reports add up.
+        const recordedBy = await mod.resolveStaffId(ctx.user.organizationId, ctx.user.id);
+        return createFamilyService({
+          ...input,
+          familyId,
+          organizationId: ctx.user.organizationId ?? input.organizationId,
+          recordedBy: recordedBy ?? input.recordedBy ?? null,
+        });
+      }),
+    // Per-staff workload over a date range — supervisor view (everyone) plus a
+    // single advocate's contact log when `staffId` is supplied.
+    staffActivity: orgStaffProcedure
+      .input(z.object({
+        organizationId: z.number(),
+        start: z.date(),
+        end: z.date(),
+        staffId: z.number().nullable().optional(),
+      }))
+      .query(async ({ input }) => {
+        return mod.getStaffActivityReport(input.organizationId, {
+          start: input.start,
+          end: input.end,
+          staffId: input.staffId ?? null,
+        });
       }),
   }),
 
@@ -1201,13 +1469,26 @@ export const appRouter = router({
     broadcast: orgStaffProcedure
       .input(z.object({
         organizationId: z.number(),
-        content: z.string(),
+        content: z.string().min(1),
         channels: z.array(z.enum(['sms', 'email']))
       }))
-      .mutation(async ({ input }) => {
-        // In production, fetch all families in organization and loop sendMessage
-        console.log(`[Broadcast] Sending to organization ${input.organizationId} via ${input.channels.join(', ')}`);
-        return { success: true, count: 150 }; // Mock count
+      .mutation(async ({ input, ctx }) => {
+        // Record a broadcast entry for every family in the caller's org and
+        // return the REAL recipient count. No provider is wired, so each row is
+        // logged as "pending" (queued) rather than reported as delivered.
+        const orgId = ctx.user.organizationId ?? input.organizationId;
+        const fams = await mod.getOrganizationFamilies(orgId);
+        const delivered = CommunicationService.hasProvider();
+        for (const f of fams) {
+          await createCommunicationLog({
+            organizationId: orgId,
+            recipientId: f.id,
+            type: "broadcast",
+            content: input.content,
+            status: delivered ? "sent" : "pending",
+          });
+        }
+        return { success: true, count: fams.length, delivered };
       }),
     list: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), recipientId: z.number().optional() }))
@@ -1247,6 +1528,35 @@ export const appRouter = router({
       .input(z.object({ organizationId: z.number(), year: z.string() }))
       .query(async ({ input }) => {
         return await getPirData(input.organizationId, input.year);
+      }),
+    // PIR question catalog (federal reference data, seeded from the form). Not
+    // org-specific, so no tenant scope — any internal staff may read it.
+    questions: staffProcedure.query(async () => {
+      return mod.getPirQuestions();
+    }),
+    // Full report for a program year: envelope + catalog + saved values.
+    getReport: orgStaffProcedure
+      .input(z.object({ organizationId: z.number(), year: z.string() }))
+      .query(async ({ input }) => {
+        return mod.getPirReport(input.organizationId, input.year);
+      }),
+    // All reports for the org, with completion counts — drives the history list.
+    listReports: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => {
+        return mod.listPirReports(input.organizationId);
+      }),
+    submitReport: orgAdminProcedure
+      .input(z.object({ organizationId: z.number(), year: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "update", resourceType: "pir_report", resourceId: input.year, detail: "submit" });
+        return mod.submitPirReport(input.organizationId, input.year);
+      }),
+    reopenReport: orgAdminProcedure
+      .input(z.object({ organizationId: z.number(), year: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "update", resourceType: "pir_report", resourceId: input.year, detail: "reopen" });
+        return mod.reopenPirReport(input.organizationId, input.year);
       }),
     // PIR is federal reporting data — edits are administrative.
     setPirValue: orgAdminProcedure

@@ -469,6 +469,13 @@ export async function getCommunicationLogs(organizationId: number, recipientId?:
   return await db.select().from(communicationLogs).where(eq(communicationLogs.organizationId, organizationId));
 }
 
+export async function createCommunicationLog(data: typeof communicationLogs.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [result] = await db.insert(communicationLogs).values(data);
+  return { id: result.insertId };
+}
+
 export async function getEducationRecords(organizationId: number, childId?: number) {
   const db = await getDb();
   if (!db) return [];

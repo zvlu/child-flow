@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
+import { objectsToCsv, downloadCsv } from "@/lib/csv";
 
 type AttendanceStatus = "present" | "absent" | "excused" | "half_day";
 
@@ -118,6 +119,18 @@ export default function Attendance() {
   const excusedCount = roster.filter(c => statusOf(c.id) === "excused").length;
   const rate = roster.length > 0 ? Math.round((presentCount / roster.length) * 100) : 0;
 
+  const exportAttendance = () => {
+    if (filtered.length === 0) { toast.message("No roster to export."); return; }
+    const rows = filtered.map((c) => ({
+      child: c.name,
+      classroom: c.classroom,
+      status: statusConfig[statusOf(c.id)].label,
+      date: date.toLocaleDateString(),
+    }));
+    downloadCsv(`attendance-${date.toISOString().slice(0, 10)}.csv`, objectsToCsv(rows));
+    toast.success(`Exported ${rows.length} attendance record${rows.length === 1 ? "" : "s"} to CSV`);
+  };
+
   const setStatus = (id: number, status: AttendanceStatus) => {
     setAttendance(prev => ({ ...prev, [id]: status }));
   };
@@ -166,7 +179,7 @@ export default function Attendance() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />Export</Button>
+          <Button variant="outline" size="sm" className="gap-2" onClick={exportAttendance}><Download className="h-4 w-4" />Export</Button>
           <Button size="sm" className="gap-2" onClick={handleSave} disabled={saveMutation.isPending || isRosterLoading}>
             {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Save Attendance

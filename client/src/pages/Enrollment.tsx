@@ -14,6 +14,7 @@ import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { dateInputToLocal } from "@/lib/date";
+import { Glossary } from "@/components/Glossary";
 
 const INCOME_LABEL: Record<string, string> = {
   below_100: "Below 100% FPL",
@@ -129,7 +130,7 @@ export default function Enrollment() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Enrollment</h1>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-1.5">Enrollment <Glossary term="ERSEA" /></h1>
           <p className="text-muted-foreground text-sm mt-0.5">Manage applications, waitlist, and enrollment processes</p>
         </div>
         <Dialog open={showNewForm} onOpenChange={setShowNewForm}>

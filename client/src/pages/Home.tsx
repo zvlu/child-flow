@@ -146,7 +146,7 @@ export default function Home() {
       <main className="relative z-10 mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 text-center">
         {/* Logo mark — gentle float + spring on hover */}
         <motion.div
-          className="mb-7 inline-flex h-20 w-20 items-center justify-center rounded-3xl text-white"
+          className="mb-7 inline-flex h-20 w-20 items-center justify-center rounded-xl text-white"
           style={{ background: "#4F7C5D", boxShadow: "0 16px 40px -12px rgba(79,124,93,0.55)" }}
           animate={float}
           transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
@@ -184,7 +184,7 @@ export default function Home() {
             return (
               <motion.div
                 key={s.label}
-                className="rounded-2xl border border-white/60 bg-white/55 px-4 py-5 backdrop-blur-md"
+                className="rounded-xl border border-white/60 bg-card/55 px-4 py-5 backdrop-blur-md"
                 whileHover={reduced ? undefined : { y: -4 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
               >

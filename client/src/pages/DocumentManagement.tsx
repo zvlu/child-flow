@@ -58,36 +58,36 @@ export function DocumentManagement() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">
+          <h1 className="text-4xl font-bold text-foreground mb-2">
             Document Management
           </h1>
-          <p className="text-slate-600">
+          <p className="text-muted-foreground">
             Securely store and manage digital documents for children and families
           </p>
         </div>
 
         {/* Action Bar */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 mb-6 border border-slate-200">
+        <div className="bg-card rounded-xl shadow-sm p-6 mb-6 border border-border">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="flex-1 flex gap-4 w-full md:w-auto">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-3 text-slate-400 w-5 h-5" />
+                <Search className="absolute left-3 top-3 text-muted-foreground w-5 h-5" />
                 <input
                   type="text"
                   placeholder="Search by child name or file..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                  className="w-full pl-10 pr-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
                 />
               </div>
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                className="px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                className="px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
               >
                 <option value="all">All Types</option>
                 {documentTypes.map((type) => (
@@ -112,7 +112,7 @@ export function DocumentManagement() {
           {filteredDocuments.map((doc) => (
             <div
               key={doc.id}
-              className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow"
+              className="bg-card rounded-xl shadow-sm border border-border p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -120,32 +120,32 @@ export function DocumentManagement() {
                     <FileText className="w-6 h-6 text-[#4F7C5D]" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-slate-900">
+                    <h3 className="font-semibold text-foreground">
                       {doc.childName}
                     </h3>
-                    <p className="text-sm text-slate-600">{doc.documentType}</p>
+                    <p className="text-sm text-muted-foreground">{doc.documentType}</p>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-3 mb-4">
-                <div className="bg-slate-50 p-3 rounded-xl">
-                  <p className="text-sm font-mono text-slate-700 truncate">
+                <div className="bg-muted p-3 rounded-xl">
+                  <p className="text-sm font-mono text-muted-foreground truncate">
                     {doc.fileName}
                   </p>
-                  <p className="text-xs text-slate-500 mt-1">{doc.fileSize}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{doc.fileSize}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
-                    <p className="text-slate-600 text-xs">Uploaded</p>
-                    <p className="font-medium text-slate-900">
+                    <p className="text-muted-foreground text-xs">Uploaded</p>
+                    <p className="font-medium text-foreground">
                       {doc.uploadedDate}
                     </p>
                   </div>
                   {doc.expiryDate && (
                     <div>
-                      <p className="text-slate-600 text-xs">Expires</p>
+                      <p className="text-muted-foreground text-xs">Expires</p>
                       <p className="font-medium text-red-600">
                         {doc.expiryDate}
                       </p>
@@ -153,13 +153,13 @@ export function DocumentManagement() {
                   )}
                 </div>
 
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Uploaded by: {doc.uploadedBy}
                 </p>
               </div>
 
               <div className="flex gap-2">
-                <button className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                <button className="flex-1 bg-muted hover:bg-muted text-muted-foreground px-4 py-2 rounded-xl flex items-center justify-center gap-2 transition-colors">
                   <Download className="w-4 h-4" />
                   Download
                 </button>
@@ -172,12 +172,12 @@ export function DocumentManagement() {
         </div>
 
         {filteredDocuments.length === 0 && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center">
-            <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-12 text-center">
+            <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
               No documents found
             </h3>
-            <p className="text-slate-600">
+            <p className="text-muted-foreground">
               Upload your first document to get started
             </p>
           </div>
@@ -186,17 +186,17 @@ export function DocumentManagement() {
         {/* Upload Modal */}
         {showUploadModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-6">
-              <h2 className="text-2xl font-bold text-slate-900 mb-4">
+            <div className="bg-card rounded-xl shadow-lg max-w-md w-full p-6">
+              <h2 className="text-2xl font-bold text-foreground mb-4">
                 Upload Document
               </h2>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Select Child
                   </label>
-                  <select className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
+                  <select className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
                     <option>Emma Johnson</option>
                     <option>Liam Chen</option>
                     <option>Sophia Rodriguez</option>
@@ -204,10 +204,10 @@ export function DocumentManagement() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Document Type
                   </label>
-                  <select className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
+                  <select className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
                     {documentTypes.map((type) => (
                       <option key={type}>{type}</option>
                     ))}
@@ -215,34 +215,34 @@ export function DocumentManagement() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     File
                   </label>
                   <div className="border-2 border-dashed border-[#A7C4AD] rounded-xl p-6 text-center cursor-pointer hover:border-[#5E8C6A] transition-colors">
                     <Upload className="w-8 h-8 text-[#4F7C5D] mx-auto mb-2" />
-                    <p className="text-sm text-slate-700 font-medium">
+                    <p className="text-sm text-muted-foreground font-medium">
                       Click to upload or drag and drop
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground">
                       PDF, DOC, DOCX up to 10MB
                     </p>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Expiry Date (Optional)
                   </label>
                   <input
                     type="date"
-                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
                   />
                 </div>
 
                 <div className="flex gap-3 pt-4">
                   <button
                     onClick={() => setShowUploadModal(false)}
-                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl transition-colors font-medium"
+                    className="flex-1 bg-muted hover:bg-muted text-muted-foreground px-4 py-2 rounded-xl transition-colors font-medium"
                   >
                     Cancel
                   </button>

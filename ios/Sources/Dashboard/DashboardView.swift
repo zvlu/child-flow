@@ -5,6 +5,7 @@ struct DashboardView: View {
     @StateObject private var clockViewModel = ClockInViewModel()
     @EnvironmentObject var appState: AppState
     @State private var showMenu = false
+    @State private var showSearch = false
 
     var body: some View {
         NavigationStack {
@@ -13,7 +14,7 @@ struct DashboardView: View {
 
                 ScrollView {
                     VStack(spacing: 0) {
-                        DashboardHeader(userName: appState.currentUser?.fullName ?? "", onMenuTap: { showMenu = true })
+                        DashboardHeader(userName: appState.currentUser?.fullName ?? "", onMenuTap: { showMenu = true }, onSearchTap: { showSearch = true })
 
                         VStack(spacing: 20) {
                             // Clock Widget
@@ -96,6 +97,7 @@ struct DashboardView: View {
                 await clockViewModel.load()
             }
             .sheet(isPresented: $showMenu) { AppMenuSheet() }
+            .sheet(isPresented: $showSearch) { GlobalSearchView() }
         }
     }
 }
@@ -445,6 +447,7 @@ struct AgendaEventRow: View {
 struct DashboardHeader: View {
     let userName: String
     var onMenuTap: (() -> Void)? = nil
+    var onSearchTap: (() -> Void)? = nil
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -490,6 +493,12 @@ struct DashboardHeader: View {
                     }
                     Spacer()
                     HStack(spacing: 18) {
+                        Button(action: { onSearchTap?() }) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundColor(.white.opacity(0.85))
+                        }
+                        .accessibilityLabel("Search children and families")
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: "bell.fill")
                                 .font(.system(size: 20))

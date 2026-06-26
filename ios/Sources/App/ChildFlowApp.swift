@@ -4,6 +4,7 @@ import UIKit
 @main
 struct ChildFlowApp: App {
     @StateObject private var appState = AppState()
+    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -33,6 +34,9 @@ struct ChildFlowApp: App {
                 }
             }
             .environmentObject(appState)
+            .onChange(of: appState.isAuthenticated) { _, isAuth in
+                if isAuth { requestPushAuthorization() }
+            }
             .onChange(of: scenePhase) { _, phase in
                 switch phase {
                 case .background: appState.noteBackgrounded()

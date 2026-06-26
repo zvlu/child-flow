@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Apple, Plus, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Glossary } from "@/components/Glossary";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
@@ -130,14 +131,14 @@ export function MealPlanning() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Apple className="w-8 h-8 text-[#4F7C5D]" />
-              <h1 className="text-4xl font-bold text-slate-900">CACFP Meal Planning</h1>
+              <h1 className="text-4xl font-bold text-foreground flex items-center gap-2">CACFP Meal Planning <Glossary term="CACFP" /></h1>
             </div>
             <button onClick={() => setShowModal(true)} className="bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
               <Plus className="w-5 h-5" />
@@ -148,45 +149,45 @@ export function MealPlanning() {
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <p className="text-slate-600 text-sm font-medium">Total Plans</p>
-            <p className="text-3xl font-bold text-slate-900 mt-2">{allPlans.length}</p>
+          <div className="bg-card rounded-xl shadow-sm border border-border p-6">
+            <p className="text-muted-foreground text-sm font-medium">Total Plans</p>
+            <p className="text-3xl font-bold text-foreground mt-2">{allPlans.length}</p>
           </div>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <p className="text-slate-600 text-sm font-medium">Meals Served (CACFP Reports)</p>
+          <div className="bg-card rounded-xl shadow-sm border border-border p-6">
+            <p className="text-muted-foreground text-sm font-medium">Meals Served (CACFP Reports)</p>
             <p className="text-3xl font-bold text-green-600 mt-2">{totalMealsServed.toLocaleString()}</p>
           </div>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <p className="text-slate-600 text-sm font-medium">CACFP Compliant (Selected Plan)</p>
+          <div className="bg-card rounded-xl shadow-sm border border-border p-6">
+            <p className="text-muted-foreground text-sm font-medium">CACFP Compliant (Selected Plan)</p>
             <p className="text-3xl font-bold text-blue-600 mt-2">{compliantPct != null ? `${compliantPct}%` : "—"}</p>
           </div>
         </div>
 
         {/* Meal Plans */}
         {plansLoading ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-10 text-center text-slate-500 mb-8">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-10 text-center text-muted-foreground mb-8">
             <Loader2 className="w-5 h-5 animate-spin inline-block mr-2 align-middle" />
             Loading meal plans...
           </div>
         ) : allPlans.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-10 text-center mb-8">
-            <Apple className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-600">No meal plans yet. Create one to get started.</p>
+          <div className="bg-card rounded-xl shadow-sm border border-border p-10 text-center mb-8">
+            <Apple className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-muted-foreground">No meal plans yet. Create one to get started.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             {allPlans.map((plan) => (
-              <div key={plan.id} onClick={() => setSelectedPlanId(plan.id)} className={`rounded-2xl shadow-sm border-2 p-6 cursor-pointer transition-all ${effectivePlanId === plan.id ? "border-[#5E8C6A] bg-[#F1F6F2]" : "border-slate-200 bg-white hover:border-[#A7C4AD]"}`}>
+              <div key={plan.id} onClick={() => setSelectedPlanId(plan.id)} className={`rounded-xl shadow-sm border-2 p-6 cursor-pointer transition-all ${effectivePlanId === plan.id ? "border-[#5E8C6A] bg-[#F1F6F2]" : "border-border bg-card hover:border-[#A7C4AD]"}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h3 className="font-semibold text-slate-900">{formatWeek(plan.weekStartDate)}</h3>
-                    <p className="text-sm text-slate-600">{plan.classroomName || `Classroom #${plan.classroomId}`}</p>
+                    <h3 className="font-semibold text-foreground">{formatWeek(plan.weekStartDate)}</h3>
+                    <p className="text-sm text-muted-foreground">{plan.classroomName || `Classroom #${plan.classroomId}`}</p>
                   </div>
                   <div className={`px-3 py-1 rounded-full text-xs font-semibold ${plan.status === "approved" ? "bg-green-100 text-green-700" : plan.status === "served" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"}`}>
                     {plan.status.charAt(0).toUpperCase() + plan.status.slice(1)}
                   </div>
                 </div>
-                <p className="text-sm text-slate-600">Week of {new Date(plan.weekStartDate).toLocaleDateString()}</p>
+                <p className="text-sm text-muted-foreground">Week of {new Date(plan.weekStartDate).toLocaleDateString()}</p>
               </div>
             ))}
           </div>
@@ -194,9 +195,9 @@ export function MealPlanning() {
 
         {/* Meal Details */}
         {selectedPlan && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-6 mb-8">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-slate-900">Weekly Menu</h2>
+              <h2 className="text-2xl font-bold text-foreground">Weekly Menu</h2>
               <div className="flex gap-2">
                 {isAdmin && selectedPlan.status === "draft" && (
                   <button
@@ -223,24 +224,24 @@ export function MealPlanning() {
             </div>
 
             {itemsLoading ? (
-              <div className="py-10 text-center text-slate-500">
+              <div className="py-10 text-center text-muted-foreground">
                 <Loader2 className="w-5 h-5 animate-spin inline-block mr-2 align-middle" />
                 Loading menu...
               </div>
             ) : itemsByDay.length === 0 ? (
-              <div className="py-10 text-center text-slate-500">No menu items in this plan yet.</div>
+              <div className="py-10 text-center text-muted-foreground">No menu items in this plan yet.</div>
             ) : (
               <div className="space-y-4">
                 {itemsByDay.map(({ day, meals }) => (
-                  <div key={day} className="border border-slate-200 rounded-xl p-4">
-                    <h3 className="font-semibold text-slate-900 mb-3">{DAY_LABELS[day]}</h3>
-                    <div className={`grid grid-cols-1 md:grid-cols-${Math.min(Math.max(mealTypesPresent.length, 1), 4)} gap-4`}>
+                  <div key={day} className="border border-border rounded-xl p-4">
+                    <h3 className="font-semibold text-foreground mb-3">{DAY_LABELS[day]}</h3>
+                    <div className={`grid grid-cols-1 ${["", "md:grid-cols-1", "md:grid-cols-2", "md:grid-cols-3", "md:grid-cols-4"][Math.min(Math.max(mealTypesPresent.length, 1), 4)]} gap-4`}>
                       {meals.map(({ type, item }) => (
                         <div key={type}>
-                          <p className="text-xs text-slate-600 font-medium mb-1">{MEAL_TYPE_LABELS[type]}</p>
-                          <p className="text-sm text-slate-900">{item!.description}</p>
+                          <p className="text-xs text-muted-foreground font-medium mb-1">{MEAL_TYPE_LABELS[type]}</p>
+                          <p className="text-sm text-foreground">{item!.description}</p>
                           {item!.servings != null && (
-                            <p className="text-xs text-slate-500 mt-1">{item!.servings} servings</p>
+                            <p className="text-xs text-muted-foreground mt-1">{item!.servings} servings</p>
                           )}
                         </div>
                       ))}
@@ -273,31 +274,31 @@ export function MealPlanning() {
         )}
 
         {/* CACFP Reports */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200">
-            <h2 className="text-xl font-bold text-slate-900">CACFP Monthly Reports</h2>
+        <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+          <div className="px-6 py-4 border-b border-border">
+            <h2 className="text-xl font-bold text-foreground">CACFP Monthly Reports</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
+              <thead className="bg-muted border-b border-border">
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Month</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Meals Served</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Reimbursement</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Status</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Month</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Meals Served</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Reimbursement</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {(cacfpReports ?? []).length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">No CACFP reports yet.</td>
+                    <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">No CACFP reports yet.</td>
                   </tr>
                 )}
                 {(cacfpReports ?? []).map((report) => (
-                  <tr key={report.id} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{formatMonth(report.reportMonth)}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{(report.mealsServed || 0).toLocaleString()}</td>
-                    <td className="px-6 py-4 text-sm font-semibold text-slate-900">{formatMoney(report.reimbursementAmount)}</td>
+                  <tr key={report.id} className="border-b border-border hover:bg-muted transition-colors">
+                    <td className="px-6 py-4 text-sm font-medium text-foreground">{formatMonth(report.reportMonth)}</td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">{(report.mealsServed || 0).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm font-semibold text-foreground">{formatMoney(report.reimbursementAmount)}</td>
                     <td className="px-6 py-4 text-sm">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${reportStatusColors[report.status] || "bg-gray-100 text-gray-700"}`}>
                         {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
@@ -313,13 +314,13 @@ export function MealPlanning() {
         {/* Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-lg max-w-2xl w-full p-6">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6">Create New Meal Plan</h2>
+            <div className="bg-card rounded-xl shadow-lg max-w-2xl w-full p-6">
+              <h2 className="text-2xl font-bold text-foreground mb-6">Create New Meal Plan</h2>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Classroom</label>
-                    <select value={newClassroomId} onChange={(e) => setNewClassroomId(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Classroom</label>
+                    <select value={newClassroomId} onChange={(e) => setNewClassroomId(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
                       <option value="">Select classroom...</option>
                       {(classrooms ?? []).map((c) => (
                         <option key={c.id} value={c.id}>{c.name}</option>
@@ -327,18 +328,18 @@ export function MealPlanning() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Week Starting</label>
-                    <input type="date" value={newWeekStart} onChange={(e) => setNewWeekStart(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]" />
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Week Starting</label>
+                    <input type="date" value={newWeekStart} onChange={(e) => setNewWeekStart(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]" />
                   </div>
                 </div>
                 {selectedPlan && planItems.length > 0 && (
-                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <input type="checkbox" checked={copyFromSelected} onChange={(e) => setCopyFromSelected(e.target.checked)} className="rounded border-slate-300 text-[#4F7C5D] focus:ring-[#5E8C6A]" />
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <input type="checkbox" checked={copyFromSelected} onChange={(e) => setCopyFromSelected(e.target.checked)} className="rounded border-border text-[#4F7C5D] focus:ring-[#5E8C6A]" />
                     Copy menu items from selected plan ({formatWeek(selectedPlan.weekStartDate)}, {selectedPlan.classroomName})
                   </label>
                 )}
                 <div className="flex gap-3 pt-4">
-                  <button onClick={() => setShowModal(false)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
+                  <button onClick={() => setShowModal(false)} className="flex-1 bg-muted hover:bg-muted text-muted-foreground px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
                   <button onClick={handleCreatePlan} disabled={createPlan.isPending} className="flex-1 bg-[#4F7C5D] hover:bg-[#3C5E47] disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium">
                     {createPlan.isPending ? "Creating..." : "Create Plan"}
                   </button>

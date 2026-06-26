@@ -15,10 +15,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Home, Phone, Mail, MapPin, Calendar, CheckCircle2, Clock, Users, Heart, BookOpen, Loader2 } from "lucide-react";
+import { Search, Plus, Home, Phone, Mail, MapPin, Calendar, CheckCircle2, Clock, Users, Heart, BookOpen, Loader2, Pencil } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
+import { Glossary } from "@/components/Glossary";
 
 const SERVICE_TYPE_LABELS: Record<string, string> = {
   home_visit: "Home Visit",
@@ -26,6 +27,8 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
   phone_call: "Phone Call",
   email: "Email",
   referral: "Referral",
+  coordinated_services: "Coordinated Services",
+  monthly_contact: "Monthly Contact",
   other: "Other",
 };
 
@@ -46,6 +49,18 @@ export default function FamilyServices() {
   const [logFollowUp, setLogFollowUp] = useState(false);
   const [logFollowUpDate, setLogFollowUpDate] = useState("");
 
+  // Edit-family dialog: any staff member can edit every field of a family in
+  // their org. Form holds all editable family columns as strings.
+  const emptyEditForm = {
+    id: 0,
+    primaryContactName: "", primaryContactPhone: "", primaryContactEmail: "",
+    secondaryContactName: "", secondaryContactPhone: "",
+    address: "", city: "", state: "", zipCode: "", notes: "",
+  };
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState(emptyEditForm);
+  const setEditField = (k: keyof typeof emptyEditForm, v: string) => setEditForm(prev => ({ ...prev, [k]: v }));
+
   const utils = trpc.useUtils();
   const { data: families, isLoading: familiesLoading } = trpc.families.list.useQuery(ORGANIZATION_ID);
   const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID);
@@ -64,6 +79,41 @@ export default function FamilyServices() {
     },
     onError: (error) => toast.error(`Failed to log contact: ${error.message}`),
   });
+
+  const updateFamily = trpc.families.update.useMutation({
+    onSuccess: () => {
+      utils.families.list.invalidate(ORGANIZATION_ID);
+      toast.success("Family information updated.");
+      setEditOpen(false);
+    },
+    onError: (error) => toast.error(`Failed to update family: ${error.message}`),
+  });
+
+  const openEditDialog = (family: NonNullable<typeof families>[number]) => {
+    setEditForm({
+      id: family.id,
+      primaryContactName: family.primaryContactName ?? "",
+      primaryContactPhone: family.primaryContactPhone ?? "",
+      primaryContactEmail: family.primaryContactEmail ?? "",
+      secondaryContactName: family.secondaryContactName ?? "",
+      secondaryContactPhone: family.secondaryContactPhone ?? "",
+      address: family.address ?? "",
+      city: family.city ?? "",
+      state: family.state ?? "",
+      zipCode: family.zipCode ?? "",
+      notes: family.notes ?? "",
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm.primaryContactName.trim()) {
+      toast.error("Primary contact name is required.");
+      return;
+    }
+    updateFamily.mutate(editForm);
+  };
 
   const childrenByFamily = useMemo(() => {
     const map = new Map<number, string[]>();
@@ -140,8 +190,8 @@ export default function FamilyServices() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Family Services</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">Manage family partnerships, goals, and community resources</p>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-1.5">Family Services <Glossary term="CFCR" /></h1>
+          <p className="text-muted-foreground text-sm mt-0.5">Manage family partnerships, goals, and community resources. View advocate workload in Reports → Staff Activity.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" className="gap-2" onClick={() => openLogDialog()}><Plus className="h-4 w-4" />Log Contact</Button>
@@ -266,7 +316,7 @@ export default function FamilyServices() {
                         <Button variant="outline" size="sm" className="flex-1 text-xs gap-1" onClick={() => openLogDialog(family.id)}>
                           <Home className="h-3.5 w-3.5" />Log Visit
                         </Button>
-                        <Button variant="outline" size="sm" className="flex-1 text-xs gap-1"><BookOpen className="h-3.5 w-3.5" />View File</Button>
+                        <Button variant="outline" size="sm" className="flex-1 text-xs gap-1" onClick={() => openEditDialog(family)}><Pencil className="h-3.5 w-3.5" />Edit</Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -442,6 +492,73 @@ export default function FamilyServices() {
               <Button type="submit" disabled={createService.isPending}>
                 {createService.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 Save Contact
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Family Dialog — any staff member can edit all info for a family in their org */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
+          <form onSubmit={handleEditSubmit}>
+            <DialogHeader>
+              <DialogTitle>Edit Family</DialogTitle>
+              <DialogDescription>Update contact and address details. Changes save for everyone on your team.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <label className="text-xs font-medium text-muted-foreground uppercase">Primary Contact Name</label>
+                <Input value={editForm.primaryContactName} onChange={e => setEditField("primaryContactName", e.target.value)} placeholder="Full name" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase">Primary Phone</label>
+                  <Input value={editForm.primaryContactPhone} onChange={e => setEditField("primaryContactPhone", e.target.value)} placeholder="(555) 555-1234" />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase">Primary Email</label>
+                  <Input value={editForm.primaryContactEmail} onChange={e => setEditField("primaryContactEmail", e.target.value)} placeholder="parent@email.com" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase">Secondary Contact</label>
+                  <Input value={editForm.secondaryContactName} onChange={e => setEditField("secondaryContactName", e.target.value)} placeholder="Full name" />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase">Secondary Phone</label>
+                  <Input value={editForm.secondaryContactPhone} onChange={e => setEditField("secondaryContactPhone", e.target.value)} placeholder="(555) 555-5678" />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-xs font-medium text-muted-foreground uppercase">Address</label>
+                <Input value={editForm.address} onChange={e => setEditField("address", e.target.value)} placeholder="Street address" />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="grid gap-2 col-span-1">
+                  <label className="text-xs font-medium text-muted-foreground uppercase">City</label>
+                  <Input value={editForm.city} onChange={e => setEditField("city", e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase">State</label>
+                  <Input value={editForm.state} maxLength={2} onChange={e => setEditField("state", e.target.value.toUpperCase())} placeholder="CT" />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase">Zip</label>
+                  <Input value={editForm.zipCode} onChange={e => setEditField("zipCode", e.target.value)} />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-xs font-medium text-muted-foreground uppercase">Notes</label>
+                <Textarea value={editForm.notes} onChange={e => setEditField("notes", e.target.value)} placeholder="Anything the team should know…" className="min-h-[80px]" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={updateFamily.isPending}>
+                {updateFamily.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Save Changes
               </Button>
             </DialogFooter>
           </form>

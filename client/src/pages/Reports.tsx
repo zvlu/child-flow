@@ -14,6 +14,7 @@ import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { objectsToCsv, downloadCsv } from "@/lib/csv";
+import { StaffActivityReport } from "@/components/StaffActivityReport";
 
 const attendanceByMonth = [
   { month: "Sep", rate: 88 }, { month: "Oct", rate: 91 }, { month: "Nov", rate: 87 },
@@ -160,9 +161,14 @@ export default function Reports() {
       <Tabs defaultValue="analytics">
         <TabsList>
           <TabsTrigger value="analytics">Analytics Dashboard</TabsTrigger>
+          <TabsTrigger value="staff-activity">Staff Activity</TabsTrigger>
           <TabsTrigger value="templates">Report Templates</TabsTrigger>
           <TabsTrigger value="saved">Saved Reports</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="staff-activity" className="mt-4">
+          <StaffActivityReport />
+        </TabsContent>
 
         <TabsContent value="analytics" className="mt-4 space-y-4">
           {/* Attendance Trend */}

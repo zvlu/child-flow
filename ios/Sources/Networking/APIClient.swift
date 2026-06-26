@@ -147,6 +147,118 @@ actor APIClient {
         try await get("compliance")
     }
 
+    // MARK: - PIR (Program Information Report)
+    func getPIRQuestions() async throws -> [PIRQuestion] {
+        try await get("pir/questions")
+    }
+
+    func listPIRReports() async throws -> [PIRReportSummary] {
+        try await get("pir/reports")
+    }
+
+    func getPIRReport(year: String) async throws -> PIRReportDetail {
+        try await get("pir/report?year=\(year)")
+    }
+
+    func setPIRValue(year: String, code: String, value: String) async throws {
+        struct Req: Encodable { let year, code, value: String }
+        let _: SuccessResponse = try await post("pir/value", body: Req(year: year, code: code, value: value))
+    }
+
+    func submitPIR(year: String) async throws {
+        struct Req: Encodable { let year: String }
+        let _: SuccessResponse = try await post("pir/submit", body: Req(year: year))
+    }
+
+    func reopenPIR(year: String) async throws {
+        struct Req: Encodable { let year: String }
+        let _: SuccessResponse = try await post("pir/reopen", body: Req(year: year))
+    }
+
+    // MARK: - Daily Reports / Moments
+    func getActivityLogs(childId: String? = nil) async throws -> [ActivityLogItem] {
+        var path = "activity"
+        if let childId { path += "?childId=\(childId)" }
+        return try await get(path)
+    }
+
+    func logActivity(childId: String, activityType: String, description: String) async throws {
+        struct Req: Encodable { let childId: String; let activityType: String; let description: String }
+        let _: SuccessResponse = try await post("activity", body: Req(childId: childId, activityType: activityType, description: description))
+    }
+
+    // MARK: - Lesson Planning
+    func getLessonPlans() async throws -> [LessonPlanSummary] {
+        try await get("lesson-plans")
+    }
+    func getLessonPlan(id: String) async throws -> LessonPlanDetail {
+        try await get("lesson-plans/\(id)")
+    }
+    func createLessonPlan(classroomId: String, weekStartDate: String, title: String?, theme: String?) async throws {
+        struct Req: Encodable { let classroomId: String; let weekStartDate: String; let title: String?; let theme: String? }
+        let _: SuccessResponse = try await post("lesson-plans", body: Req(classroomId: classroomId, weekStartDate: weekStartDate, title: title, theme: theme))
+    }
+    func addLessonActivity(planId: String, dayOfWeek: String, title: String, description: String?, domain: String?) async throws {
+        struct Req: Encodable { let dayOfWeek: String; let title: String; let description: String?; let domain: String? }
+        let _: SuccessResponse = try await post("lesson-plans/\(planId)/activities", body: Req(dayOfWeek: dayOfWeek, title: title, description: description, domain: domain))
+    }
+    func publishLessonPlan(id: String, published: Bool) async throws {
+        struct Req: Encodable { let published: Bool }
+        let _: SuccessResponse = try await post("lesson-plans/\(id)/publish", body: Req(published: published))
+    }
+
+    // MARK: - Child Portfolios
+    func getPortfolio(childId: String) async throws -> [PortfolioEntryItem] {
+        try await get("portfolio?childId=\(childId)")
+    }
+    func createPortfolioEntry(childId: String, title: String, observation: String?, domain: String?, observedAt: String?) async throws {
+        struct Req: Encodable { let childId: String; let title: String; let observation: String?; let domain: String?; let observedAt: String? }
+        let _: SuccessResponse = try await post("portfolio", body: Req(childId: childId, title: title, observation: observation, domain: domain, observedAt: observedAt))
+    }
+
+    // MARK: - Subsidies
+    func getSubsidies() async throws -> [SubsidyItem] {
+        try await get("subsidies")
+    }
+    func createSubsidy(familyId: String, agencyName: String, authorizedAmount: String?, copayAmount: String?, status: String, notes: String?) async throws {
+        struct Req: Encodable { let familyId: String; let agencyName: String; let authorizedAmount: String?; let copayAmount: String?; let status: String; let notes: String? }
+        let _: SuccessResponse = try await post("subsidies", body: Req(familyId: familyId, agencyName: agencyName, authorizedAmount: authorizedAmount, copayAmount: copayAmount, status: status, notes: notes))
+    }
+
+    // MARK: - Assessments
+    func getAssessments(childId: String? = nil) async throws -> [AssessmentItem] {
+        var path = "assessments"
+        if let childId { path += "?childId=\(childId)" }
+        return try await get(path)
+    }
+    func createAssessment(childId: String, type: String, title: String, description: String?, score: String?, domain: String?) async throws {
+        struct Req: Encodable { let childId: String; let type: String; let title: String; let description: String?; let score: String?; let domain: String? }
+        let _: SuccessResponse = try await post("assessments", body: Req(childId: childId, type: type, title: title, description: description, score: score, domain: domain))
+    }
+
+    // MARK: - Calendar
+    func getCalendar() async throws -> [CalendarEventItem] {
+        try await get("calendar")
+    }
+    func createCalendarEvent(title: String, eventType: String, startDate: String, location: String?) async throws {
+        struct Req: Encodable { let title: String; let eventType: String; let startDate: String; let location: String? }
+        let _: SuccessResponse = try await post("calendar", body: Req(title: title, eventType: eventType, startDate: startDate, location: location))
+    }
+
+    // MARK: - Meal plans
+    func getMealPlans() async throws -> [MealPlanItem] {
+        try await get("meals")
+    }
+    func getMealItems(planId: String) async throws -> [MealItemRow] {
+        try await get("meals/\(planId)/items")
+    }
+
+    // MARK: - Push notifications
+    func registerDeviceToken(_ token: String, platform: String = "ios") async throws {
+        struct Req: Encodable { let token: String; let platform: String }
+        let _: SuccessResponse = try await post("push/register", body: Req(token: token, platform: platform))
+    }
+
     // MARK: - Settings
     func getSettings() async throws -> ProgramSettings {
         try await get("settings")
@@ -368,6 +480,11 @@ actor APIClient {
         try await get("family/notifications")
     }
 
+    /// The family's live Daily Reports feed (their children's moments).
+    func getFamilyActivity() async throws -> [ActivityLogItem] {
+        try await get("family/activity")
+    }
+
     func getSchoolStatus() async throws -> SchoolStatus {
         try await get("family/school-status")
     }
@@ -418,9 +535,29 @@ actor APIClient {
         let _: SuccessResponse = try await post("absences/\(id)/review", body: Req(approve: approve))
     }
 
+    // MARK: - Staff Activity report
+    /// `preset` ∈ month | lastMonth | 90d | year. Pass `staffId` to get that
+    /// advocate's contact log in `detail`.
+    func fetchStaffActivity(preset: String, staffId: String? = nil) async throws -> StaffActivityReport {
+        var path = "reports/staff-activity?preset=\(preset)"
+        if let staffId { path += "&staffId=\(staffId)" }
+        return try await get(path)
+    }
+
     // MARK: - Private helpers
+
+    /// Joins `path` onto `baseURL` while preserving any query string. We can't use
+    /// `appendingPathComponent` here: it treats the whole string as one path segment
+    /// and percent-encodes the `?` (e.g. `attendance%3Fdate=…`), which breaks routing
+    /// and query parsing server-side. Current paths use only URL-safe query values.
+    private func makeURL(_ path: String) -> URL {
+        let base = baseURL.absoluteString
+        let joined = path.hasPrefix("/") ? base + path : base + "/" + path
+        return URL(string: joined) ?? baseURL.appendingPathComponent(path)
+    }
+
     private func get<T: Decodable>(_ path: String) async throws -> T {
-        let url = baseURL.appendingPathComponent(path)
+        let url = makeURL(path)
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         addAuthHeader(&request)
@@ -430,7 +567,7 @@ actor APIClient {
     }
 
     private func post<Body: Encodable, T: Decodable>(_ path: String, body: Body) async throws -> T {
-        let url = baseURL.appendingPathComponent(path)
+        let url = makeURL(path)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

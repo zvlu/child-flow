@@ -426,7 +426,7 @@ export default function Children() {
                       {kids.map((child: any) => (
                         <Link key={child.id} href={`/children/${child.id}`}>
                           <div className="flex items-center gap-3 p-3 rounded-xl border border-border hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer">
-                            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
                               {child.firstName?.[0]}{child.lastName?.[0]}
                             </div>
                             <div className="min-w-0">

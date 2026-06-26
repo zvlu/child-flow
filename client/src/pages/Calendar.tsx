@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -98,6 +99,15 @@ export default function Calendar() {
     onSuccess: () => { invalidate(); toast.success("Event deleted"); closeDialog(); },
     onError: (err) => toast.error(err.message || "Couldn't delete event"),
   });
+  const confirm = useConfirm();
+  const confirmDeleteEvent = async (id: number, title?: string) => {
+    if (await confirm({
+      title: "Delete this event?",
+      description: title ? `"${title}" will be removed from the calendar.` : "This event will be removed from the calendar.",
+      confirmLabel: "Delete",
+      destructive: true,
+    })) deleteEvent.mutate(id);
+  };
 
   const closeDialog = () => { setShowDialog(false); setEditingId(null); setForm(emptyForm); };
   const openCreate = (date?: Date) => {
@@ -146,7 +156,7 @@ export default function Calendar() {
   const EventChip = ({ ev, dense }: { ev: CalendarEvent; dense?: boolean }) => (
     <button
       onClick={(e) => { e.stopPropagation(); openEdit(ev); }}
-      className={`block w-full text-left ${dense ? "text-[10px] px-2 py-1" : "text-xs px-2 py-1.5"} font-bold rounded-lg truncate border hover:brightness-95 transition ${eventTypeColor(ev.eventType)}`}
+      className={`block w-full text-left ${dense ? "text-[10px] px-2 py-1" : "text-xs px-2 py-1.5"} font-bold rounded-md truncate border hover:brightness-95 transition ${eventTypeColor(ev.eventType)}`}
       title={ev.title}
     >
       {!dense && !ev.allDay && <span className="opacity-70 mr-1">{ev.startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>}
@@ -165,7 +175,7 @@ export default function Calendar() {
       <>
         <div className="grid grid-cols-7 gap-2 mb-4">
           {daysOfWeek.map((d) => (
-            <div key={d} className="text-center font-bold text-slate-600 text-sm uppercase tracking-widest py-2">{d}</div>
+            <div key={d} className="text-center font-bold text-muted-foreground text-sm uppercase tracking-widest py-2">{d}</div>
           ))}
         </div>
         <div className="grid grid-cols-7 gap-2">
@@ -176,16 +186,16 @@ export default function Calendar() {
               <div
                 key={i}
                 onClick={() => date && openCreate(date)}
-                className={`rounded-2xl border-2 min-h-[120px] p-2 transition-all ${
-                  date ? (isToday ? "border-primary bg-primary/5" : "border-slate-200 hover:border-primary/30 hover:bg-slate-50 cursor-pointer") : "border-transparent bg-slate-50"
+                className={`rounded-xl border-2 min-h-[120px] p-2 transition-all ${
+                  date ? (isToday ? "border-primary bg-primary/5" : "border-border hover:border-primary/30 hover:bg-muted cursor-pointer") : "border-transparent bg-muted"
                 }`}
               >
                 {date && (
                   <div className="space-y-1">
-                    <p className={`font-bold text-sm ${isToday ? "text-primary" : "text-slate-700"}`}>{date.getDate()}</p>
+                    <p className={`font-bold text-sm ${isToday ? "text-primary" : "text-muted-foreground"}`}>{date.getDate()}</p>
                     <div className="space-y-1">
                       {dayEvents.slice(0, 3).map((ev) => <EventChip key={ev.id} ev={ev} dense />)}
-                      {dayEvents.length > 3 && <div className="text-[9px] font-bold text-slate-500 px-2">+{dayEvents.length - 3} more</div>}
+                      {dayEvents.length > 3 && <div className="text-[9px] font-bold text-muted-foreground px-2">+{dayEvents.length - 3} more</div>}
                     </div>
                   </div>
                 )}
@@ -208,9 +218,9 @@ export default function Calendar() {
           const isToday = sameDay(date, new Date());
           return (
             <div key={date.toISOString()} onClick={() => openCreate(date)}
-              className={`rounded-2xl border-2 min-h-[360px] p-2 cursor-pointer transition-all ${isToday ? "border-primary bg-primary/5" : "border-slate-200 hover:border-primary/30 hover:bg-slate-50"}`}>
-              <p className={`text-center font-bold text-xs uppercase tracking-wide ${isToday ? "text-primary" : "text-slate-500"}`}>{daysOfWeek[date.getDay()]}</p>
-              <p className={`text-center font-bold text-lg mb-2 ${isToday ? "text-primary" : "text-slate-700"}`}>{date.getDate()}</p>
+              className={`rounded-xl border-2 min-h-[360px] p-2 cursor-pointer transition-all ${isToday ? "border-primary bg-primary/5" : "border-border hover:border-primary/30 hover:bg-muted"}`}>
+              <p className={`text-center font-bold text-xs uppercase tracking-wide ${isToday ? "text-primary" : "text-muted-foreground"}`}>{daysOfWeek[date.getDay()]}</p>
+              <p className={`text-center font-bold text-lg mb-2 ${isToday ? "text-primary" : "text-muted-foreground"}`}>{date.getDate()}</p>
               <div className="space-y-1">
                 {dayEvents.map((ev) => <EventChip key={ev.id} ev={ev} dense />)}
               </div>
@@ -228,13 +238,13 @@ export default function Calendar() {
       <div className="space-y-2" onClick={() => openCreate(currentDate)}>
         {dayEvents.length === 0 ? (
           <div className="py-16 text-center cursor-pointer">
-            <AlertCircle className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm text-slate-500 font-bold">No events — click to add one</p>
+            <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground font-bold">No events — click to add one</p>
           </div>
         ) : (
           dayEvents.map((ev) => (
             <button key={ev.id} onClick={(e) => { e.stopPropagation(); openEdit(ev); }}
-              className={`w-full text-left p-4 rounded-2xl border-2 hover:shadow-sm transition ${eventTypeColor(ev.eventType)}`}>
+              className={`w-full text-left p-4 rounded-xl border-2 hover:shadow-sm transition ${eventTypeColor(ev.eventType)}`}>
               <div className="flex items-center justify-between">
                 <span className="font-bold">{ev.title}</span>
                 <Badge className={`${eventTypeColor(ev.eventType)} rounded-full text-[10px] font-bold`}>{eventTypeLabel(ev.eventType)}</Badge>
@@ -256,20 +266,20 @@ export default function Calendar() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
             <CalendarIcon className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Program Calendar</h1>
-            <p className="text-sm text-slate-500 font-medium">Track school events, holidays, and important dates</p>
+            <h1 className="text-2xl font-bold text-foreground">Program Calendar</h1>
+            <p className="text-sm text-muted-foreground font-medium">Track school events, holidays, and important dates</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {/* View switcher */}
-          <div className="flex rounded-full bg-slate-100 p-1">
+          <div className="flex rounded-full bg-muted p-1">
             {(["month", "week", "day"] as ViewMode[]).map((v) => (
               <button key={v} onClick={() => setView(v)}
-                className={`px-3 py-1.5 rounded-full text-sm font-bold capitalize transition ${view === v ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                className={`px-3 py-1.5 rounded-full text-sm font-bold capitalize transition ${view === v ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-muted-foreground"}`}>
                 {v}
               </button>
             ))}
@@ -283,14 +293,14 @@ export default function Calendar() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main calendar */}
         <div className="lg:col-span-2">
-          <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-            <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-slate-100/50 pb-4">
+          <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+            <CardHeader className="border-b border-border bg-gradient-to-r from-background to-muted/50 pb-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-xl font-bold text-slate-900">{headerLabel()}</CardTitle>
+                <CardTitle className="text-xl font-bold text-foreground">{headerLabel()}</CardTitle>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentDate(new Date())} className="rounded-lg font-bold text-xs hover:bg-slate-200">Today</Button>
-                  <Button variant="ghost" size="icon" onClick={() => shift(-1)} className="rounded-lg h-9 w-9 hover:bg-slate-200"><ChevronLeft className="h-5 w-5" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => shift(1)} className="rounded-lg h-9 w-9 hover:bg-slate-200"><ChevronRight className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="sm" onClick={() => setCurrentDate(new Date())} className="rounded-lg font-bold text-xs hover:bg-muted">Today</Button>
+                  <Button variant="ghost" size="icon" onClick={() => shift(-1)} className="rounded-lg h-9 w-9 hover:bg-muted"><ChevronLeft className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => shift(1)} className="rounded-lg h-9 w-9 hover:bg-muted"><ChevronRight className="h-5 w-5" /></Button>
                 </div>
               </div>
             </CardHeader>
@@ -304,50 +314,50 @@ export default function Calendar() {
 
         {/* Upcoming sidebar */}
         <div className="space-y-6">
-          <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-            <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-slate-100/50 pb-3">
-              <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2"><Clock className="h-5 w-5 text-primary" /> Upcoming Events</CardTitle>
+          <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+            <CardHeader className="border-b border-border bg-gradient-to-r from-background to-muted/50 pb-3">
+              <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2"><Clock className="h-5 w-5 text-primary" /> Upcoming Events</CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
               {events.filter((e) => e.startDate >= new Date(new Date().setHours(0, 0, 0, 0))).sort((a, b) => a.startDate.getTime() - b.startDate.getTime()).slice(0, 8).map((ev) => (
-                <div key={ev.id} className="p-3 rounded-2xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition-all group cursor-pointer" onClick={() => openEdit(ev)}>
+                <div key={ev.id} className="p-3 rounded-xl border border-border hover:border-primary/30 hover:shadow-sm transition-all group cursor-pointer" onClick={() => openEdit(ev)}>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex-1">
-                      <p className="font-bold text-slate-800 text-sm group-hover:text-primary transition-colors">{ev.title}</p>
+                      <p className="font-bold text-foreground text-sm group-hover:text-primary transition-colors">{ev.title}</p>
                       <Badge className={`${eventTypeColor(ev.eventType)} rounded-full text-[10px] font-bold mt-1`}>{eventTypeLabel(ev.eventType)}</Badge>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()} className="rounded-lg h-7 w-7 text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-all"><MoreHorizontal className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()} className="rounded-lg h-7 w-7 text-muted-foreground hover:text-muted-foreground opacity-0 group-hover:opacity-100 transition-all"><MoreHorizontal className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="rounded-2xl">
+                      <DropdownMenuContent align="end" className="rounded-xl">
                         <DropdownMenuItem className="rounded-lg font-bold gap-2" onClick={() => openEdit(ev)}><Edit className="h-4 w-4" /> Edit</DropdownMenuItem>
-                        <DropdownMenuItem className="rounded-lg font-bold gap-2 text-red-600" onClick={() => deleteEvent.mutate(ev.id)}><Trash2 className="h-4 w-4" /> Delete</DropdownMenuItem>
+                        <DropdownMenuItem className="rounded-lg font-bold gap-2 text-red-600" onClick={() => confirmDeleteEvent(ev.id, ev.title)}><Trash2 className="h-4 w-4" /> Delete</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  <div className="space-y-1 text-[11px] font-bold text-slate-500">
+                  <div className="space-y-1 text-[11px] font-bold text-muted-foreground">
                     <div className="flex items-center gap-1.5"><CalendarIcon className="h-3 w-3" />{ev.startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
                     {ev.location && <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" /> {ev.location}</div>}
                   </div>
-                  {ev.description && <p className="text-[10px] text-slate-600 font-medium mt-2 line-clamp-2">{ev.description}</p>}
+                  {ev.description && <p className="text-[10px] text-muted-foreground font-medium mt-2 line-clamp-2">{ev.description}</p>}
                 </div>
               ))}
               {events.filter((e) => e.startDate >= new Date(new Date().setHours(0, 0, 0, 0))).length === 0 && (
-                <div className="py-8 text-center"><AlertCircle className="h-8 w-8 text-slate-300 mx-auto mb-2" /><p className="text-sm text-slate-500 font-bold">No upcoming events</p></div>
+                <div className="py-8 text-center"><AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" /><p className="text-sm text-muted-foreground font-bold">No upcoming events</p></div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-            <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-slate-100/50 pb-3">
-              <CardTitle className="text-sm font-bold text-slate-900 uppercase tracking-widest">Event Types</CardTitle>
+          <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+            <CardHeader className="border-b border-border bg-gradient-to-r from-background to-muted/50 pb-3">
+              <CardTitle className="text-sm font-bold text-foreground uppercase tracking-widest">Event Types</CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-2">
               {[{ type: "holiday", label: "Holiday" }, { type: "school_event", label: "School Event" }, { type: "parent_event", label: "Parent Event" }, { type: "staff_training", label: "Staff Training" }, { type: "deadline", label: "Deadline" }].map((item) => (
                 <div key={item.type} className="flex items-center gap-2">
                   <div className={`h-3 w-3 rounded-full ${item.type === "holiday" ? "bg-red-500" : item.type === "school_event" ? "bg-green-500" : item.type === "parent_event" ? "bg-amber-500" : item.type === "staff_training" ? "bg-purple-500" : "bg-red-500"}`} />
-                  <span className="text-sm font-bold text-slate-600">{item.label}</span>
+                  <span className="text-sm font-bold text-muted-foreground">{item.label}</span>
                 </div>
               ))}
             </CardContent>
@@ -357,7 +367,7 @@ export default function Calendar() {
 
       {/* Create / Edit dialog */}
       <Dialog open={showDialog} onOpenChange={(o) => (o ? setShowDialog(true) : closeDialog())}>
-        <DialogContent className="rounded-2xl">
+        <DialogContent className="rounded-xl">
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit Event" : "New Event"}</DialogTitle>
           </DialogHeader>
@@ -391,7 +401,7 @@ export default function Calendar() {
           <div className="flex justify-between gap-2 mt-2">
             <div>
               {editingId && (
-                <Button variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => deleteEvent.mutate(editingId)} disabled={deleteEvent.isPending}>
+                <Button variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => confirmDeleteEvent(editingId, form.title)} disabled={deleteEvent.isPending}>
                   <Trash2 className="h-4 w-4 mr-1" /> Delete
                 </Button>
               )}

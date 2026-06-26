@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct ChildFlowFamilyApp: App {
     @StateObject private var appState = FamilyAppState()
+    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate
 
     var body: some Scene {
         WindowGroup {
@@ -13,6 +14,7 @@ struct ChildFlowFamilyApp: App {
             case .authenticated:
                 FamilyTabView()
                     .environmentObject(appState)
+                    .onAppear { requestPushAuthorization() }
             }
         }
     }

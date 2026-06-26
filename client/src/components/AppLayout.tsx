@@ -120,7 +120,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const alertAccent = (type: string) =>
     type === "health" || type === "attendance" ? "text-destructive"
     : type === "absence" ? "text-amber-600"
-    : type === "message" ? "text-blue-600" : "text-slate-600";
+    : type === "message" ? "text-blue-600" : "text-muted-foreground";
 
   if (loading) {
     return (
@@ -141,14 +141,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-white/85 hover:text-white hover:bg-white/10 md:hidden"
+          className="h-8 w-8 text-white/85 hover:text-white hover:bg-card/10 md:hidden"
           onClick={() => setMobileNavOpen(true)}
           aria-label="Open navigation"
         >
           <Menu className="h-4 w-4" />
         </Button>
         <div className="flex items-center gap-2 mr-4">
-          <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-card/20 flex items-center justify-center">
             <Baby className="h-4 w-4 text-white" />
           </div>
           <span className="font-bold text-base tracking-tight">Sprout</span>
@@ -163,8 +163,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   className={cn(
                     "px-3 md:px-4 h-full flex items-center text-xs font-semibold transition-colors whitespace-nowrap border-b-2 border-transparent",
                     isActive 
-                      ? "bg-white/20 text-white border-white"
-                      : "hover:bg-white/10 text-white/85 hover:text-white"
+                      ? "bg-card/20 text-white border-white"
+                      : "hover:bg-card/10 text-white/85 hover:text-white"
                   )}
                 >
                   {item.label}
@@ -179,8 +179,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <Button
                   variant="ghost"
                   className={cn(
-                    "h-full rounded-none px-3 md:px-4 text-xs font-semibold text-white/85 hover:text-white hover:bg-white/10 border-b-2 border-transparent",
-                    topNavOverflowItems.some((item) => isTopNavActive(item.path)) && "bg-white/20 text-white border-white"
+                    "h-full rounded-none px-3 md:px-4 text-xs font-semibold text-white/85 hover:text-white hover:bg-card/10 border-b-2 border-transparent",
+                    topNavOverflowItems.some((item) => isTopNavActive(item.path)) && "bg-card/20 text-white border-white"
                   )}
                 >
                   More
@@ -210,15 +210,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <div className="hidden xl:block">
             <CommandPalette />
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10" onClick={() => handleTopNavAction("Print")}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-card/10" onClick={() => handleTopNavAction("Print")}>
             <Printer className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10" onClick={() => navigate("/settings")} aria-label="Account & settings">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-card/10" onClick={() => navigate("/settings")} aria-label="Account & settings">
             <UserCircle className="h-4 w-4" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10">
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-card/10">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -340,7 +340,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     <button
                       onClick={() => setMoreToolsOpen(!moreToolsOpen)}
                       className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-150",
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-bold transition-all duration-150",
                         activeMoreTool
                           ? "bg-sidebar-primary/15 text-sidebar-foreground"
                           : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -381,7 +381,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   <button
                     onClick={() => setMoreToolsOpen(!moreToolsOpen)}
                     className={cn(
-                      "w-full flex items-center justify-center px-3 py-2 rounded-lg transition-all duration-150",
+                      "w-full flex items-center justify-center px-3 py-2 rounded-xl transition-all duration-150",
                       activeMoreTool
                         ? "bg-sidebar-primary/15 text-sidebar-foreground"
                         : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -419,23 +419,23 @@ export default function AppLayout({ children }: AppLayoutProps) {
         {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Page Header (Breadcrumb style) */}
-          <header className="h-10 border-b border-border bg-white flex items-center px-3 md:px-6 gap-3 md:gap-4 flex-shrink-0">
+          <header className="h-10 border-b border-border bg-card flex items-center px-3 md:px-6 gap-3 md:gap-4 flex-shrink-0">
             <div className="flex-1 flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Sprout</span>
-              <ChevronRight className="h-3 w-3 text-slate-300" />
-              <h2 className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Sprout</span>
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+              <h2 className="text-[11px] font-bold text-foreground uppercase tracking-widest">
                 {allSideNavItems.find((i) => isNavItemActive(i.path))?.label || "Dashboard"}
               </h2>
             </div>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+              <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground">
                 <CalendarIcon className="h-3 w-3" />
                 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-7 w-7 relative" aria-label={`Notifications${bellAlerts.length ? `, ${bellAlerts.length} new` : ""}`}>
-                    <Bell className="h-3.5 w-3.5 text-slate-400" />
+                    <Bell className="h-3.5 w-3.5 text-muted-foreground" />
                     {bellAlerts.length > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 flex items-center justify-center text-[9px] font-bold text-white bg-destructive rounded-full">
                         {bellAlerts.length > 9 ? "9+" : bellAlerts.length}

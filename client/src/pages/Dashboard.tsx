@@ -164,7 +164,8 @@ export default function Dashboard() {
     if (!healthRecords) return [];
     const counts = new Map<string, number>();
     for (const rec of healthRecords) {
-      counts.set(rec.status, (counts.get(rec.status) ?? 0) + 1);
+      const status = rec.status ?? "unknown";
+      counts.set(status, (counts.get(status) ?? 0) + 1);
     }
     return Array.from(counts.entries()).map(([status, value]) => ({
       name: HEALTH_STATUS_LABELS[status] ?? formatTypeLabel(status),
@@ -195,7 +196,7 @@ export default function Dashboard() {
         id: `insight-${ins.id}`,
         message: ins.title,
         severity: ins.priority === "critical" || ins.priority === "high" ? "high" : ins.priority === "medium" ? "medium" : "low",
-        time: new Date(ins.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        time: ins.generatedAt ? new Date(ins.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "",
         href: "/action-queue",
       });
     }

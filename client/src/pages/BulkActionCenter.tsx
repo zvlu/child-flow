@@ -81,25 +81,25 @@ export function BulkActionCenter() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">
+          <h1 className="text-4xl font-bold text-foreground mb-2">
             Bulk Action Center
           </h1>
-          <p className="text-slate-600">
+          <p className="text-muted-foreground">
             Save time by performing actions on entire classrooms at once
           </p>
         </div>
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-600 text-sm font-medium">Total Actions</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1">
+                <p className="text-muted-foreground text-sm font-medium">Total Actions</p>
+                <p className="text-3xl font-bold text-foreground mt-1">
                   {actions.length}
                 </p>
               </div>
@@ -107,10 +107,10 @@ export function BulkActionCenter() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-600 text-sm font-medium">Completed</p>
+                <p className="text-muted-foreground text-sm font-medium">Completed</p>
                 <p className="text-3xl font-bold text-green-600 mt-1">
                   {actions.filter((a) => a.status === "completed").length}
                 </p>
@@ -119,11 +119,11 @@ export function BulkActionCenter() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-600 text-sm font-medium">Children Processed</p>
-                <p className="text-3xl font-bold text-slate-900 mt-1">
+                <p className="text-muted-foreground text-sm font-medium">Children Processed</p>
+                <p className="text-3xl font-bold text-foreground mt-1">
                   {actions.reduce((sum, a) => sum + a.recordCount, 0)}
                 </p>
               </div>
@@ -134,7 +134,7 @@ export function BulkActionCenter() {
 
         {/* Action Types */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-slate-900 mb-4">Quick Actions</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-4">Quick Actions</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {actionTypes.map((action) => {
               const Icon = action.icon;
@@ -145,13 +145,13 @@ export function BulkActionCenter() {
                     setSelectedAction(action.id);
                     setShowModal(true);
                   }}
-                  className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-[#A7C4AD] transition-all text-left"
+                  className="bg-card rounded-xl shadow-sm border border-border p-6 hover:shadow-md hover:border-[#A7C4AD] transition-all text-left"
                 >
                   <div className={`${action.color} w-12 h-12 rounded-xl flex items-center justify-center mb-3`}>
                     <Icon className="w-6 h-6" />
                   </div>
-                  <h3 className="font-semibold text-slate-900">{action.label}</h3>
-                  <p className="text-sm text-slate-600 mt-1">
+                  <h3 className="font-semibold text-foreground">{action.label}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
                     Apply to entire classroom
                   </p>
                 </button>
@@ -161,31 +161,31 @@ export function BulkActionCenter() {
         </div>
 
         {/* Action History */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200">
-            <h2 className="text-2xl font-bold text-slate-900">Recent Actions</h2>
+        <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+          <div className="p-6 border-b border-border">
+            <h2 className="text-2xl font-bold text-foreground">Recent Actions</h2>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
+              <thead className="bg-muted border-b border-border">
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                     Action
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                     Classroom
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                     Records
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                     Performed By
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                     Date
                   </th>
                 </tr>
@@ -194,26 +194,26 @@ export function BulkActionCenter() {
                 {actions.map((action) => (
                   <tr
                     key={action.id}
-                    className="border-b border-slate-200 hover:bg-slate-50 transition-colors"
+                    className="border-b border-border hover:bg-muted transition-colors"
                   >
-                    <td className="px-6 py-4 text-sm font-medium text-slate-900">
+                    <td className="px-6 py-4 text-sm font-medium text-foreground">
                       {action.actionType}
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
                       {action.classroom}
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
-                      <span className="bg-slate-100 px-3 py-1 rounded-full">
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
+                      <span className="bg-muted px-3 py-1 rounded-full">
                         {action.recordCount} children
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm">
                       {getStatusBadge(action.status)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
                       {action.performedBy}
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
                       {action.date}
                     </td>
                   </tr>
@@ -226,20 +226,20 @@ export function BulkActionCenter() {
         {/* Bulk Action Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-lg max-w-2xl w-full p-6">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6">
+            <div className="bg-card rounded-xl shadow-lg max-w-2xl w-full p-6">
+              <h2 className="text-2xl font-bold text-foreground mb-6">
                 {actionTypes.find((a) => a.id === selectedAction)?.label}
               </h2>
 
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Select Classroom
                   </label>
                   <select
                     value={selectedClassroom}
                     onChange={(e) => setSelectedClassroom(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
                   >
                     <option value="">Choose a classroom...</option>
                     {classrooms.map((classroom) => (
@@ -252,7 +252,7 @@ export function BulkActionCenter() {
 
                 {selectedAction === "attendance" && (
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Attendance Status
                     </label>
                     <div className="grid grid-cols-2 gap-3">
@@ -260,7 +260,7 @@ export function BulkActionCenter() {
                         (status) => (
                           <button
                             key={status}
-                            className="p-3 border border-slate-300 rounded-xl hover:border-[#5E8C6A] hover:bg-[#F1F6F2] transition-colors text-sm font-medium"
+                            className="p-3 border border-border rounded-xl hover:border-[#5E8C6A] hover:bg-[#F1F6F2] transition-colors text-sm font-medium"
                           >
                             {status}
                           </button>
@@ -272,10 +272,10 @@ export function BulkActionCenter() {
 
                 {selectedAction === "health" && (
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Health Screening Type
                     </label>
-                    <select className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
+                    <select className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
                       <option>Immunization</option>
                       <option>Dental</option>
                       <option>Physical</option>
@@ -287,12 +287,12 @@ export function BulkActionCenter() {
 
                 {selectedAction === "notes" && (
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Note Content
                     </label>
                     <textarea
                       placeholder="Enter note to apply to all children in this classroom..."
-                      className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] resize-none"
+                      className="w-full px-4 py-3 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] resize-none"
                       rows={4}
                     />
                   </div>
@@ -307,7 +307,7 @@ export function BulkActionCenter() {
                 <div className="flex gap-3 pt-4">
                   <button
                     onClick={() => setShowModal(false)}
-                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl transition-colors font-medium"
+                    className="flex-1 bg-muted hover:bg-muted text-muted-foreground px-4 py-2 rounded-xl transition-colors font-medium"
                   >
                     Cancel
                   </button>

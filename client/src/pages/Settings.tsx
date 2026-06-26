@@ -15,6 +15,7 @@ import { ORGANIZATION_ID } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ConfirmDialog";
 import {
   TOP_NAV_PRIMARY_COUNT, sortByOrder, topNavForRole, sideNavForRole,
   type NavItem, type NavSection, type NavRole,
@@ -475,6 +476,15 @@ function CustomRolesManager() {
     onSuccess: () => { utils.roles.list.invalidate(); toast.success("Role removed"); },
     onError: (e) => toast.error(e.message || "Could not remove role"),
   });
+  const confirm = useConfirm();
+  const confirmRemove = async (role: { id: number; name: string }) => {
+    if (await confirm({
+      title: `Remove the "${role.name}" role?`,
+      description: "Staff currently assigned this role label will keep their access tier, but the label will be gone.",
+      confirmLabel: "Remove",
+      destructive: true,
+    })) remove.mutate({ id: role.id, organizationId: ORGANIZATION_ID });
+  };
 
   return (
     <Card>
@@ -507,7 +517,7 @@ function CustomRolesManager() {
                   className="opacity-50 hover:opacity-100 transition-opacity"
                   title={`Remove ${role.name}`}
                   disabled={remove.isPending}
-                  onClick={() => remove.mutate({ id: role.id, organizationId: ORGANIZATION_ID })}
+                  onClick={() => confirmRemove(role)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>

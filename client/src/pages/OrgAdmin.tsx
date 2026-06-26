@@ -14,7 +14,7 @@ import { toast } from "sonner";
 
 const TIER_LABEL: Record<string, string> = { starter: "Starter", professional: "Professional", enterprise: "Enterprise" };
 const tierBadge = (t: string) => {
-  const map: Record<string, string> = { starter: "bg-slate-100 text-slate-700", professional: "bg-blue-100 text-blue-700", enterprise: "bg-purple-100 text-purple-700" };
+  const map: Record<string, string> = { starter: "bg-muted text-muted-foreground", professional: "bg-blue-100 text-blue-700", enterprise: "bg-purple-100 text-purple-700" };
   return <Badge className={`${map[t] ?? map.starter} border-0 text-xs`}>{TIER_LABEL[t] ?? t}</Badge>;
 };
 

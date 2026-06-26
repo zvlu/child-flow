@@ -59,7 +59,7 @@ export function registerRosterRoutes(app: Express) {
       return;
     }
 
-    const [org] = await db.select().from(organizations).limit(1);
+    const org = user.organizationId != null ? { id: user.organizationId } : null;
     if (!org) {
       res.json([]);
       return;
@@ -142,7 +142,7 @@ export function registerRosterRoutes(app: Express) {
       res.status(500).json({ error: "Database not available" });
       return;
     }
-    const [org] = await db.select().from(organizations).limit(1);
+    const org = user.organizationId != null ? { id: user.organizationId } : null;
     if (!org) {
       res.json([]);
       return;
@@ -177,7 +177,7 @@ export function registerRosterRoutes(app: Express) {
       res.status(500).json({ error: "Database not available" });
       return;
     }
-    const [org] = await db.select().from(organizations).limit(1);
+    const org = user.organizationId != null ? { id: user.organizationId } : null;
     if (!org) {
       res.json([]);
       return;
@@ -234,7 +234,7 @@ export function registerRosterRoutes(app: Express) {
       res.status(500).json({ error: "Database not available" });
       return;
     }
-    const [org] = await db.select().from(organizations).limit(1);
+    const org = user.organizationId != null ? { id: user.organizationId } : null;
     if (!org) {
       res.json([]);
       return;

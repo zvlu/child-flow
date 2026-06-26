@@ -19,6 +19,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
 
 interface ChildDetailProps { id: string; }
@@ -53,15 +54,15 @@ const healthRecordBadge = (status: string) => {
   if (status === "up_to_date") return <Badge className="bg-green-100 text-green-700 border-none rounded-full px-3 font-bold">Up to Date</Badge>;
   if (status === "due_soon") return <Badge className="bg-amber-100 text-amber-700 border-none rounded-full px-3 font-bold">Due Soon</Badge>;
   if (status === "overdue") return <Badge className="bg-red-100 text-red-700 border-none rounded-full px-3 font-bold">Overdue</Badge>;
-  if (status === "exempt") return <Badge className="bg-slate-100 text-slate-600 border-none rounded-full px-3 font-bold">Exempt</Badge>;
-  return <Badge className="bg-slate-100 text-slate-600 border-none rounded-full px-3 font-bold">Not Required</Badge>;
+  if (status === "exempt") return <Badge className="bg-muted text-muted-foreground border-none rounded-full px-3 font-bold">Exempt</Badge>;
+  return <Badge className="bg-muted text-muted-foreground border-none rounded-full px-3 font-bold">Not Required</Badge>;
 };
 
 const childStatusBadge = (status: string | undefined) => {
   if (status === "active") return <Badge className="bg-green-100 text-green-700 border-green-200 rounded-full px-3 font-bold">Active</Badge>;
   if (status === "graduated") return <Badge className="bg-blue-100 text-blue-700 border-blue-200 rounded-full px-3 font-bold">Graduated</Badge>;
   if (status === "withdrawn") return <Badge className="bg-red-100 text-red-700 border-red-200 rounded-full px-3 font-bold">Withdrawn</Badge>;
-  return <Badge className="bg-slate-100 text-slate-600 border-slate-200 rounded-full px-3 font-bold">Inactive</Badge>;
+  return <Badge className="bg-muted text-muted-foreground border-border rounded-full px-3 font-bold">Inactive</Badge>;
 };
 
 export default function ChildDetail({ id }: ChildDetailProps) {
@@ -94,6 +95,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
     },
     onError: (err) => toast.error(err.message || "Couldn't add flag"),
   });
+  const confirm = useConfirm();
   const removeFlag = trpc.children.removeFlag.useMutation({
     onSuccess: () => {
       utils.children.flags.invalidate(ORGANIZATION_ID);
@@ -232,11 +234,11 @@ export default function ChildDetail({ id }: ChildDetailProps) {
     return (
       <div className="p-6 bg-[#FBF6EE] min-h-full">
         <div className="text-center py-20">
-          <Baby className="h-14 w-14 mx-auto mb-4 text-slate-300" />
-          <h2 className="text-xl font-bold text-slate-800">Child not found</h2>
-          <p className="text-sm text-slate-500 mt-1">This record may have been removed.</p>
+          <Baby className="h-14 w-14 mx-auto mb-4 text-muted-foreground" />
+          <h2 className="text-xl font-bold text-foreground">Child not found</h2>
+          <p className="text-sm text-muted-foreground mt-1">This record may have been removed.</p>
           <Link href="/children">
-            <Button variant="outline" className="mt-6 gap-2 rounded-full font-bold">
+            <Button variant="outline" className="mt-6 gap-2 font-bold">
               <ArrowLeft className="h-4 w-4" /> Back to Children
             </Button>
           </Link>
@@ -259,19 +261,19 @@ export default function ChildDetail({ id }: ChildDetailProps) {
     <div className="p-6 space-y-6 bg-[#FBF6EE] min-h-full">
       <div className="flex items-center gap-4">
         <Link href="/children">
-          <Button variant="ghost" size="sm" className="gap-2 rounded-full font-bold">
+          <Button variant="ghost" size="sm" className="gap-2 font-bold">
             <ArrowLeft className="h-4 w-4" /> Back
           </Button>
         </Link>
         <div className="flex items-center gap-4 flex-1">
-          <Avatar className="h-14 w-14 rounded-2xl border-2 border-primary/10">
+          <Avatar className="h-14 w-14 rounded-full border-2 border-primary/10">
             <AvatarFallback className="bg-primary/10 text-primary text-lg font-bold">{initials}</AvatarFallback>
           </Avatar>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">{child.firstName} {child.lastName}</h1>
+            <h1 className="text-2xl font-bold text-foreground">{child.firstName} {child.lastName}</h1>
             <div className="flex items-center gap-2 mt-1">
-              {childStatusBadge(child.status)}
-              <span className="text-sm text-slate-500 font-medium">{age} &bull; {classroomName} &bull; {teacherName}</span>
+              {childStatusBadge(child.status ?? undefined)}
+              <span className="text-sm text-muted-foreground font-medium">{age} &bull; {classroomName} &bull; {teacherName}</span>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               {childFlagList.map((f: any) => (
@@ -286,7 +288,11 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                 >
                   {f.label}
                   <button
-                    onClick={() => removeFlag.mutate({ flagId: f.id })}
+                    onClick={async () => {
+                      if (await confirm({ title: `Remove the "${f.label}" flag?`, confirmLabel: "Remove", destructive: true })) {
+                        removeFlag.mutate({ flagId: f.id });
+                      }
+                    }}
                     className="ml-0.5 rounded-full hover:bg-black/10 p-0.5"
                     aria-label={`Remove ${f.label} flag`}
                   >
@@ -296,7 +302,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
               ))}
               <button
                 onClick={() => { setFlagType("allergy"); setFlagLabel(""); setShowFlagDialog(true); }}
-                className="inline-flex items-center gap-1 rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-500 hover:border-primary hover:text-primary transition-colors"
+                className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors"
               >
                 <Plus className="h-3 w-3" /> Flag
               </button>
@@ -305,7 +311,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
         </div>
         <Button
           size="sm"
-          className="gap-2 rounded-full font-bold shadow-md"
+          className="gap-2 font-bold shadow-md"
           onClick={() => {
             setEditStatus((child.status as any) ?? "active");
             setEditNotes(child.notes ?? "");
@@ -319,7 +325,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
       {/* Edit Profile Dialog */}
       {/* Add safety flag */}
       <Dialog open={showFlagDialog} onOpenChange={setShowFlagDialog}>
-        <DialogContent className="rounded-2xl">
+        <DialogContent className="rounded-xl">
           <DialogHeader>
             <DialogTitle>Add safety flag</DialogTitle>
           </DialogHeader>
@@ -516,13 +522,13 @@ export default function ChildDetail({ id }: ChildDetailProps) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { label: "Attendance Rate", value: attendance.rate !== null ? `${attendance.rate}%` : "—", color: "text-green-600" },
-              { label: "Days Present", value: attendance.present, color: "text-slate-700" },
+              { label: "Days Present", value: attendance.present, color: "text-foreground" },
               { label: "Health Status", value: overallHealthStatus.label, color: overallHealthStatus.color },
-              { label: "Enrolled Since", value: formatDate(child.enrollmentDate), color: "text-slate-700" },
+              { label: "Enrolled Since", value: formatDate(child.enrollmentDate), color: "text-foreground" },
             ].map(stat => (
-              <Card key={stat.label} className="rounded-2xl border-slate-200 shadow-sm">
+              <Card key={stat.label} className="rounded-xl border-border shadow-sm">
                 <CardContent className="p-4 text-center">
-                  <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">{stat.label}</p>
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">{stat.label}</p>
                   <p className={`text-xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
                 </CardContent>
               </Card>
@@ -530,7 +536,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
           </div>
 
           <Tabs defaultValue="profile" className="w-full">
-            <TabsList className="bg-white border border-slate-200 p-1 rounded-2xl w-fit shadow-sm mb-6">
+            <TabsList className="bg-card border border-border p-1 rounded-xl w-fit shadow-sm mb-6">
               <TabsTrigger value="profile" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Profile</TabsTrigger>
               <TabsTrigger value="health" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Health</TabsTrigger>
               <TabsTrigger value="attendance" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Attendance</TabsTrigger>
@@ -541,8 +547,8 @@ export default function ChildDetail({ id }: ChildDetailProps) {
 
             <TabsContent value="profile" className="mt-0 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-                  <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
+                <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                  <CardHeader className="border-b border-border bg-muted/50 pb-3">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <User className="h-4 w-4 text-primary" /> Child Information
                     </CardTitle>
@@ -556,14 +562,14 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                       ["Family Contact", family?.primaryContactName ?? "—"],
                     ].map(([label, value]) => (
                       <div key={label as string} className="flex justify-between">
-                        <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">{label as string}</span>
-                        <span className="font-bold text-slate-700">{value as string}</span>
+                        <span className="text-muted-foreground font-bold uppercase text-[10px] tracking-wider">{label as string}</span>
+                        <span className="font-bold text-foreground">{value as string}</span>
                       </div>
                     ))}
                   </CardContent>
                 </Card>
-                <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-                  <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
+                <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                  <CardHeader className="border-b border-border bg-muted/50 pb-3">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <FileText className="h-4 w-4 text-primary" /> Enrollment Details
                     </CardTitle>
@@ -576,20 +582,20 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                       ["Status", capitalize(child.status)],
                     ].map(([label, value]) => (
                       <div key={label} className="flex justify-between">
-                        <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">{label}</span>
-                        <span className="font-bold text-slate-700">{value}</span>
+                        <span className="text-muted-foreground font-bold uppercase text-[10px] tracking-wider">{label}</span>
+                        <span className="font-bold text-foreground">{value}</span>
                       </div>
                     ))}
                   </CardContent>
                 </Card>
               </div>
-              <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-                <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
+              <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                <CardHeader className="border-b border-border bg-muted/50 pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <MessageSquare className="h-4 w-4 text-primary" /> Notes and Observations
                     </CardTitle>
-                    <Button size="sm" variant="outline" className="rounded-full font-bold gap-1 text-xs" onClick={() => setShowNoteDialog(true)}>
+                    <Button size="sm" variant="outline" className="font-bold gap-1 text-xs" onClick={() => setShowNoteDialog(true)}>
                       <Plus className="h-3.5 w-3.5" /> Add Note
                     </Button>
                   </div>
@@ -598,13 +604,13 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                   {isNotesLoading ? (
                     <div className="py-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
                   ) : sortedNotes.length === 0 ? (
-                    <p className="text-sm text-slate-400 font-medium text-center py-6">No notes yet. Add the first observation.</p>
+                    <p className="text-sm text-muted-foreground font-medium text-center py-6">No notes yet. Add the first observation.</p>
                   ) : (
                     sortedNotes.map((note: any) => (
                       <div key={note.id} className="border-l-4 border-primary/20 pl-4 py-1">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className="text-xs font-bold text-primary uppercase tracking-wider">{note.title}</span>
-                          <span className="text-[10px] font-bold text-slate-400">{formatDate(note.createdAt)}</span>
+                          <span className="text-[10px] font-bold text-muted-foreground">{formatDate(note.createdAt)}</span>
                           {note.priority && ["high", "critical"].includes(note.priority) && (
                             <Badge className={cn(
                               "rounded-full px-2 text-[10px] font-bold border-none",
@@ -617,7 +623,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                             <Badge className="rounded-full px-2 text-[10px] font-bold border-none bg-primary/10 text-primary">Pinned</Badge>
                           )}
                         </div>
-                        <p className="text-sm text-slate-600 font-medium leading-relaxed">{note.content}</p>
+                        <p className="text-sm text-muted-foreground font-medium leading-relaxed">{note.content}</p>
                       </div>
                     ))
                   )}
@@ -627,8 +633,8 @@ export default function ChildDetail({ id }: ChildDetailProps) {
 
             <TabsContent value="health" className="mt-0 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-                  <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
+                <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                  <CardHeader className="border-b border-border bg-muted/50 pb-3">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <Heart className="h-4 w-4 text-red-500" /> Health Records
                     </CardTitle>
@@ -637,13 +643,13 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                     {isHealthLoading ? (
                       <div className="py-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
                     ) : (healthRecords ?? []).length === 0 ? (
-                      <p className="text-sm text-slate-400 font-medium text-center py-6">No health records on file.</p>
+                      <p className="text-sm text-muted-foreground font-medium text-center py-6">No health records on file.</p>
                     ) : (
                       (healthRecords ?? []).map((rec: any) => (
-                        <div key={rec.id} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                        <div key={rec.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/50 border border-border">
                           <div>
-                            <p className="font-bold text-slate-700">{healthTypeLabel[rec.type] ?? capitalize(rec.type)}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                            <p className="font-bold text-foreground">{healthTypeLabel[rec.type] ?? capitalize(rec.type)}</p>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">
                               {formatDate(rec.recordDate)}
                               {rec.expiryDate ? ` • Expires: ${formatDate(rec.expiryDate)}` : ""}
                               {rec.provider ? ` • ${rec.provider}` : ""}
@@ -657,35 +663,35 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                     )}
                   </CardContent>
                 </Card>
-                <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-                  <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
+                <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                  <CardHeader className="border-b border-border bg-muted/50 pb-3">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <ShieldCheck className="h-4 w-4 text-primary" /> Medical Information
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 space-y-4 text-sm">
-                    <div className="flex justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                      <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider self-center">Overall Status</span>
+                    <div className="flex justify-between p-3 rounded-xl bg-muted/50 border border-border">
+                      <span className="text-muted-foreground font-bold uppercase text-[10px] tracking-wider self-center">Overall Status</span>
                       <span className={cn("font-bold", overallHealthStatus.color)}>{overallHealthStatus.label}</span>
                     </div>
-                    <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
-                      <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider flex items-center gap-1">
+                    <div className="p-3 rounded-xl bg-muted/50 border border-border space-y-2">
+                      <span className="text-muted-foreground font-bold uppercase text-[10px] tracking-wider flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" /> Allergies
                       </span>
                       {allergyNotes.length === 0 ? (
-                        <p className="font-bold text-slate-700">None known</p>
+                        <p className="font-bold text-foreground">None known</p>
                       ) : (
                         allergyNotes.map((n: any) => (
                           <div key={n.id}>
-                            <p className="font-bold text-slate-700">{n.title}</p>
-                            <p className="text-xs text-slate-500 font-medium">{n.content}</p>
+                            <p className="font-bold text-foreground">{n.title}</p>
+                            <p className="text-xs text-muted-foreground font-medium">{n.content}</p>
                           </div>
                         ))
                       )}
                     </div>
-                    <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-                      <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">General Notes</span>
-                      <p className="font-bold text-slate-700">{child.notes || "None"}</p>
+                    <div className="p-3 rounded-xl bg-muted/50 border border-border space-y-1">
+                      <span className="text-muted-foreground font-bold uppercase text-[10px] tracking-wider">General Notes</span>
+                      <p className="font-bold text-foreground">{child.notes || "None"}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -693,23 +699,23 @@ export default function ChildDetail({ id }: ChildDetailProps) {
             </TabsContent>
 
             <TabsContent value="attendance" className="mt-0">
-              <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-                <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
+              <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                <CardHeader className="border-b border-border bg-muted/50 pb-3">
                   <CardTitle className="text-base font-bold flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-primary" /> Attendance Summary (Last 30 Days)
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-8">
                   <div className="grid grid-cols-3 gap-6 mb-8">
-                    <div className="text-center p-4 rounded-2xl bg-green-50 border border-green-100">
+                    <div className="text-center p-4 rounded-xl bg-green-50 border border-green-100">
                       <p className="text-3xl font-bold text-green-600">{attendance.present}</p>
                       <p className="text-[10px] font-bold uppercase text-green-700/60 tracking-widest mt-1">Days Present</p>
                     </div>
-                    <div className="text-center p-4 rounded-2xl bg-red-50 border border-red-100">
+                    <div className="text-center p-4 rounded-xl bg-red-50 border border-red-100">
                       <p className="text-3xl font-bold text-red-500">{attendance.absent}</p>
                       <p className="text-[10px] font-bold uppercase text-red-700/60 tracking-widest mt-1">Days Absent</p>
                     </div>
-                    <div className="text-center p-4 rounded-2xl bg-amber-50 border border-amber-100">
+                    <div className="text-center p-4 rounded-xl bg-amber-50 border border-amber-100">
                       <p className="text-3xl font-bold text-amber-500">{attendance.excused}</p>
                       <p className="text-[10px] font-bold uppercase text-amber-700/60 tracking-widest mt-1">Excused</p>
                     </div>
@@ -717,26 +723,26 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                   {attendance.rate !== null ? (
                     <div className="space-y-3">
                       <div className="flex justify-between text-sm">
-                        <span className="font-bold text-slate-500 uppercase tracking-wider text-[11px]">Overall Attendance Rate</span>
+                        <span className="font-bold text-muted-foreground uppercase tracking-wider text-[11px]">Overall Attendance Rate</span>
                         <span className="font-bold text-primary">{attendance.rate}%</span>
                       </div>
                       <Progress value={attendance.rate} className="h-3 rounded-full" />
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-400 font-medium text-center">No attendance recorded in the last 30 days.</p>
+                    <p className="text-sm text-muted-foreground font-medium text-center">No attendance recorded in the last 30 days.</p>
                   )}
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="assessments" className="mt-0">
-              <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-                <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
+              <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                <CardHeader className="border-b border-border bg-muted/50 pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <BarChart3 className="h-4 w-4 text-primary" /> Developmental Records
                     </CardTitle>
-                    <Button size="sm" variant="outline" className="rounded-full font-bold gap-1 text-xs" onClick={() => setShowAssessmentDialog(true)}>
+                    <Button size="sm" variant="outline" className="font-bold gap-1 text-xs" onClick={() => setShowAssessmentDialog(true)}>
                       <Plus className="h-3.5 w-3.5" /> New Assessment
                     </Button>
                   </div>
@@ -745,7 +751,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                   {isEducationLoading ? (
                     <div className="py-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
                   ) : (educationRecords ?? []).length === 0 ? (
-                    <p className="text-sm text-slate-400 font-medium text-center py-6">No assessments recorded yet.</p>
+                    <p className="text-sm text-muted-foreground font-medium text-center py-6">No assessments recorded yet.</p>
                   ) : (
                     (educationRecords ?? []).map((a: any) => {
                       const numericScore = a.score != null ? parseFloat(String(a.score)) : NaN;
@@ -753,14 +759,14 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                         <div key={a.id} className="space-y-2">
                           <div className="flex justify-between items-center">
                             <div>
-                              <span className="text-sm font-bold text-slate-700">{a.title}</span>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                              <span className="text-sm font-bold text-foreground">{a.title}</span>
+                              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">
                                 {capitalize(a.type)} • {formatDate(a.assessmentDate)}
                               </p>
-                              {a.description && <p className="text-xs text-slate-500 font-medium mt-0.5">{a.description}</p>}
+                              {a.description && <p className="text-xs text-muted-foreground font-medium mt-0.5">{a.description}</p>}
                             </div>
                             {a.score != null && a.score !== "" && (
-                              <span className="text-sm font-bold text-slate-800 text-right">{a.score}</span>
+                              <span className="text-sm font-bold text-foreground text-right">{a.score}</span>
                             )}
                           </div>
                           {!isNaN(numericScore) && (
@@ -775,8 +781,8 @@ export default function ChildDetail({ id }: ChildDetailProps) {
             </TabsContent>
 
             <TabsContent value="documents" className="mt-0">
-              <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-                <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
+              <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                <CardHeader className="border-b border-border bg-muted/50 pb-3">
                   <CardTitle className="text-base font-bold flex items-center gap-2">
                     <FileText className="h-4 w-4 text-primary" /> Documents
                   </CardTitle>
@@ -785,24 +791,24 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                   {isDocumentsLoading ? (
                     <div className="py-6 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
                   ) : (documents ?? []).length === 0 ? (
-                    <p className="text-sm text-slate-400 font-medium text-center py-6">No documents on file.</p>
+                    <p className="text-sm text-muted-foreground font-medium text-center py-6">No documents on file.</p>
                   ) : (
                     (documents ?? []).map((doc: any) => (
-                      <div key={doc.id} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                      <div key={doc.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/50 border border-border">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
                             <FileText className="h-5 w-5" />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-bold text-slate-700 truncate">{doc.fileName}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                            <p className="font-bold text-foreground truncate">{doc.fileName}</p>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">
                               {capitalize(doc.documentType)} • Uploaded {formatDate(doc.uploadedAt)}
                               {doc.expiryDate ? ` • Expires ${formatDate(doc.expiryDate)}` : ""}
                             </p>
                           </div>
                         </div>
                         {doc.fileUrl && (
-                          <Button asChild variant="ghost" size="sm" className="rounded-full font-bold text-xs flex-shrink-0">
+                          <Button asChild variant="ghost" size="sm" className="font-bold text-xs flex-shrink-0">
                             <a href={doc.fileUrl} target="_blank" rel="noreferrer">View</a>
                           </Button>
                         )}
@@ -815,30 +821,30 @@ export default function ChildDetail({ id }: ChildDetailProps) {
 
             <TabsContent value="family" className="mt-0 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-                  <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
+                <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                  <CardHeader className="border-b border-border bg-muted/50 pb-3">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <Home className="h-4 w-4 text-primary" /> Primary Contact
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 space-y-4 text-sm">
                     {!family ? (
-                      <p className="text-sm text-slate-400 font-medium text-center py-6">No family linked to this child.</p>
+                      <p className="text-sm text-muted-foreground font-medium text-center py-6">No family linked to this child.</p>
                     ) : (
                       <>
-                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                          <div className="font-bold text-lg text-slate-800">{family.primaryContactName}</div>
+                        <div className="p-4 rounded-xl bg-muted/50 border border-border">
+                          <div className="font-bold text-lg text-foreground">{family.primaryContactName}</div>
                           <div className="text-xs font-bold text-primary uppercase tracking-widest mt-0.5">Primary Contact</div>
                         </div>
                         <div className="space-y-3 px-2">
-                          <div className="flex items-center gap-3 font-bold text-slate-600">
-                            <Phone className="h-4 w-4 text-slate-400" /> {family.primaryContactPhone || "—"}
+                          <div className="flex items-center gap-3 font-bold text-muted-foreground">
+                            <Phone className="h-4 w-4 text-muted-foreground" /> {family.primaryContactPhone || "—"}
                           </div>
-                          <div className="flex items-center gap-3 font-bold text-slate-600">
-                            <Mail className="h-4 w-4 text-slate-400" /> {family.primaryContactEmail || "—"}
+                          <div className="flex items-center gap-3 font-bold text-muted-foreground">
+                            <Mail className="h-4 w-4 text-muted-foreground" /> {family.primaryContactEmail || "—"}
                           </div>
-                          <div className="flex items-start gap-3 font-bold text-slate-600">
-                            <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
+                          <div className="flex items-start gap-3 font-bold text-muted-foreground">
+                            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                             {[family.address, family.city, family.state, family.zipCode].filter(Boolean).join(", ") || "—"}
                           </div>
                         </div>
@@ -846,28 +852,28 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                     )}
                   </CardContent>
                 </Card>
-                <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-                  <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
+                <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                  <CardHeader className="border-b border-border bg-muted/50 pb-3">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <ShieldCheck className="h-4 w-4 text-primary" /> Authorized Contacts
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 space-y-3 text-sm">
                     {(contacts ?? []).length === 0 ? (
-                      <p className="text-sm text-slate-400 font-medium text-center py-6">No additional contacts on file.</p>
+                      <p className="text-sm text-muted-foreground font-medium text-center py-6">No additional contacts on file.</p>
                     ) : (
                       (contacts ?? []).map((contact: any) => (
-                        <div key={contact.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                        <div key={contact.id} className="p-3 rounded-xl bg-muted/50 border border-border">
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-slate-700">{contact.contactName}</span>
+                            <span className="font-bold text-foreground">{contact.contactName}</span>
                             {Boolean(contact.isPrimary) && (
                               <Badge className="rounded-full px-2 text-[10px] font-bold border-none bg-primary/10 text-primary">Primary</Badge>
                             )}
                           </div>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{contact.relationship || "Contact"}</p>
-                          <div className="mt-2 space-y-1 text-xs font-bold text-slate-600">
-                            {contact.phone && <div className="flex items-center gap-2"><Phone className="h-3 w-3 text-slate-400" /> {contact.phone}</div>}
-                            {contact.email && <div className="flex items-center gap-2"><Mail className="h-3 w-3 text-slate-400" /> {contact.email}</div>}
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">{contact.relationship || "Contact"}</p>
+                          <div className="mt-2 space-y-1 text-xs font-bold text-muted-foreground">
+                            {contact.phone && <div className="flex items-center gap-2"><Phone className="h-3 w-3 text-muted-foreground" /> {contact.phone}</div>}
+                            {contact.email && <div className="flex items-center gap-2"><Mail className="h-3 w-3 text-muted-foreground" /> {contact.email}</div>}
                           </div>
                         </div>
                       ))
@@ -881,13 +887,13 @@ export default function ChildDetail({ id }: ChildDetailProps) {
 
         {/* Sidebar: Sibling Grouping */}
         <div className="space-y-6">
-          <Card className="rounded-3xl border-primary/20 shadow-md overflow-hidden bg-primary/5">
+          <Card className="rounded-xl border-primary/20 shadow-md overflow-hidden bg-primary/5">
             <CardHeader className="border-b border-primary/10 bg-primary/10">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg font-bold flex items-center gap-2 text-primary">
                   <Users className="h-5 w-5" /> Sibling Group
                 </CardTitle>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-primary hover:bg-primary/20">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/20">
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -895,34 +901,34 @@ export default function ChildDetail({ id }: ChildDetailProps) {
             </CardHeader>
             <CardContent className="p-4 space-y-3">
               {isSiblingsLoading ? (
-                <div className="py-4 text-center text-sm text-slate-400 font-bold">Loading siblings...</div>
+                <div className="py-4 text-center text-sm text-muted-foreground font-bold">Loading siblings...</div>
               ) : siblings && siblings.filter((s: any) => s.id !== childId).length > 0 ? (
                 siblings.filter((s: any) => s.id !== childId).map((sibling: any) => (
                   <Link key={sibling.id} href={`/children/${sibling.id}`} asChild>
-                    <a className="flex items-center justify-between p-3 rounded-2xl bg-white border border-primary/10 hover:border-primary/30 hover:shadow-sm transition-all group">
+                    <a className="flex items-center justify-between p-3 rounded-xl bg-card border border-primary/10 hover:border-primary/30 hover:shadow-sm transition-all group">
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold">
                           {sibling.firstName?.[0] ?? "?"}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-800 group-hover:text-primary transition-colors">{sibling.firstName} {sibling.lastName}</p>
-                          <p className="text-[10px] font-bold uppercase text-slate-400 tracking-tighter">
+                          <p className="font-bold text-foreground group-hover:text-primary transition-colors">{sibling.firstName} {sibling.lastName}</p>
+                          <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter">
                             {sibling.status} • {sibling.gender ?? "—"}
                           </p>
                         </div>
                       </div>
-                      <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-primary transition-colors" />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                     </a>
                   </Link>
                 ))
               ) : (
                 <div className="py-8 text-center">
-                  <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
-                    <Users className="h-6 w-6 text-slate-300" />
+                  <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                    <Users className="h-6 w-6 text-muted-foreground" />
                   </div>
-                  <p className="text-sm text-slate-500 font-bold">No siblings linked</p>
-                  <p className="text-[11px] text-slate-400 font-bold mt-1">Add a sibling to share family data</p>
-                  <Button variant="outline" size="sm" className="mt-4 rounded-full font-bold text-xs border-slate-200 hover:bg-primary hover:text-white hover:border-primary transition-all">
+                  <p className="text-sm text-muted-foreground font-bold">No siblings linked</p>
+                  <p className="text-[11px] text-muted-foreground font-bold mt-1">Add a sibling to share family data</p>
+                  <Button variant="outline" size="sm" className="mt-4 font-bold text-xs border-border hover:bg-primary hover:text-white hover:border-primary transition-all">
                     Link Sibling
                   </Button>
                 </div>
@@ -931,23 +937,23 @@ export default function ChildDetail({ id }: ChildDetailProps) {
           </Card>
 
           {/* Quick Actions Card */}
-          <Card className="rounded-3xl border-slate-200 shadow-sm overflow-hidden">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-3">
-              <CardTitle className="text-sm font-bold text-slate-800 uppercase tracking-widest">Quick Actions</CardTitle>
+          <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+            <CardHeader className="border-b border-border bg-muted/50 pb-3">
+              <CardTitle className="text-sm font-bold text-foreground uppercase tracking-widest">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-2">
-              <Button variant="ghost" className="w-full justify-start rounded-xl font-bold text-slate-600 hover:text-primary hover:bg-primary/5" onClick={() => setShowNoteDialog(true)}>
+              <Button variant="ghost" className="w-full justify-start rounded-xl font-bold text-muted-foreground hover:text-primary hover:bg-primary/5" onClick={() => setShowNoteDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" /> Add Note
               </Button>
               <Link href="/attendance">
-                <Button variant="ghost" className="w-full justify-start rounded-xl font-bold text-slate-600 hover:text-primary hover:bg-primary/5">
+                <Button variant="ghost" className="w-full justify-start rounded-xl font-bold text-muted-foreground hover:text-primary hover:bg-primary/5">
                   <Plus className="h-4 w-4 mr-2" /> Log Attendance
                 </Button>
               </Link>
-              <Button variant="ghost" className="w-full justify-start rounded-xl font-bold text-slate-600 hover:text-primary hover:bg-primary/5" onClick={() => setShowAssessmentDialog(true)}>
+              <Button variant="ghost" className="w-full justify-start rounded-xl font-bold text-muted-foreground hover:text-primary hover:bg-primary/5" onClick={() => setShowAssessmentDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" /> New Assessment
               </Button>
-              <Button variant="ghost" className="w-full justify-start rounded-xl font-bold text-slate-600 hover:text-primary hover:bg-primary/5" onClick={() => window.print()}>
+              <Button variant="ghost" className="w-full justify-start rounded-xl font-bold text-muted-foreground hover:text-primary hover:bg-primary/5" onClick={() => window.print()}>
                 <Printer className="h-4 w-4 mr-2" /> Print Profile
               </Button>
             </CardContent>

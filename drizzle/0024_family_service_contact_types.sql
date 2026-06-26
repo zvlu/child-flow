@@ -1,0 +1,1 @@
+ALTER TABLE `family_services` MODIFY COLUMN `type` enum('home_visit','office_visit','phone_call','email','referral','coordinated_services','monthly_contact','other') NOT NULL;

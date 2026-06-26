@@ -45,7 +45,9 @@ async function requireViewer(req: Request): Promise<Viewer | null> {
 
 /** Can this viewer see this conversation at all? */
 function canAccess(viewer: Viewer, conversation: Conversation): boolean {
-  if (viewer.side === "staff") return true;
+  // Staff may only see threads in their own organization; a parent only their
+  // own family's thread (which is inherently within their org).
+  if (viewer.side === "staff") return conversation.organizationId === viewer.user.organizationId;
   return conversation.familyId === viewer.familyId;
 }
 
@@ -152,7 +154,11 @@ export function registerMessagingRoutes(app: Express) {
 
     const rows =
       viewer.side === "staff"
-        ? await db.select().from(conversations).orderBy(desc(conversations.updatedAt))
+        ? await db
+            .select()
+            .from(conversations)
+            .where(eq(conversations.organizationId, viewer.user.organizationId ?? -1))
+            .orderBy(desc(conversations.updatedAt))
         : await db
             .select()
             .from(conversations)
@@ -298,6 +304,11 @@ export function registerMessagingRoutes(app: Express) {
       .limit(1);
     if (!family) {
       res.status(404).json({ error: "Family not found" });
+      return;
+    }
+    // Staff may only start threads with families in their own org.
+    if (viewer.side === "staff" && family.organizationId !== viewer.user.organizationId) {
+      res.status(403).json({ error: "You don't have access to that family." });
       return;
     }
 

@@ -2,7 +2,7 @@ import { COOKIE_NAME, WEB_SESSION_IDLE_TTL_MS } from "@shared/const";
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
 import { getSessionCookieOptions } from "./cookies";
-import { ENV } from "./env";
+import { ENV, devAuthBypassEnabled } from "./env";
 import { sdk } from "./sdk";
 import { getUserByOpenId } from "../db";
 
@@ -64,7 +64,7 @@ export async function createContext(
     user = null;
   }
 
-  if (!user && ENV.allowDevAuthBypass && !ENV.isProduction) {
+  if (!user && devAuthBypassEnabled()) {
     if (!warnedAboutDevBypass) {
       console.warn(
         "[Auth] ALLOW_DEV_AUTH_BYPASS is enabled — injecting a mock admin for " +

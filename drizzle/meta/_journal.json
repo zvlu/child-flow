@@ -120,6 +120,62 @@
       "when": 1781803077290,
       "tag": "0016_sad_vivisector",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1782139007868,
+      "tag": "0017_pir_catalog_and_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1782229249574,
+      "tag": "0018_lesson_planning",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1782229910085,
+      "tag": "0019_portfolios",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1782237553734,
+      "tag": "0020_subsidies",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1782240674600,
+      "tag": "0021_activity_media",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1782303747378,
+      "tag": "0022_activity_media_type",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1782328524886,
+      "tag": "0023_device_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1782389643879,
+      "tag": "0024_family_service_contact_types",
+      "breakpoints": true
     }
   ]
 }

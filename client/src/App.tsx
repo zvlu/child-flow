@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ConfirmProvider } from "@/components/ConfirmDialog";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -8,6 +9,11 @@ import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Children from "./pages/Children";
 import ChildDetail from "./pages/ChildDetail";
+import DailyReports from "./pages/DailyReports";
+import LessonPlanning from "./pages/LessonPlanning";
+import Portfolios from "./pages/Portfolios";
+import Subsidies from "./pages/Subsidies";
+import GlossaryPage from "./pages/GlossaryPage";
 import Attendance from "./pages/Attendance";
 import Health from "./pages/Health";
 import FamilyServices from "./pages/FamilyServices";
@@ -82,6 +88,41 @@ function Router() {
         {(params: { id: string }) => (
           <AppLayout>
             <ChildDetail id={params.id} />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/daily-reports">
+        {() => (
+          <AppLayout>
+            <DailyReports />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/lesson-planning">
+        {() => (
+          <AppLayout>
+            <LessonPlanning />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/portfolios">
+        {() => (
+          <AppLayout>
+            <Portfolios />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/subsidies">
+        {() => (
+          <AppLayout>
+            <Subsidies />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/glossary">
+        {() => (
+          <AppLayout>
+            <GlossaryPage />
           </AppLayout>
         )}
       </Route>
@@ -250,8 +291,10 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light" switchable>
         <TooltipProvider>
-          <Toaster richColors position="top-right" />
-          <Router />
+          <ConfirmProvider>
+            <Toaster richColors position="top-right" />
+            <Router />
+          </ConfirmProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

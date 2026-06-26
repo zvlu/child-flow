@@ -16,6 +16,7 @@ import { Search, Plus, Heart, Stethoscope, Syringe, AlertTriangle, CheckCircle2,
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
+import { objectsToCsv, downloadCsv } from "@/lib/csv";
 
 type HealthType = "immunization" | "dental" | "physical" | "vision" | "hearing" | "lead" | "hemoglobin" | "other";
 type HealthStatus = "up_to_date" | "due_soon" | "overdue" | "exempt" | "not_required";
@@ -46,8 +47,8 @@ const statusBadge = (status?: string) => {
   if (status === "up_to_date") return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100 text-xs">Current</Badge>;
   if (status === "due_soon") return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100 text-xs">Due Soon</Badge>;
   if (status === "overdue") return <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100 text-xs">Overdue</Badge>;
-  if (status === "exempt") return <Badge className="bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-100 text-xs">Exempt</Badge>;
-  if (status === "not_required") return <Badge className="bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-100 text-xs">Not Required</Badge>;
+  if (status === "exempt") return <Badge className="bg-muted text-muted-foreground border-border hover:bg-muted text-xs">Exempt</Badge>;
+  if (status === "not_required") return <Badge className="bg-muted text-muted-foreground border-border hover:bg-muted text-xs">Not Required</Badge>;
   return <Badge variant="outline" className="text-muted-foreground text-xs">No Record</Badge>;
 };
 
@@ -104,6 +105,21 @@ export default function Health() {
     },
     onError: (err) => toast.error(err.message || "Failed to add health record"),
   });
+
+  const exportHealth = () => {
+    const records = healthQuery.data ?? [];
+    if (!records.length) { toast.message("No health records to export yet."); return; }
+    const nameById = new Map((childrenQuery.data ?? []).map((c) => [c.id, `${c.firstName} ${c.lastName}`]));
+    const rows = records.map((r) => ({
+      child: nameById.get(r.childId) ?? `Child #${r.childId}`,
+      type: r.type,
+      status: r.status ?? "",
+      date: r.recordDate ? new Date(r.recordDate).toLocaleDateString() : "",
+      notes: r.notes ?? "",
+    }));
+    downloadCsv(`health-records-${new Date().toISOString().slice(0, 10)}.csv`, objectsToCsv(rows));
+    toast.success(`Exported ${rows.length} health record${rows.length === 1 ? "" : "s"} to CSV`);
+  };
 
   const handleAddRecord = () => {
     if (!form.childId) {
@@ -207,7 +223,7 @@ export default function Health() {
           <p className="text-muted-foreground text-sm mt-0.5">Track screenings, immunizations, and medical information</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />Export</Button>
+          <Button variant="outline" size="sm" className="gap-2" onClick={exportHealth}><Download className="h-4 w-4" />Export</Button>
           <Button size="sm" className="gap-2" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" />Add Record</Button>
         </div>
       </div>

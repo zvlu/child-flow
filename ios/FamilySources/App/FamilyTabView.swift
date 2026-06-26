@@ -3,6 +3,11 @@ import SwiftUI
 struct FamilyTabView: View {
     var body: some View {
         TabView {
+            FamilyTodayView()
+                .tabItem {
+                    Label("Today", systemImage: "sparkles")
+                }
+
             FamilyHomeView()
                 .tabItem {
                     Label("Home", systemImage: "house.fill")
