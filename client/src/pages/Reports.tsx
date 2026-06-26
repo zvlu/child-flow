@@ -8,7 +8,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import { Download, FileText, BarChart3, TrendingUp, Users, Heart, ClipboardCheck, ShieldCheck, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
@@ -22,29 +22,15 @@ const attendanceByMonth = [
   { month: "Mar", rate: 89 }, { month: "Apr", rate: 91 },
 ];
 
-const enrollmentByClassroom = [
-  { classroom: "Room A", enrolled: 16, capacity: 17 },
-  { classroom: "Room B", enrolled: 16, capacity: 17 },
-  { classroom: "Room C", enrolled: 15, capacity: 17 },
-];
-
-const healthCompliance = [
-  { name: "Physical Exams", compliant: 44, total: 47 },
-  { name: "Dental Exams", compliant: 38, total: 47 },
-  { name: "Vision Screening", compliant: 45, total: 47 },
-  { name: "Hearing Screening", compliant: 46, total: 47 },
-  { name: "Immunizations", compliant: 40, total: 47 },
-];
-
-const demographicsData = [
-  { name: "White", value: 12 },
-  { name: "Black/African American", value: 18 },
-  { name: "Hispanic/Latino", value: 11 },
-  { name: "Asian", value: 4 },
-  { name: "Two or More Races", value: 2 },
-];
-
 const COLORS = ["#4ade80", "#60a5fa", "#f59e0b", "#a78bfa", "#f87171"];
+
+const HEALTH_TYPE_LABELS: Record<string, string> = {
+  physical: "Physical Exams",
+  dental: "Dental Exams",
+  vision: "Vision Screening",
+  hearing: "Hearing Screening",
+  immunization: "Immunizations",
+};
 
 const savedReports = [
   { name: "Monthly Attendance Summary", type: "Attendance", lastRun: "Nov 1, 2024", format: "PDF" },
@@ -70,6 +56,47 @@ export default function Reports() {
   const utils = trpc.useUtils();
   const [, navigate] = useLocation();
   const [busy, setBusy] = useState<string | null>(null);
+
+  // Live data behind the analytics charts (the attendance-trend line below is
+  // still illustrative — true monthly rates need a heavier aggregation).
+  const childrenQuery = trpc.children.list.useQuery(orgId);
+  const classroomsQuery = trpc.classrooms.list.useQuery(orgId);
+  const healthQuery = trpc.health.list.useQuery({ organizationId: orgId });
+
+  const enrollmentByClassroom = useMemo(
+    () => (classroomsQuery.data ?? []).map((c: any) => ({
+      classroom: c.name, enrolled: c.enrolledCount ?? 0, capacity: c.capacity ?? 0,
+    })),
+    [classroomsQuery.data],
+  );
+
+  const demographicsData = useMemo(() => {
+    const buckets: Record<string, number> = {};
+    const now = Date.now();
+    for (const c of childrenQuery.data ?? []) {
+      if (!c.dateOfBirth) continue;
+      const age = Math.floor((now - new Date(c.dateOfBirth).getTime()) / (365.25 * 24 * 3600 * 1000));
+      const label = age < 3 ? "Under 3" : age >= 5 ? "Age 5+" : `Age ${age}`;
+      buckets[label] = (buckets[label] ?? 0) + 1;
+    }
+    const order = ["Under 3", "Age 3", "Age 4", "Age 5+"];
+    return Object.entries(buckets)
+      .sort(([a], [b]) => order.indexOf(a) - order.indexOf(b))
+      .map(([name, value]) => ({ name, value }));
+  }, [childrenQuery.data]);
+
+  const healthCompliance = useMemo(() => {
+    const byType: Record<string, { compliant: number; total: number }> = {};
+    for (const r of (healthQuery.data ?? []) as any[]) {
+      const t = byType[r.type] ?? { compliant: 0, total: 0 };
+      t.total += 1;
+      if (r.status === "up_to_date") t.compliant += 1;
+      byType[r.type] = t;
+    }
+    return Object.entries(byType).map(([type, v]) => ({
+      name: HEALTH_TYPE_LABELS[type] ?? type, compliant: v.compliant, total: v.total,
+    }));
+  }, [healthQuery.data]);
 
   const today = () => new Date().toISOString().slice(0, 10);
   const runExport = async (key: string, fileBase: string, fetcher: () => Promise<any[]>) => {
@@ -221,8 +248,8 @@ export default function Reports() {
             {/* Demographics */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Child Demographics</CardTitle>
-                <CardDescription>Race/ethnicity breakdown</CardDescription>
+                <CardTitle className="text-base">Children by Age</CardTitle>
+                <CardDescription>Age distribution across enrolled children</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-4">

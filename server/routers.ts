@@ -873,11 +873,21 @@ export const appRouter = router({
           fileSize: z.number().optional(),
           mimeType: z.string().optional(),
           expiryDate: z.date().optional(),
-          uploadedBy: z.number(),
+          // Resolved server-side from the signed-in user when omitted.
+          uploadedBy: z.number().optional(),
         })
       )
-      .mutation(async ({ input }) => {
-        return mod.createDocument(input);
+      .mutation(async ({ input, ctx }) => {
+        await assertChildInOrg(ctx.user, input.childId);
+        const uploadedBy = input.uploadedBy ?? (await mod.resolveStaffId(ctx.user.organizationId, ctx.user.id));
+        if (uploadedBy == null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No staff record to attribute the upload to." });
+        }
+        return mod.createDocument({
+          ...input,
+          organizationId: ctx.user.organizationId ?? input.organizationId,
+          uploadedBy,
+        });
       }),
     delete: staffProcedure
       .input(z.number())
