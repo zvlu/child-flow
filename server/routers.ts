@@ -1253,25 +1253,33 @@ export const appRouter = router({
           classroomId: z.number(),
           date: z.date(),
           status: z.enum(["present", "absent", "excused", "half_day"]),
-          performedBy: z.number(),
+          // Resolved server-side from the signed-in user when omitted.
+          performedBy: z.number().optional(),
           description: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "classroom", input.classroomId);
+        const performedBy = input.performedBy ?? (await mod.resolveStaffId(ctx.user.organizationId, ctx.user.id));
+        if (performedBy == null) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No staff record to attribute this action to." });
+        }
+        const orgId = ctx.user.organizationId ?? input.organizationId;
         const roster = await mod.getClassroomRoster(input.classroomId);
         await mod.saveAttendanceForDate(
-          input.organizationId,
+          orgId,
           input.date,
           roster.map(c => ({ childId: c.id, status: input.status })),
-          input.performedBy
+          performedBy
         );
         await mod.createBulkActionLog({
-          organizationId: input.organizationId,
+          organizationId: orgId,
           classroomId: input.classroomId,
           actionType: "bulk_attendance",
           description: input.description ?? `Marked ${roster.length} children ${input.status}`,
           recordCount: roster.length,
-          performedBy: input.performedBy,
+          status: "completed",
+          performedBy,
         });
         return { affected: roster.length };
       }),
