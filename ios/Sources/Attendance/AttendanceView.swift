@@ -69,13 +69,19 @@ struct AttendanceView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(justSaved ? "Saved ✓" : "Save") {
-                        viewModel.saveAll()
-                        justSaved = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { justSaved = false }
+                    HStack(spacing: 10) {
+                        NavigationLink { ChronicAbsenceView() } label: {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                        }
+                        Button(justSaved ? "Saved ✓" : "Save") {
+                            viewModel.saveAll()
+                            justSaved = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { justSaved = false }
+                        }
+                        .fontWeight(.semibold)
+                        .disabled(viewModel.records.isEmpty)
                     }
-                    .fontWeight(.semibold)
-                    .disabled(viewModel.records.isEmpty)
                 }
             }
             .sheet(isPresented: $showMenu) { AppMenuSheet() }

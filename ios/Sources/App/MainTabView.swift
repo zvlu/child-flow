@@ -92,6 +92,14 @@ struct AppMenuSheet: View {
                             destination: AnyView(FamilyServicesView())
                         )
                         ModuleCard(
+                            label: "Chronic Absence",
+                            subtitle: "85% threshold alerts & AIP",
+                            icon: "exclamationmark.triangle.fill",
+                            color: .orange,
+                            bgColor: Color.orange.opacity(0.1),
+                            destination: AnyView(ChronicAbsenceView())
+                        )
+                        ModuleCard(
                             label: "Family Events",
                             subtitle: "Plan & track engagement",
                             icon: "person.3.fill",
@@ -130,6 +138,14 @@ struct AppMenuSheet: View {
                             color: .cfFamily,
                             bgColor: .cfFamilyBg,
                             destination: AnyView(EnrollmentView())
+                        )
+                        ModuleCard(
+                            label: "ERSEA",
+                            subtitle: "Eligibility, waitlist & selection",
+                            icon: "list.number",
+                            color: .cfGoals,
+                            bgColor: .cfGoalsBg,
+                            destination: AnyView(ERSEAView())
                         )
                         ModuleCard(
                             label: "Verification",

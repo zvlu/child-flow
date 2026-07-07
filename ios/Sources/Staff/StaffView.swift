@@ -464,14 +464,14 @@ class StaffViewModel: ObservableObject {
         } catch {
             #if DEBUG
             allStaff = [
-                StaffMember(id:"s1", fullName:"Dr. Patricia Hayes",    role:"Program Director",     roleKey:"director",          email:"p.hayes@childflow.org",  phone:"(555) 200-1001", trainingHours:24, classroom:nil),
-                StaffMember(id:"s2", fullName:"Ms. Carmen Rivera",     role:"Lead Teacher",          roleKey:"teacher",           email:"c.rivera@childflow.org", phone:"(555) 200-1002", trainingHours:18, classroom:"Room 1A"),
-                StaffMember(id:"s3", fullName:"Mr. James Carter",      role:"Lead Teacher",          roleKey:"teacher",           email:"j.carter@childflow.org", phone:"(555) 200-1003", trainingHours:12, classroom:"Room 2B"),
-                StaffMember(id:"s4", fullName:"Ms. Destiny Moore",     role:"Teacher Assistant",     roleKey:"assistant",         email:"d.moore@childflow.org",  phone:"(555) 200-1004", trainingHours:8,  classroom:"Room 1A"),
-                StaffMember(id:"s5", fullName:"Mr. Tyrell Washington", role:"Teacher Assistant",     roleKey:"assistant",         email:"t.wash@childflow.org",   phone:"(555) 200-1005", trainingHours:5,  classroom:"Room 2B"),
-                StaffMember(id:"s6", fullName:"Ms. Sandra Thompson",   role:"Family Service Worker", roleKey:"familyWorker",      email:"s.thomp@childflow.org",  phone:"(555) 200-1006", trainingHours:20, classroom:nil),
-                StaffMember(id:"s7", fullName:"Ms. Angela Kim",        role:"Family Service Worker", roleKey:"familyWorker",      email:"a.kim@childflow.org",    phone:"(555) 200-1007", trainingHours:16, classroom:nil),
-                StaffMember(id:"s8", fullName:"Dr. Marcus Ellis",      role:"Health Coordinator",    roleKey:"healthCoordinator", email:"m.ellis@childflow.org",  phone:"(555) 200-1008", trainingHours:22, classroom:nil),
+                StaffMember(id:"s1", fullName:"Dr. Patricia Hayes",    role:"Program Director",     roleKey:"director",          email:"p.hayes@sprout.org",  phone:"(555) 200-1001", trainingHours:24, classroom:nil),
+                StaffMember(id:"s2", fullName:"Ms. Carmen Rivera",     role:"Lead Teacher",          roleKey:"teacher",           email:"c.rivera@sprout.org", phone:"(555) 200-1002", trainingHours:18, classroom:"Room 1A"),
+                StaffMember(id:"s3", fullName:"Mr. James Carter",      role:"Lead Teacher",          roleKey:"teacher",           email:"j.carter@sprout.org", phone:"(555) 200-1003", trainingHours:12, classroom:"Room 2B"),
+                StaffMember(id:"s4", fullName:"Ms. Destiny Moore",     role:"Teacher Assistant",     roleKey:"assistant",         email:"d.moore@sprout.org",  phone:"(555) 200-1004", trainingHours:8,  classroom:"Room 1A"),
+                StaffMember(id:"s5", fullName:"Mr. Tyrell Washington", role:"Teacher Assistant",     roleKey:"assistant",         email:"t.wash@sprout.org",   phone:"(555) 200-1005", trainingHours:5,  classroom:"Room 2B"),
+                StaffMember(id:"s6", fullName:"Ms. Sandra Thompson",   role:"Family Service Worker", roleKey:"familyWorker",      email:"s.thomp@sprout.org",  phone:"(555) 200-1006", trainingHours:20, classroom:nil),
+                StaffMember(id:"s7", fullName:"Ms. Angela Kim",        role:"Family Service Worker", roleKey:"familyWorker",      email:"a.kim@sprout.org",    phone:"(555) 200-1007", trainingHours:16, classroom:nil),
+                StaffMember(id:"s8", fullName:"Dr. Marcus Ellis",      role:"Health Coordinator",    roleKey:"healthCoordinator", email:"m.ellis@sprout.org",  phone:"(555) 200-1008", trainingHours:22, classroom:nil),
             ]
             #endif
         }

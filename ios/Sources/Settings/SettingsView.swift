@@ -99,7 +99,7 @@ struct AboutView: View {
                 LabeledContent("Purpose", value: "Head Start Management")
             }
             Section("Contact") {
-                Link("support@childflow.org", destination: URL(string: "mailto:support@childflow.org")!)
+                Link("support@sprout.org", destination: URL(string: "mailto:support@sprout.org")!)
             }
         }
         .navigationTitle("About")

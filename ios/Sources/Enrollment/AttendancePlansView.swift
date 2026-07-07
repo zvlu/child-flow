@@ -301,30 +301,23 @@ struct NewAttendancePlanSheet: View {
     private func save() {
         isSaving = true
         Task {
-            do {
-                let plan = try await APIClient.shared.createAttendancePlan(
-                    childId: UUID().uuidString,
-                    barriers: barriers.filter { !$0.isEmpty }
-                )
-                await MainActor.run { onSave(plan); dismiss() }
-            } catch {
-                let mock = AttendanceSuccessPlan(
-                    id: UUID().uuidString,
-                    childId: UUID().uuidString,
-                    childName: childName,
-                    classroom: classroom,
-                    currentAttendanceRate: attendanceRate,
-                    createdDate: Date(),
-                    reviewDate: reviewDate,
-                    familyAdvocate: familyAdvocate,
-                    barriers: barriers.filter { !$0.isEmpty },
-                    strategies: strategies.filter { !$0.isEmpty }.map { s in
-                        AttendancePlanStrategy(id: UUID().uuidString, description: s, isImplemented: false, targetDate: nil)
-                    },
-                    status: .active
-                )
-                await MainActor.run { onSave(mock); dismiss() }
-            }
+            let plan = AttendanceSuccessPlan(
+                id: UUID().uuidString,
+                childId: UUID().uuidString,
+                childName: childName,
+                classroom: classroom,
+                currentAttendanceRate: attendanceRate,
+                createdDate: Date(),
+                reviewDate: reviewDate,
+                familyAdvocate: familyAdvocate,
+                barriers: barriers.filter { !$0.isEmpty },
+                strategies: strategies.filter { !$0.isEmpty }.map { s in
+                    AttendancePlanStrategy(id: UUID().uuidString, description: s, isImplemented: false, targetDate: nil)
+                },
+                status: .active
+            )
+            try? await APIClient.shared.createAttendancePlan(plan)
+            await MainActor.run { onSave(plan); dismiss() }
             isSaving = false
         }
     }

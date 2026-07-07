@@ -59,6 +59,9 @@ struct EnrollmentView: View {
                         Image(systemName: "plus")
                     }
                     Menu {
+                        NavigationLink(destination: ERSEAView()) {
+                            Label("ERSEA — Eligibility & Waitlist", systemImage: "list.number")
+                        }
                         NavigationLink(destination: ApplicationVerificationView()) {
                             Label("Verification Checklists", systemImage: "checkmark.rectangle.fill")
                         }

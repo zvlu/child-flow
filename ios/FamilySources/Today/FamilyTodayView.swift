@@ -4,23 +4,30 @@ import AVKit
 
 private func familyMomentMeta(_ type: String) -> (label: String, symbol: String, color: Color) {
     switch type {
-    case "meal": return ("Meal", "fork.knife", .cfAttendance)
-    case "nap": return ("Nap", "moon.fill", .cfChildren)
-    case "diaper": return ("Diaper", "drop.fill", .orange)
-    case "note": return ("Note", "text.bubble.fill", .cfInfo)
-    case "photo": return ("Photo", "camera.fill", .cfFamily)
-    default: return ("Activity", "sparkles", .cfPrimary)
+    case "meal": return (L(.meal), "fork.knife", .cfAttendance)
+    case "nap": return (L(.nap), "moon.fill", .cfChildren)
+    case "diaper": return (L(.diaper), "drop.fill", .orange)
+    case "note": return (L(.noteWord), "text.bubble.fill", .cfInfo)
+    case "photo": return (L(.photo), "camera.fill", .cfFamily)
+    default: return (L(.activity), "sparkles", .cfPrimary)
     }
 }
 
 private func familyDayLabel(_ d: Date) -> String {
     let cal = Calendar.current
-    if cal.isDateInToday(d) { return "Today" }
-    if cal.isDateInYesterday(d) { return "Yesterday" }
-    let f = DateFormatter(); f.dateFormat = "EEEE, MMM d"; return f.string(from: d)
+    if cal.isDateInToday(d) { return L(.today) }
+    if cal.isDateInYesterday(d) { return L(.yesterday) }
+    let f = DateFormatter()
+    f.locale = FamilyL10n.shared.locale
+    f.setLocalizedDateFormatFromTemplate("EEEEMMMd")
+    return f.string(from: d)
 }
 private func familyTime(_ d: Date) -> String {
-    let f = DateFormatter(); f.dateFormat = "h:mm a"; return f.string(from: d)
+    let f = DateFormatter()
+    f.locale = FamilyL10n.shared.locale
+    f.timeStyle = .short
+    f.dateStyle = .none
+    return f.string(from: d)
 }
 
 /// AsyncImage can't load `data:` URLs, so decode base64 image data URLs directly.
@@ -41,12 +48,13 @@ final class FamilyTodayViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         do { activities = try await APIClient.shared.getFamilyActivity() }
-        catch { errorMessage = (error as? APIError)?.errorDescription ?? "Couldn't load today's updates." }
+        catch { errorMessage = (error as? APIError)?.errorDescription ?? L(.couldntLoadUpdates) }
     }
 }
 
 struct FamilyTodayView: View {
     @StateObject private var vm = FamilyTodayViewModel()
+    @ObservedObject private var l10n = FamilyL10n.shared
 
     private var grouped: [(day: String, items: [ActivityLogItem])] {
         var order: [String] = []
@@ -67,8 +75,8 @@ struct FamilyTodayView: View {
                 } else if vm.activities.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "sparkles").font(.largeTitle).foregroundColor(.cfPrimary.opacity(0.4))
-                        Text("No updates yet today").font(.cfSubheadline).foregroundColor(.cfTextSecondary)
-                        Text("Your child's teachers will share meals, naps, and moments here.")
+                        Text(L(.noUpdatesToday)).font(.cfSubheadline).foregroundColor(.cfTextSecondary)
+                        Text(L(.teachersWillShare))
                             .font(.cfCaption).foregroundColor(.cfTextSecondary).multilineTextAlignment(.center)
                     }.padding()
                 } else {
@@ -81,7 +89,7 @@ struct FamilyTodayView: View {
                     }
                 }
             }
-            .navigationTitle("Today")
+            .navigationTitle(L(.tabToday))
         }
         .task { await vm.load() }
         .refreshable { await vm.load() }

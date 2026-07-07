@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 @main
-struct ChildFlowApp: App {
+struct SproutApp: App {
     @StateObject private var appState = AppState()
     @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate
     @Environment(\.scenePhase) private var scenePhase

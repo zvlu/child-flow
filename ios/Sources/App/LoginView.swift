@@ -145,7 +145,7 @@ struct LoginView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Link("Contact your program administrator",
-                         destination: URL(string: "mailto:support@childflow.org")!)
+                         destination: URL(string: "mailto:support@sprout.org")!)
                         .font(.caption)
                         .foregroundColor(.accentColor)
                 }

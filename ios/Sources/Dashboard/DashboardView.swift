@@ -603,9 +603,11 @@ struct DashboardTask: Identifiable {
         /// against the family name, case-insensitively.
         case family(name: String, tab: FamilyDetailTab)
         case health
+        case healthCompliance
         case healthCategory(HealthCategory)
         case documents
         case attendance
+        case chronicAbsence
         case messages
     }
 }
@@ -688,9 +690,11 @@ struct TaskDestinationView: View {
         case .familyServices:                FamilyServicesView()
         case .family(let name, let tab):     FamilyLaunchView(familyName: name, tab: tab)
         case .health:                        HealthView()
+        case .healthCompliance:              HealthComplianceView()
         case .healthCategory(let category):  HealthCategoryLaunchView(category: category)
         case .documents:                     DocumentsView()
         case .attendance:                    AttendanceView()
+        case .chronicAbsence:               ChronicAbsenceView()
         case .messages:                      MessagingView()
         }
     }
@@ -786,12 +790,12 @@ class DashboardViewModel: ObservableObject {
             #if DEBUG
             alerts = [
                 ProgramAlert(id: "a1",
-                             title: "2 Children Below 85% Attendance",
-                             description: "Jason Chen (51%), Marcus Williams (72%) have active attendance plans.",
+                             title: "2 Children Chronically Absent",
+                             description: "Jason Chen (51%) and Marcus Williams (72%) are below the 85% threshold.",
                              type: "attendance"),
                 ProgramAlert(id: "a2",
-                             title: "5 Health Records Due This Month",
-                             description: "Dental exams and physical screenings need scheduling.",
+                             title: "3 Children Have Compliance Deadlines",
+                             description: "1 overdue health screening, 2 dental deadlines within 10 days.",
                              type: "health"),
                 ProgramAlert(id: "a3",
                              title: "3 Family Messages Not Delivered",
@@ -827,7 +831,7 @@ class DashboardViewModel: ObservableObject {
         pendingTasks = [
             DashboardTask(id: "t1", title: "Sign Sofia Johnson's IEP",             dueLabel: "Due today",  urgency: .today,    destination: .family(name: "Johnson", tab: .overview)),
             DashboardTask(id: "t2", title: "Complete FNA — Rodriguez family",       dueLabel: "Due Jun 12", urgency: .upcoming, destination: .family(name: "Rodriguez", tab: .fna)),
-            DashboardTask(id: "t3", title: "Schedule Jason Chen dental screening",  dueLabel: "Overdue",    urgency: .overdue,  destination: .healthCategory(.dental)),
+            DashboardTask(id: "t3", title: "Liam Rivera — health screening overdue", dueLabel: "Overdue",    urgency: .overdue,  destination: .healthCompliance),
             DashboardTask(id: "t4", title: "Upload Aaliyah's immunization record",  dueLabel: "Due Jun 15", urgency: .upcoming, destination: .healthCategory(.immunizations)),
             DashboardTask(id: "t5", title: "Review Marcus Williams CFCR",           dueLabel: "Due Jun 18", urgency: .upcoming, destination: .family(name: "Williams", tab: .cfcr)),
         ]

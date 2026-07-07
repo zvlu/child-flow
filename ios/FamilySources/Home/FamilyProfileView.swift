@@ -3,6 +3,7 @@ import SwiftUI
 struct FamilyProfileView: View {
     @EnvironmentObject var appState: FamilyAppState
     @State private var showSignOutConfirmation = false
+    @ObservedObject private var l10n = FamilyL10n.shared
 
     var body: some View {
         NavigationStack {
@@ -29,7 +30,7 @@ struct FamilyProfileView: View {
                         .padding(.vertical, 4)
                     }
 
-                    Section("My Children") {
+                    Section(L(.myChildren)) {
                         ForEach(profile.children) { child in
                             HStack(spacing: 12) {
                                 Circle()
@@ -52,24 +53,27 @@ struct FamilyProfileView: View {
                     }
                 }
 
-                Section("Support") {
-                    Link(destination: URL(string: "mailto:support@childflow.org")!) {
-                        Label("Contact Support", systemImage: "envelope")
+                // #50 Multilingual: in-app language switcher.
+                LanguagePickerSection()
+
+                Section(L(.support)) {
+                    Link(destination: URL(string: "mailto:support@sprout.org")!) {
+                        Label(L(.contactSupport), systemImage: "envelope")
                     }
                     NavigationLink(destination: FamilyAboutView()) {
-                        Label("About Sprout", systemImage: "info.circle")
+                        Label(L(.aboutSprout), systemImage: "info.circle")
                     }
                 }
 
                 Section {
-                    Button("Sign Out", role: .destructive) {
+                    Button(L(.signOut), role: .destructive) {
                         showSignOutConfirmation = true
                     }
                 }
             }
-            .navigationTitle("My Profile")
-            .confirmationDialog("Sign out?", isPresented: $showSignOutConfirmation, titleVisibility: .visible) {
-                Button("Sign Out", role: .destructive) {
+            .navigationTitle(L(.tabProfile))
+            .confirmationDialog(L(.signOutConfirm), isPresented: $showSignOutConfirmation, titleVisibility: .visible) {
+                Button(L(.signOut), role: .destructive) {
                     appState.signOut()
                 }
             }
@@ -78,17 +82,19 @@ struct FamilyProfileView: View {
 }
 
 struct FamilyAboutView: View {
+    @ObservedObject private var l10n = FamilyL10n.shared
+
     var body: some View {
         List {
             Section {
-                LabeledContent("App", value: "Sprout")
-                LabeledContent("For", value: "Head Start Families")
-                LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
+                LabeledContent(L(.appWord), value: "Sprout")
+                LabeledContent(L(.forWord), value: L(.headStartFamilies))
+                LabeledContent(L(.versionWord), value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
             }
-            Section("Contact") {
-                Link("support@childflow.org", destination: URL(string: "mailto:support@childflow.org")!)
+            Section {
+                Link("support@sprout.org", destination: URL(string: "mailto:support@sprout.org")!)
             }
         }
-        .navigationTitle("About")
+        .navigationTitle(L(.about))
     }
 }

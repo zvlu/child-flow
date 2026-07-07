@@ -4,6 +4,7 @@ import Charts
 /// Graphs for parents: weekly attendance per child and family goal progress.
 struct FamilyProgressView: View {
     @StateObject private var viewModel = FamilyProgressViewModel()
+    @ObservedObject private var l10n = FamilyL10n.shared
 
     var body: some View {
         NavigationStack {
@@ -31,7 +32,7 @@ struct FamilyProgressView: View {
                 }
                 .padding(.vertical)
             }
-            .navigationTitle("Progress")
+            .navigationTitle(L(.tabProgress))
             .refreshable { await viewModel.load() }
             .task { await viewModel.load() }
         }
@@ -42,9 +43,9 @@ struct FamilyProgressView: View {
             Image(systemName: "chart.bar")
                 .font(.largeTitle)
                 .foregroundColor(.secondary)
-            Text("No progress data yet")
+            Text(L(.noProgressData))
                 .font(.headline)
-            Text("Attendance and goal progress will appear here.")
+            Text(L(.progressWillAppear))
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
@@ -66,18 +67,18 @@ struct AttendanceChartCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("\(series.childName) — Attendance")
+                Text(L(.attendanceChartFmt, series.childName))
                     .font(.headline)
                 Spacer()
                 if let latest = series.weeks.last {
-                    Text("\(latest.rate)% this week")
+                    Text(L(.thisWeekFmt, latest.rate))
                         .font(.caption.weight(.semibold))
                         .foregroundColor(barColor(latest.rate))
                 }
             }
 
             if series.weeks.isEmpty {
-                Text("No attendance recorded yet.")
+                Text(L(.noAttendanceRecorded))
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
@@ -97,7 +98,7 @@ struct AttendanceChartCard: View {
                 .chartYScale(domain: 0...100)
                 .frame(height: 170)
 
-                Text("Dashed line: the 85% attendance goal")
+                Text(L(.dashedLine85))
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -115,7 +116,7 @@ struct GoalsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Family Goals")
+            Text(L(.familyGoals))
                 .font(.headline)
 
             ForEach(goals) { goal in
@@ -125,7 +126,7 @@ struct GoalsCard: View {
                             .font(.subheadline.weight(.medium))
                         Spacer()
                         if goal.status == "completed" {
-                            Label("Done", systemImage: "checkmark.circle.fill")
+                            Label(L(.done), systemImage: "checkmark.circle.fill")
                                 .font(.caption.weight(.semibold))
                                 .foregroundColor(.green)
                         } else {

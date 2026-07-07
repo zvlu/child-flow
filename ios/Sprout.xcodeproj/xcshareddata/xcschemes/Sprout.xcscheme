@@ -15,10 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "715DA1811291A120D44D3E24"
-               BuildableName = "ChildFlow.app"
-               BlueprintName = "ChildFlow"
-               ReferencedContainer = "container:ChildFlow.xcodeproj">
+               BlueprintIdentifier = "A0A478F3AEF1FB11D68C21A5"
+               BuildableName = "Sprout.app"
+               BlueprintName = "Sprout"
+               ReferencedContainer = "container:Sprout.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -32,10 +32,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "715DA1811291A120D44D3E24"
-            BuildableName = "ChildFlow.app"
-            BlueprintName = "ChildFlow"
-            ReferencedContainer = "container:ChildFlow.xcodeproj">
+            BlueprintIdentifier = "A0A478F3AEF1FB11D68C21A5"
+            BuildableName = "Sprout.app"
+            BlueprintName = "Sprout"
+            ReferencedContainer = "container:Sprout.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -44,10 +44,10 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "CD042676ABEBCF15B054DADC"
-               BuildableName = "ChildFlowTests.xctest"
-               BlueprintName = "ChildFlowTests"
-               ReferencedContainer = "container:ChildFlow.xcodeproj">
+               BlueprintIdentifier = "00AB10705A8E5E4FCB6934A7"
+               BuildableName = "SproutTests.xctest"
+               BlueprintName = "SproutTests"
+               ReferencedContainer = "container:Sprout.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -68,10 +68,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "715DA1811291A120D44D3E24"
-            BuildableName = "ChildFlow.app"
-            BlueprintName = "ChildFlow"
-            ReferencedContainer = "container:ChildFlow.xcodeproj">
+            BlueprintIdentifier = "A0A478F3AEF1FB11D68C21A5"
+            BuildableName = "Sprout.app"
+            BlueprintName = "Sprout"
+            ReferencedContainer = "container:Sprout.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -87,10 +87,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "715DA1811291A120D44D3E24"
-            BuildableName = "ChildFlow.app"
-            BlueprintName = "ChildFlow"
-            ReferencedContainer = "container:ChildFlow.xcodeproj">
+            BlueprintIdentifier = "A0A478F3AEF1FB11D68C21A5"
+            BuildableName = "Sprout.app"
+            BlueprintName = "Sprout"
+            ReferencedContainer = "container:Sprout.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>

@@ -178,6 +178,194 @@ struct EnrollmentApplication: Codable, Identifiable {
     let classroom: String?
 }
 
+// MARK: - ERSEA (Eligibility / Recruitment / Selection / Enrollment / Attendance)
+
+/// 2024 Federal Poverty Level guidelines — household size → annual income limit (100% FPL)
+/// Source: HHS 2024 FPL guidelines. Head Start income limit = 100% FPL.
+struct FederalPovertyLevel {
+    static let limits2024: [Int: Int] = [
+        1: 15060, 2: 20440, 3: 25820, 4: 31200, 5: 36580,
+        6: 41960, 7: 47340, 8: 52720
+    ]
+    /// Returns annual income limit for household size (adds $5,380 per person beyond 8)
+    static func limit(for householdSize: Int) -> Int {
+        if householdSize <= 8 { return limits2024[householdSize] ?? 52720 }
+        return 52720 + (householdSize - 8) * 5380
+    }
+    /// Returns percentage of FPL (e.g. 85 for 85% FPL)
+    static func percentage(income: Int, householdSize: Int) -> Double {
+        let lim = Double(limit(for: householdSize))
+        return (Double(income) / lim) * 100
+    }
+}
+
+/// Categorical eligibility bypasses income testing — child is automatically eligible
+enum CategoricalEligibility: String, Codable, CaseIterable {
+    case homeless           = "Experiencing Homelessness (McKinney-Vento)"
+    case fosterCare         = "Foster Care"
+    case publicAssistance   = "Receiving Public Assistance (SNAP/TANF/SSI)"
+    case iepIfsp            = "Has IEP or IFSP"
+    case none               = "None (income-based)"
+
+    var icon: String {
+        switch self {
+        case .homeless:         return "house.slash.fill"
+        case .fosterCare:       return "figure.2.and.child.holdinghands"
+        case .publicAssistance: return "creditcard.fill"
+        case .iepIfsp:          return "doc.badge.plus"
+        case .none:             return "dollarsign.circle"
+        }
+    }
+    var color: Color {
+        switch self {
+        case .homeless:         return .cfHealth
+        case .fosterCare:       return .cfFamily
+        case .publicAssistance: return .cfPrimary
+        case .iepIfsp:          return .cfGoals
+        case .none:             return .cfTextSecondary
+        }
+    }
+    var isAutoEligible: Bool { self != .none }
+}
+
+/// Full ERSEA eligibility record for one applicant
+struct EligibilityRecord: Codable, Identifiable {
+    let id: String
+    let childName: String
+    let childDateOfBirth: Date
+    let familyId: String?
+    let applicationDate: Date
+
+    // Income eligibility
+    var householdSize: Int
+    var annualIncome: Int                       // total household
+    var incomeSource: String                    // e.g. "Employment + SNAP"
+
+    // Categorical
+    var categoricalEligibility: CategoricalEligibility
+
+    // Selection priority score (higher = selected first)
+    // Head Start grantees must document selection criteria per §1302.14
+    var priorityScore: Int                      // computed from risk factors below
+    var riskFactors: [EligibilityRiskFactor]
+
+    // Status
+    var status: EligibilityStatus
+    var enrolledDate: Date?
+    var classroom: String?
+    var waitlistPosition: Int?                  // nil if enrolled/withdrawn
+    var notes: String
+
+    // MARK: Computed
+    var isIncomeEligible: Bool {
+        annualIncome <= FederalPovertyLevel.limit(for: householdSize)
+    }
+    var isEligible: Bool {
+        categoricalEligibility.isAutoEligible || isIncomeEligible
+    }
+    var fplPercentage: Double {
+        FederalPovertyLevel.percentage(income: annualIncome, householdSize: householdSize)
+    }
+    var childAge: Int {
+        Calendar.current.dateComponents([.year], from: childDateOfBirth, to: Date()).year ?? 0
+    }
+
+    enum EligibilityStatus: String, Codable, CaseIterable {
+        case pending   = "Pending Review"
+        case eligible  = "Eligible — Waitlist"
+        case enrolled  = "Enrolled"
+        case denied    = "Ineligible"
+        case withdrawn = "Withdrawn"
+
+        var color: Color {
+            switch self {
+            case .pending:   return .orange
+            case .eligible:  return .cfPrimary
+            case .enrolled:  return .cfAttendance
+            case .denied:    return .cfHealth
+            case .withdrawn: return .cfTextSecondary
+            }
+        }
+        var icon: String {
+            switch self {
+            case .pending:   return "clock.fill"
+            case .eligible:  return "list.number"
+            case .enrolled:  return "checkmark.circle.fill"
+            case .denied:    return "xmark.circle.fill"
+            case .withdrawn: return "minus.circle.fill"
+            }
+        }
+    }
+}
+
+/// Risk factors that increase selection priority score
+enum EligibilityRiskFactor: String, Codable, CaseIterable {
+    case singleParent        = "Single Parent Household"
+    case childInFosterCare   = "Child in Foster Care"
+    case domesticViolence    = "Domestic Violence"
+    case parentWithDisability = "Parent with Disability"
+    case homeless            = "Experiencing Homelessness"
+    case limitedEnglish      = "Limited English Proficiency"
+    case childHasIEP         = "Child Has IEP/IFSP"
+    case refugeeAsylum       = "Refugee or Asylum Seeker"
+    case substanceUse        = "Substance Use in Home"
+    case incarceratedParent  = "Incarcerated Parent"
+
+    var pointValue: Int {
+        switch self {
+        case .homeless, .childInFosterCare, .domesticViolence: return 10
+        case .childHasIEP, .singleParent: return 7
+        case .limitedEnglish, .parentWithDisability: return 5
+        default: return 3
+        }
+    }
+    var icon: String { "exclamationmark.shield.fill" }
+}
+
+// MARK: - Suspension / Expulsion Log (Performance Standards §1302.17)
+// Programs may NOT expel or suspend children without following specific steps
+
+struct SuspensionExpulsionLog: Codable, Identifiable {
+    let id: String
+    let childId: String
+    let childName: String
+    let incidentDate: Date
+    let incidentType: IncidentType
+    var behaviorDescription: String
+
+    // Required steps before any suspension/expulsion
+    var mentalHealthConsultRequested: Bool
+    var mentalHealthConsultDate: Date?
+    var familyMeetingHeld: Bool
+    var familyMeetingDate: Date?
+    var behaviourSupportPlanCreated: Bool
+    var behaviourSupportPlanDate: Date?
+    var stateAgencyNotified: Bool          // required before expulsion
+    var stateNotificationDate: Date?
+    var outcome: Outcome
+    var resolutionDate: Date?
+    var notes: String
+
+    var allStepsComplete: Bool {
+        mentalHealthConsultRequested && familyMeetingHeld && behaviourSupportPlanCreated
+    }
+
+    enum IncidentType: String, Codable, CaseIterable {
+        case suspensionShort = "Short-term Suspension (<10 days)"
+        case suspensionLong  = "Long-term Suspension (10+ days)"
+        case expulsion       = "Expulsion"
+        case internalReview  = "Internal Review Only"
+    }
+
+    enum Outcome: String, Codable, CaseIterable {
+        case returned         = "Child Returned"
+        case transferred      = "Transferred to Another Program"
+        case behaviourSupport = "Behavior Support Plan Active"
+        case expelledByParent = "Family Withdrew Child"
+        case pending          = "Pending Resolution"
+    }
+}
+
 // MARK: - Dashboard
 struct ProgramStats: Codable {
     var totalEnrolled: Int = 0
@@ -447,6 +635,10 @@ struct Message: Codable, Identifiable {
     let body: String
     let sentAt: Date
     let isRead: Bool
+    /// Original text when `body` was auto-translated into the viewer's language.
+    var bodyOriginal: String?
+    /// True when `body` is an AI translation of `bodyOriginal`.
+    var isTranslated: Bool?
 
     enum SenderRole: String, Codable {
         case staff, family
@@ -701,6 +893,144 @@ struct FamilyPartnershipAgreement: Codable, Identifiable {
     }
 }
 
+// MARK: - Family Referral (community service referrals tracked in FPA)
+struct FamilyReferral: Codable, Identifiable {
+    let id: String
+    let familyId: String
+    let agencyName: String
+    let serviceType: ReferralService
+    let referredBy: String
+    let referralDate: Date
+    var followUpDate: Date?
+    var status: ReferralStatus
+    var notes: String
+    var outcomeNotes: String
+
+    enum ReferralService: String, Codable, CaseIterable {
+        case housing            = "Housing Assistance"
+        case foodAssistance     = "Food Assistance"
+        case mentalHealth       = "Mental Health Services"
+        case substanceUse       = "Substance Use Support"
+        case domesticViolence   = "Domestic Violence Services"
+        case legalAid           = "Legal Aid"
+        case employment         = "Employment Services"
+        case adultEducation     = "Adult Education / GED"
+        case childcare          = "Additional Childcare"
+        case medicalCare        = "Medical Care"
+        case dentalCare         = "Dental Care"
+        case visionCare         = "Vision Care"
+        case transportation     = "Transportation"
+        case utilityAssistance  = "Utility Assistance"
+        case financialCounseling = "Financial Counseling"
+        case other              = "Other"
+
+        var icon: String {
+            switch self {
+            case .housing:            return "house.fill"
+            case .foodAssistance:     return "cart.fill"
+            case .mentalHealth:       return "brain.head.profile"
+            case .substanceUse:       return "cross.case.fill"
+            case .domesticViolence:   return "shield.fill"
+            case .legalAid:           return "building.columns.fill"
+            case .employment:         return "briefcase.fill"
+            case .adultEducation:     return "graduationcap.fill"
+            case .childcare:          return "figure.child"
+            case .medicalCare:        return "stethoscope"
+            case .dentalCare:         return "tooth.fill"
+            case .visionCare:         return "eye.fill"
+            case .transportation:     return "car.fill"
+            case .utilityAssistance:  return "bolt.fill"
+            case .financialCounseling: return "dollarsign.circle.fill"
+            case .other:              return "star.fill"
+            }
+        }
+    }
+
+    enum ReferralStatus: String, Codable, CaseIterable {
+        case pending    = "Pending"
+        case contacted  = "Contacted"
+        case enrolled   = "Enrolled / Receiving"
+        case declined   = "Declined by Family"
+        case unavailable = "Service Unavailable"
+        case completed  = "Completed"
+
+        var color: Color {
+            switch self {
+            case .pending:     return .orange
+            case .contacted:   return .cfPrimary
+            case .enrolled:    return .cfAttendance
+            case .declined:    return .cfTextSecondary
+            case .unavailable: return .cfHealth
+            case .completed:   return .cfAttendance
+            }
+        }
+        var icon: String {
+            switch self {
+            case .pending:     return "clock.fill"
+            case .contacted:   return "phone.fill"
+            case .enrolled:    return "checkmark.circle.fill"
+            case .declined:    return "xmark.circle.fill"
+            case .unavailable: return "nosign"
+            case .completed:   return "checkmark.seal.fill"
+            }
+        }
+    }
+}
+
+// MARK: - Home Visit Log
+struct HomeVisitLog: Codable, Identifiable {
+    let id: String
+    let familyId: String
+    let visitDate: Date
+    let visitType: VisitType
+    let durationMinutes: Int
+    let conductedBy: String
+    let topicsCovered: [VisitTopic]
+    var notes: String
+    var goalsMentioned: [String]   // goal IDs referenced in visit
+    let locationVerified: Bool     // GPS stamp captured
+
+    var durationLabel: String {
+        let h = durationMinutes / 60
+        let m = durationMinutes % 60
+        if h > 0 { return m > 0 ? "\(h)h \(m)m" : "\(h)h" }
+        return "\(m)m"
+    }
+
+    enum VisitType: String, Codable, CaseIterable {
+        case homeVisit      = "Home Visit"
+        case officeVisit    = "Office Visit"
+        case phoneCall      = "Phone Call"
+        case groupSocial    = "Group Socialization"
+        case communityEvent = "Community Event"
+
+        var icon: String {
+            switch self {
+            case .homeVisit:      return "house.fill"
+            case .officeVisit:    return "building.2.fill"
+            case .phoneCall:      return "phone.fill"
+            case .groupSocial:    return "person.3.fill"
+            case .communityEvent: return "mappin.circle.fill"
+            }
+        }
+    }
+
+    enum VisitTopic: String, Codable, CaseIterable {
+        case childDevelopment   = "Child Development"
+        case familyGoals        = "Family Goals"
+        case healthWellness     = "Health & Wellness"
+        case housingStability   = "Housing Stability"
+        case employment         = "Employment"
+        case education          = "Adult Education"
+        case parentingSkills    = "Parenting Skills"
+        case communityResources = "Community Resources"
+        case childBehavior      = "Child Behavior"
+        case schoolReadiness    = "School Readiness"
+        case crisisSupport      = "Crisis Support"
+        case other              = "Other"
+    }
+}
+
 // MARK: - Family Goals (SMART Goals)
 struct FamilyGoal: Codable, Identifiable {
     let id: String
@@ -877,6 +1207,104 @@ struct NewCFCRRequest: Codable {
     let behaviorNotes: String
     let developmentalNotes: String
     let familyGoalNotes: String
+}
+
+// MARK: - Chronic Absence Alert System
+// Head Start requires 85% attendance — below = chronic absence (>10% absent days)
+// Performance Standards §1302.21
+
+struct ChronicAbsenceAlert: Identifiable, Codable {
+    let childId: String
+    let childName: String
+    let familyId: String
+    let classroom: String
+    let familyAdvocate: String
+
+    // Attendance stats for current program year
+    let totalDaysEnrolled: Int
+    let totalDaysPresent: Int
+    let totalDaysAbsent: Int
+    let unexcusedAbsences: Int
+    let excusedAbsences: Int
+
+    var id: String { childId }
+
+    // Trend: last 4 weeks rates (0.0–1.0)
+    var weeklyRates: [Double]          // most recent last
+
+    // Risk categorization
+    var riskLevel: RiskLevel {
+        if attendanceRate < 0.60 { return .severe }
+        if attendanceRate < 0.75 { return .high }
+        if attendanceRate < 0.85 { return .at_risk }
+        if attendanceRate < 0.90 { return .watch }
+        return .onTrack
+    }
+
+    var attendanceRate: Double {
+        totalDaysEnrolled > 0 ? Double(totalDaysPresent) / Double(totalDaysEnrolled) : 1.0
+    }
+
+    var absenceRate: Double { 1.0 - attendanceRate }
+
+    var hasAIP: Bool                   // Attendance Improvement Plan exists
+    var lastOutreachDate: Date?
+    var consecutiveAbsences: Int       // current streak
+    var notes: String
+
+    enum RiskLevel: String, CaseIterable {
+        case severe  = "Severe (<60%)"
+        case high    = "High (<75%)"
+        case at_risk = "At Risk (<85%)"
+        case watch   = "Needs Monitoring"
+        case onTrack = "On Track"
+
+        var color: Color {
+            switch self {
+            case .severe:  return Color(red: 0.85, green: 0.1, blue: 0.1)
+            case .high:    return .cfHealth
+            case .at_risk: return Color(red: 0.9, green: 0.4, blue: 0.1)
+            case .watch:   return .orange
+            case .onTrack: return .cfAttendance
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .severe:  return "exclamationmark.octagon.fill"
+            case .high:    return "xmark.circle.fill"
+            case .at_risk: return "exclamationmark.triangle.fill"
+            case .watch:   return "eye.fill"
+            case .onTrack: return "checkmark.circle.fill"
+            }
+        }
+
+        var priority: Int {
+            switch self {
+            case .severe: return 0; case .high: return 1; case .at_risk: return 2
+            case .watch: return 3; case .onTrack: return 4
+            }
+        }
+
+        var needsAIP: Bool { self == .severe || self == .high || self == .at_risk }
+    }
+
+    /// Auto-generate outreach message text
+    func outreachMessage(advocateName: String) -> String {
+        let pct = Int(attendanceRate * 100)
+        return """
+Hello, this is \(advocateName) from the Head Start program.
+
+We're reaching out because \(childName)'s attendance is currently \(pct)%, which is below our 85% requirement for program participation.
+
+We want to make sure your family has all the support needed to attend consistently. Could we schedule a time to talk about any barriers you're experiencing?
+
+Please reply to this message or call us at your convenience.
+
+Warm regards,
+\(advocateName)
+"""
+    }
 }
 
 // MARK: - Attendance Success Plan
@@ -1312,6 +1740,155 @@ struct StaffContactDetail: Decodable, Identifiable {
     let familyName: String
     let description: String
     let followUpRequired: Bool
+}
+
+// MARK: - Health Compliance (Head Start 45-day health / 90-day dental deadlines)
+
+/// Per-child compliance status for a single health screening type.
+struct ChildHealthCompliance: Identifiable, Codable {
+    let childId: String
+    let childName: String
+    let familyId: String
+    let enrollmentDate: Date           // clock starts here
+    let dateOfBirth: Date
+
+    // Screenings
+    var healthScreeningDate: Date?     // must complete within 45 days of enrollment
+    var dentalScreeningDate: Date?     // must complete within 90 days
+    var visionScreeningDate: Date?     // recommended within 45 days
+    var hearingScreeningDate: Date?    // recommended within 45 days
+    var developmentalScreeningDate: Date? // ASQ or similar
+
+    var id: String { childId }
+
+    // MARK: Deadlines
+    var healthDeadline: Date { Calendar.current.date(byAdding: .day, value: 45, to: enrollmentDate)! }
+    var dentalDeadline: Date { Calendar.current.date(byAdding: .day, value: 90, to: enrollmentDate)! }
+
+    // MARK: Days remaining (negative = overdue)
+    var healthDaysRemaining: Int { Calendar.current.dateComponents([.day], from: Date(), to: healthDeadline).day ?? 0 }
+    var dentalDaysRemaining: Int { Calendar.current.dateComponents([.day], from: Date(), to: dentalDeadline).day ?? 0 }
+
+    var healthStatus: ComplianceStatus {
+        if healthScreeningDate != nil { return .completed }
+        let d = healthDaysRemaining
+        if d < 0 { return .overdue }
+        if d <= 7 { return .critical }
+        if d <= 14 { return .warning }
+        return .onTrack
+    }
+
+    var dentalStatus: ComplianceStatus {
+        if dentalScreeningDate != nil { return .completed }
+        let d = dentalDaysRemaining
+        if d < 0 { return .overdue }
+        if d <= 7 { return .critical }
+        if d <= 14 { return .warning }
+        return .onTrack
+    }
+
+    enum ComplianceStatus: String {
+        case completed = "Completed"
+        case onTrack   = "On Track"
+        case warning   = "Due Soon"
+        case critical  = "Urgent"
+        case overdue   = "Overdue"
+
+        var color: Color {
+            switch self {
+            case .completed: return .cfAttendance
+            case .onTrack:   return .cfPrimary
+            case .warning:   return .orange
+            case .critical:  return Color(red: 0.9, green: 0.4, blue: 0.1)
+            case .overdue:   return .cfHealth
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .completed: return "checkmark.circle.fill"
+            case .onTrack:   return "clock.fill"
+            case .warning:   return "exclamationmark.circle"
+            case .critical:  return "exclamationmark.triangle.fill"
+            case .overdue:   return "xmark.circle.fill"
+            }
+        }
+
+        var priority: Int {
+            switch self {
+            case .overdue: return 0; case .critical: return 1
+            case .warning: return 2; case .onTrack: return 3; case .completed: return 4
+            }
+        }
+    }
+}
+
+// MARK: - Safety Drill Log
+
+struct SafetyDrillLog: Codable, Identifiable {
+    let id: String
+    let drillType: DrillType
+    let drillDate: Date
+    let conductedBy: String
+    let durationMinutes: Int
+    let participantCount: Int
+    var notes: String
+    var issuesFound: String
+    var resolvedDate: Date?
+
+    enum DrillType: String, Codable, CaseIterable {
+        case fireEvacuation     = "Fire Evacuation"
+        case lockdown           = "Lockdown"
+        case tornadoShelter     = "Tornado / Severe Weather"
+        case busEvacuation      = "Bus Evacuation"
+        case firstAid           = "First Aid / Emergency"
+        case other              = "Other"
+
+        var icon: String {
+            switch self {
+            case .fireEvacuation: return "flame.fill"
+            case .lockdown:       return "lock.shield.fill"
+            case .tornadoShelter: return "tornado"
+            case .busEvacuation:  return "bus.fill"
+            case .firstAid:       return "cross.fill"
+            case .other:          return "exclamationmark.triangle.fill"
+            }
+        }
+    }
+}
+
+// MARK: - Mental Health Consult Log
+
+struct MentalHealthConsult: Codable, Identifiable {
+    let id: String
+    let childId: String?               // nil = program-level consult
+    let childName: String?
+    let consultDate: Date
+    let consultantName: String
+    let consultType: ConsultType
+    var summary: String
+    var followUpDate: Date?
+    var followUpNotes: String
+
+    enum ConsultType: String, Codable, CaseIterable {
+        case behaviorSupport    = "Behavior Support"
+        case familySupport      = "Family Support"
+        case staffCoaching      = "Staff Coaching"
+        case classroomStrategy  = "Classroom Strategy"
+        case referralReview     = "Referral Review"
+        case programwide        = "Program-wide Planning"
+
+        var icon: String {
+            switch self {
+            case .behaviorSupport:   return "brain.head.profile"
+            case .familySupport:     return "house.and.flag.fill"
+            case .staffCoaching:     return "person.badge.shield.checkmark"
+            case .classroomStrategy: return "rectangle.on.rectangle.fill"
+            case .referralReview:    return "arrow.turn.up.right"
+            case .programwide:       return "building.2.fill"
+            }
+        }
+    }
 }
 
 /// Display label for a family-contact type key (shared by web + iOS).

@@ -4,6 +4,7 @@ import SwiftUI
 
 struct FamilyMessagesView: View {
     @StateObject private var viewModel = FamilyMessagesViewModel()
+    @ObservedObject private var l10n = FamilyL10n.shared
 
     var body: some View {
         NavigationStack {
@@ -12,9 +13,9 @@ struct FamilyMessagesView: View {
                     ProgressView()
                 } else if viewModel.conversations.isEmpty {
                     ContentUnavailableView(
-                        "No Messages Yet",
+                        L(.noMessagesYet),
                         systemImage: "bubble.left.and.bubble.right",
-                        description: Text("Your child's teachers will reach out here.")
+                        description: Text(L(.teachersReachOut))
                     )
                 } else {
                     List(viewModel.conversations) { conversation in
@@ -30,7 +31,7 @@ struct FamilyMessagesView: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle("Messages")
+            .navigationTitle(L(.tabMessages))
             .task { await viewModel.load() }
             .refreshable { await viewModel.load() }
         }
@@ -72,7 +73,7 @@ struct FamilyConversationRow: View {
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
-                Text("Re: \(conversation.childName)")
+                Text(L(.reFmt, conversation.childName))
                     .font(.caption)
                     .foregroundColor(.accentColor)
                 Text(conversation.lastMessage)
@@ -119,7 +120,7 @@ struct FamilyChatView: View {
             Divider()
 
             HStack(alignment: .bottom, spacing: 10) {
-                TextField("Message", text: $viewModel.draft, axis: .vertical)
+                TextField(L(.messagePlaceholder), text: $viewModel.draft, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(1...5)
                     .focused($isInputFocused)
@@ -136,7 +137,7 @@ struct FamilyChatView: View {
             .padding(.horizontal)
             .padding(.vertical, 10)
         }
-        .navigationTitle(conversation.participantNames.first ?? "Messages")
+        .navigationTitle(conversation.participantNames.first ?? L(.tabMessages))
         .navigationBarTitleDisplayMode(.inline)
         .task { await viewModel.load() }
     }
@@ -145,8 +146,10 @@ struct FamilyChatView: View {
 // Family bubble — flipped perspective (family messages on right, staff on left)
 struct FamilyMessageBubble: View {
     let message: Message
+    @State private var showOriginal = false
 
     var isFromFamily: Bool { message.senderRole == .family }
+    var isTranslated: Bool { (message.isTranslated ?? false) && message.bodyOriginal != nil }
 
     var body: some View {
         HStack {
@@ -160,17 +163,28 @@ struct FamilyMessageBubble: View {
                         .padding(.leading, 4)
                 }
 
-                Text(message.body)
+                Text(showOriginal ? (message.bodyOriginal ?? message.body) : message.body)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(isFromFamily ? Color.accentColor : Color(.secondarySystemBackground))
                     .foregroundColor(isFromFamily ? .white : .primary)
                     .clipShape(RoundedRectangle(cornerRadius: 18))
 
-                Text(message.sentAt, style: .time)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 4)
+                HStack(spacing: 6) {
+                    Text(message.sentAt, style: .time)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    if isTranslated {
+                        Button {
+                            withAnimation { showOriginal.toggle() }
+                        } label: {
+                            Label(showOriginal ? "Translated" : "Original", systemImage: "globe")
+                                .font(.caption2)
+                                .foregroundColor(.accentColor)
+                        }
+                    }
+                }
+                .padding(.horizontal, 4)
             }
 
             if !isFromFamily { Spacer(minLength: 60) }

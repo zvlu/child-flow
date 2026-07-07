@@ -121,6 +121,33 @@ actor APIClient {
         try await get("health")
     }
 
+    // MARK: - Health Compliance (45-day / 90-day deadlines)
+    func getHealthCompliance() async throws -> [ChildHealthCompliance] {
+        try await get("health/compliance")
+    }
+
+    func updateHealthCompliance(_ record: ChildHealthCompliance) async throws {
+        let _: EmptyResponse = try await post("health/compliance/\(record.childId)", body: record)
+    }
+
+    // MARK: - Safety Drills
+    func getSafetyDrills() async throws -> [SafetyDrillLog] {
+        try await get("health/drills")
+    }
+
+    func logSafetyDrill(_ drill: SafetyDrillLog) async throws {
+        let _: EmptyResponse = try await post("health/drills", body: drill)
+    }
+
+    // MARK: - Mental Health Consults
+    func getMentalHealthConsults() async throws -> [MentalHealthConsult] {
+        try await get("health/consults")
+    }
+
+    func logMentalHealthConsult(_ consult: MentalHealthConsult) async throws {
+        let _: EmptyResponse = try await post("health/consults", body: consult)
+    }
+
     // MARK: - Family Services
     func getFamilies() async throws -> [Family] {
         try await get("families")
@@ -134,6 +161,27 @@ actor APIClient {
     // MARK: - Enrollment
     func getEnrollmentApplications() async throws -> [EnrollmentApplication] {
         try await get("enrollment")
+    }
+
+    // MARK: - ERSEA
+    func getEligibilityRecords() async throws -> [EligibilityRecord] {
+        try await get("ersea/eligibility")
+    }
+
+    func createEligibilityRecord(_ record: EligibilityRecord) async throws {
+        let _: EmptyResponse = try await post("ersea/eligibility", body: record)
+    }
+
+    func updateEligibilityRecord(_ record: EligibilityRecord) async throws {
+        let _: EmptyResponse = try await post("ersea/eligibility/\(record.id)", body: record)
+    }
+
+    func getSuspensionLogs() async throws -> [SuspensionExpulsionLog] {
+        try await get("ersea/suspensions")
+    }
+
+    func createSuspensionLog(_ log: SuspensionExpulsionLog) async throws {
+        let _: EmptyResponse = try await post("ersea/suspensions", body: log)
     }
 
     // MARK: - Reports
@@ -283,6 +331,15 @@ actor APIClient {
         return try await post("messaging/conversations", body: req)
     }
 
+    /// Sync the user's preferred message language — the server then auto-
+    /// translates incoming messages into it (real-time translation).
+    struct LanguagePreferenceRequest: Codable { let language: String }
+    struct LanguagePreferenceResponse: Codable { let ok: Bool; let language: String }
+    @discardableResult
+    func setPreferredLanguage(_ code: String) async throws -> LanguagePreferenceResponse {
+        try await post("messaging/language", body: LanguagePreferenceRequest(language: code))
+    }
+
     // MARK: - Family Invitations (Staff-side)
     func getInvitationStatus(criteria: InvitationFilterCriteria) async throws -> InvitationsResponse {
         try await post("messaging/invitations/search", body: criteria)
@@ -310,6 +367,32 @@ actor APIClient {
     func createFPA(familyId: String) async throws -> FamilyPartnershipAgreement {
         struct Req: Encodable { let familyId: String }
         return try await post("families/fpa", body: Req(familyId: familyId))
+    }
+
+    func updateFPA(_ fpa: FamilyPartnershipAgreement) async throws {
+        let _: EmptyResponse = try await post("families/\(fpa.familyId)/fpa/update", body: fpa)
+    }
+
+    // MARK: - Referrals
+    func getReferrals(familyId: String) async throws -> [FamilyReferral] {
+        try await get("families/\(familyId)/referrals")
+    }
+
+    func addReferral(_ referral: FamilyReferral) async throws {
+        let _: EmptyResponse = try await post("families/\(referral.familyId)/referrals", body: referral)
+    }
+
+    func updateReferral(_ referral: FamilyReferral) async throws {
+        let _: EmptyResponse = try await post("families/\(referral.familyId)/referrals/\(referral.id)", body: referral)
+    }
+
+    // MARK: - Home Visit Logs
+    func getVisitLogs(familyId: String) async throws -> [HomeVisitLog] {
+        try await get("families/\(familyId)/visits")
+    }
+
+    func logHomeVisit(_ visit: HomeVisitLog) async throws {
+        let _: EmptyResponse = try await post("families/\(visit.familyId)/visits", body: visit)
     }
 
     // MARK: - Family Goals
@@ -354,9 +437,13 @@ actor APIClient {
         try await get("attendance/plans")
     }
 
-    func createAttendancePlan(childId: String, barriers: [String]) async throws -> AttendanceSuccessPlan {
-        struct Req: Encodable { let childId: String; let barriers: [String] }
-        return try await post("attendance/plans", body: Req(childId: childId, barriers: barriers))
+    func createAttendancePlan(_ plan: AttendanceSuccessPlan) async throws {
+        let _: EmptyResponse = try await post("attendance/plans", body: plan)
+    }
+
+    // MARK: - Chronic Absence Alerts
+    func getChronicAbsenceAlerts() async throws -> [ChronicAbsenceAlert] {
+        try await get("attendance/chronic-absence")
     }
 
     // MARK: - Application Verification

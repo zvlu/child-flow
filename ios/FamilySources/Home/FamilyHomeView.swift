@@ -4,6 +4,7 @@ struct FamilyHomeView: View {
     @EnvironmentObject var appState: FamilyAppState
     @StateObject private var viewModel = FamilyHomeViewModel()
     @State private var showReportAbsence = false
+    @ObservedObject private var l10n = FamilyL10n.shared
 
     var body: some View {
         NavigationStack {
@@ -20,9 +21,9 @@ struct FamilyHomeView: View {
                     if let profile = appState.familyProfile {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Hello, \(profile.fullName.split(separator: " ").first.map(String.init) ?? profile.fullName) 👋")
+                                Text(L(.helloFmt, profile.fullName.split(separator: " ").first.map(String.init) ?? profile.fullName))
                                     .font(.title2.bold())
-                                Text("Here's an update on your child.")
+                                Text(L(.childUpdateSubtitle))
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
@@ -40,9 +41,9 @@ struct FamilyHomeView: View {
                             Image(systemName: "calendar.badge.minus")
                                 .font(.system(size: 18, weight: .semibold))
                             VStack(alignment: .leading, spacing: 1) {
-                                Text("My child isn't coming")
+                                Text(L(.childNotComing))
                                     .font(.subheadline.weight(.semibold))
-                                Text("Report an absence — your family advocate will confirm")
+                                Text(L(.reportAbsenceSubtitle))
                                     .font(.caption2)
                                     .opacity(0.85)
                             }
@@ -76,7 +77,7 @@ struct FamilyHomeView: View {
                     // Recent absence reports + their review status
                     if !viewModel.absences.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Absence Reports")
+                            Text(L(.absenceReports))
                                 .font(.headline)
                                 .padding(.horizontal)
                             ForEach(viewModel.absences.prefix(3)) { report in
@@ -89,7 +90,7 @@ struct FamilyHomeView: View {
                     // Notifications
                     if !viewModel.notifications.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Notifications")
+                            Text(L(.notifications))
                                 .font(.headline)
                                 .padding(.horizontal)
                             ForEach(viewModel.notifications.prefix(5)) { note in
@@ -102,7 +103,7 @@ struct FamilyHomeView: View {
                     // Upcoming events
                     if !viewModel.upcomingEvents.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Upcoming")
+                            Text(L(.upcoming))
                                 .font(.headline)
                                 .padding(.horizontal)
 
@@ -115,7 +116,7 @@ struct FamilyHomeView: View {
                 }
                 .padding(.bottom, 24)
             }
-            .navigationTitle("Home")
+            .navigationTitle(L(.tabHome))
             .refreshable { await viewModel.load() }
             .task { await viewModel.load() }
             .sheet(isPresented: $showReportAbsence) {
@@ -140,7 +141,7 @@ struct SchoolStatusBanner: View {
                 Text(status.label)
                     .font(.subheadline.weight(.semibold))
                 if let title = status.nextClosureTitle, let date = status.nextClosureDate {
-                    Text("Next closure: \(title) · \(date.formatted(.dateTime.month(.abbreviated).day()))")
+                    Text(L(.nextClosureFmt, "\(title) · \(date.formatted(.dateTime.month(.abbreviated).day()))"))
                         .font(.caption2)
                         .opacity(0.8)
                 }
@@ -169,9 +170,9 @@ struct AbsenceReportRow: View {
 
     var statusLabel: String {
         switch report.status {
-        case "approved": return "Approved"
-        case "denied":   return "See advocate"
-        default:         return "Pending review"
+        case "approved": return L(.approved)
+        case "denied":   return L(.seeAdvocate)
+        default:         return L(.pendingReview)
         }
     }
 
@@ -249,33 +250,37 @@ struct ReportAbsenceSheet: View {
     @State private var isSubmitting = false
     @State private var errorMessage: String?
 
-    private let reasons: [(String, String)] = [
-        ("sick", "Illness"),
-        ("appointment", "Appointment"),
-        ("family_emergency", "Family emergency"),
-        ("transportation", "Transportation"),
-        ("travel", "Travel"),
-        ("other", "Other"),
-    ]
+    @ObservedObject private var l10n = FamilyL10n.shared
+
+    private var reasons: [(String, String)] {
+        [
+            ("sick", L(.reasonIllness)),
+            ("appointment", L(.reasonAppointment)),
+            ("family_emergency", L(.reasonEmergency)),
+            ("transportation", L(.reasonTransportation)),
+            ("travel", L(.reasonTravel)),
+            ("other", L(.reasonOther)),
+        ]
+    }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Who is staying home?") {
-                    Picker("Child", selection: $selectedChildId) {
+                Section(L(.whoStayingHome)) {
+                    Picker(L(.childLabel), selection: $selectedChildId) {
                         ForEach(children) { child in
                             Text(child.fullName).tag(child.id)
                         }
                     }
                 }
-                Section("When and why") {
-                    DatePicker("Date", selection: $date, in: Date()..., displayedComponents: .date)
-                    Picker("Reason", selection: $reason) {
+                Section(L(.whenAndWhy)) {
+                    DatePicker(L(.dateLabel), selection: $date, in: Date()..., displayedComponents: .date)
+                    Picker(L(.reasonLabel), selection: $reason) {
                         ForEach(reasons, id: \.0) { value, label in
                             Text(label).tag(value)
                         }
                     }
-                    TextField("Add a note (optional)", text: $note, axis: .vertical)
+                    TextField(L(.addNoteOptional), text: $note, axis: .vertical)
                         .lineLimit(2...4)
                 }
                 if let errorMessage {
@@ -292,21 +297,21 @@ struct ReportAbsenceSheet: View {
                         if isSubmitting {
                             ProgressView().frame(maxWidth: .infinity)
                         } else {
-                            Text("Send to Family Advocate")
+                            Text(L(.sendToAdvocate))
                                 .fontWeight(.semibold)
                                 .frame(maxWidth: .infinity)
                         }
                     }
                     .disabled(isSubmitting || selectedChildId.isEmpty)
                 } footer: {
-                    Text("Your family advocate will review this. Once approved, the day is marked as an excused absence.")
+                    Text(L(.absenceFooter))
                 }
             }
-            .navigationTitle("Report Absence")
+            .navigationTitle(L(.reportAbsence))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(L(.cancel)) { dismiss() }
                 }
             }
             .onAppear {
@@ -396,13 +401,13 @@ struct FamilyChildCard: View {
 
                 // Stats row
                 HStack(spacing: 0) {
-                    ChildStatCell(label: "Attendance", value: "\(child.attendanceRate)%",
+                    ChildStatCell(label: L(.attendance), value: "\(child.attendanceRate)%",
                                   color: child.attendanceRate >= 90 ? .green : .orange)
                     Divider().frame(height: 44)
-                    ChildStatCell(label: "Health", value: child.healthStatus,
+                    ChildStatCell(label: L(.health), value: child.healthStatus,
                                   color: healthColor(child.healthStatus))
                     Divider().frame(height: 44)
-                    ChildStatCell(label: "Status", value: child.enrollmentStatus, color: .blue)
+                    ChildStatCell(label: L(.statusWord), value: child.enrollmentStatus, color: .blue)
                 }
 
                 Divider()
@@ -412,7 +417,7 @@ struct FamilyChildCard: View {
                     Image(systemName: "person.fill")
                         .foregroundColor(.secondary)
                         .font(.caption)
-                    Text("Teacher: \(child.teacher)")
+                    Text(L(.teacherFmt, child.teacher))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     Spacer()
@@ -426,7 +431,7 @@ struct FamilyChildCard: View {
                         Image(systemName: "calendar.badge.clock")
                             .foregroundColor(.accentColor)
                             .font(.caption)
-                        Text("Next: \(nextEvent)")
+                        Text(L(.nextFmt, nextEvent))
                             .font(.subheadline)
                         Spacer()
                     }
@@ -452,9 +457,9 @@ struct FamilyChildCard: View {
                     .foregroundColor(.green)
                     .font(.title3)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Picked up \(timeStr(today?.checkOutTime))")
+                    Text(L(.pickedUpFmt, timeStr(today?.checkOutTime)))
                         .font(.subheadline.weight(.semibold))
-                    Text("Dropped off \(timeStr(today?.checkInTime))")
+                    Text(L(.droppedOffFmt, timeStr(today?.checkInTime)))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -465,14 +470,14 @@ struct FamilyChildCard: View {
             HStack(spacing: 12) {
                 HStack(spacing: 6) {
                     Circle().fill(Color.green).frame(width: 8, height: 8)
-                    Text("Checked in \(timeStr(today?.checkInTime))")
+                    Text(L(.checkedInFmt, timeStr(today?.checkInTime)))
                         .font(.subheadline.weight(.medium))
                 }
                 Spacer()
                 Button(action: onCheckOut) {
                     Group {
                         if busy { ProgressView().tint(.white) }
-                        else { Label("Check out", systemImage: "arrow.up.right.square") }
+                        else { Label(L(.checkOut), systemImage: "arrow.up.right.square") }
                     }
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(.white)
@@ -488,7 +493,7 @@ struct FamilyChildCard: View {
             Button(action: onCheckIn) {
                 Group {
                     if busy { ProgressView().tint(.white) }
-                    else { Label("Check in \(child.firstName)", systemImage: "checkmark.circle.fill") }
+                    else { Label(L(.checkInFmt, child.firstName), systemImage: "checkmark.circle.fill") }
                 }
                 .font(.headline)
                 .foregroundColor(.white)

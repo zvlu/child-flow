@@ -205,8 +205,10 @@ struct ConversationView: View {
 
 struct MessageBubble: View {
     let message: Message
+    @State private var showOriginal = false
 
     var isFromStaff: Bool { message.senderRole == .staff }
+    var isTranslated: Bool { (message.isTranslated ?? false) && message.bodyOriginal != nil }
 
     var body: some View {
         HStack {
@@ -220,7 +222,7 @@ struct MessageBubble: View {
                         .padding(.leading, 4)
                 }
 
-                Text(message.body)
+                Text(showOriginal ? (message.bodyOriginal ?? message.body) : message.body)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(isFromStaff ? Color.accentColor : Color(.secondarySystemBackground))
@@ -231,6 +233,15 @@ struct MessageBubble: View {
                     Text(message.sentAt, style: .time)
                         .font(.caption2)
                         .foregroundColor(.secondary)
+                    if isTranslated {
+                        Button {
+                            withAnimation { showOriginal.toggle() }
+                        } label: {
+                            Label(showOriginal ? "Show translation" : "Show original", systemImage: "globe")
+                                .font(.caption2)
+                                .foregroundColor(.accentColor)
+                        }
+                    }
                     if isFromStaff {
                         Group {
                             if message.isRead {

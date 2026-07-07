@@ -371,6 +371,141 @@ enum MockData {
         )
     }
 
+    // MARK: - Family Referrals
+    static func referrals(for familyId: String) -> [FamilyReferral] {
+        switch familyId {
+        case "family-1":
+            return [
+                FamilyReferral(id: "ref-1a", familyId: familyId, agencyName: "Community Housing Alliance",
+                               serviceType: .housing, referredBy: "Rosa Martinez",
+                               referralDate: daysAgo(60), followUpDate: daysAgo(30),
+                               status: .enrolled, notes: "Family applied for Section 8 waitlist",
+                               outcomeNotes: "Accepted onto waitlist — estimated 6 month wait"),
+                FamilyReferral(id: "ref-1b", familyId: familyId, agencyName: "Adult Learning Center",
+                               serviceType: .adultEducation, referredBy: "Rosa Martinez",
+                               referralDate: daysAgo(45), followUpDate: daysFromNow(14),
+                               status: .contacted, notes: "Maria interested in GED program",
+                               outcomeNotes: ""),
+                FamilyReferral(id: "ref-1c", familyId: familyId, agencyName: "County Food Bank",
+                               serviceType: .foodAssistance, referredBy: "Rosa Martinez",
+                               referralDate: daysAgo(90), followUpDate: daysAgo(60),
+                               status: .enrolled, notes: "Monthly SNAP supplement distribution",
+                               outcomeNotes: "Family picks up monthly")
+            ]
+        case "family-2":
+            return [
+                FamilyReferral(id: "ref-2a", familyId: familyId, agencyName: "Safe Harbor Counseling",
+                               serviceType: .mentalHealth, referredBy: "David Okafor",
+                               referralDate: daysAgo(30), followUpDate: daysFromNow(7),
+                               status: .pending, notes: "Father requested counseling support after job loss",
+                               outcomeNotes: ""),
+                FamilyReferral(id: "ref-2b", familyId: familyId, agencyName: "WorkForce Solutions",
+                               serviceType: .employment, referredBy: "David Okafor",
+                               referralDate: daysAgo(20), followUpDate: daysFromNow(10),
+                               status: .contacted, notes: "Resume assistance and job placement",
+                               outcomeNotes: "First appointment scheduled")
+            ]
+        case "family-3":
+            return [
+                FamilyReferral(id: "ref-3a", familyId: familyId, agencyName: "City Dental Clinic",
+                               serviceType: .dentalCare, referredBy: "Rosa Martinez",
+                               referralDate: daysAgo(14), followUpDate: daysFromNow(21),
+                               status: .pending, notes: "Children need dental follow-up",
+                               outcomeNotes: ""),
+                FamilyReferral(id: "ref-3b", familyId: familyId, agencyName: "Legal Aid Society",
+                               serviceType: .legalAid, referredBy: "Rosa Martinez",
+                               referralDate: daysAgo(5), followUpDate: daysFromNow(30),
+                               status: .pending, notes: "Immigration documentation assistance",
+                               outcomeNotes: "")
+            ]
+        case "family-4":
+            return []
+        case "family-5":
+            return [
+                FamilyReferral(id: "ref-5a", familyId: familyId, agencyName: "Utility Assistance Program",
+                               serviceType: .utilityAssistance, referredBy: "Rosa Martinez",
+                               referralDate: daysAgo(21), followUpDate: daysFromNow(9),
+                               status: .enrolled, notes: "Heating assistance for winter",
+                               outcomeNotes: "Approved — $400 credit applied"),
+                FamilyReferral(id: "ref-5b", familyId: familyId, agencyName: "Family Counseling Center",
+                               serviceType: .mentalHealth, referredBy: "Rosa Martinez",
+                               referralDate: daysAgo(60), followUpDate: daysAgo(30),
+                               status: .completed, notes: "Grief counseling after family loss",
+                               outcomeNotes: "6-session program completed successfully")
+            ]
+        default:
+            return []
+        }
+    }
+
+    // MARK: - Home Visit Logs
+    static func visitLogs(for familyId: String) -> [HomeVisitLog] {
+        switch familyId {
+        case "family-1":
+            return [
+                HomeVisitLog(id: "visit-1a", familyId: familyId, visitDate: daysAgo(7),
+                             visitType: .homeVisit, durationMinutes: 90,
+                             conductedBy: "Rosa Martinez",
+                             topicsCovered: [.familyGoals, .childDevelopment, .communityResources],
+                             notes: "Great visit. Maria discussed GED progress. Children were engaged in play activities. Reviewed housing referral status.",
+                             goalsMentioned: ["goal-1-edu"], locationVerified: true),
+                HomeVisitLog(id: "visit-1b", familyId: familyId, visitDate: daysAgo(21),
+                             visitType: .homeVisit, durationMinutes: 95,
+                             conductedBy: "Rosa Martinez",
+                             topicsCovered: [.parentingSkills, .schoolReadiness, .healthWellness],
+                             notes: "Discussed kindergarten readiness activities. Provided literacy materials. Mother expressed concern about Sofia's speech.",
+                             goalsMentioned: [], locationVerified: true),
+                HomeVisitLog(id: "visit-1c", familyId: familyId, visitDate: daysAgo(42),
+                             visitType: .phoneCall, durationMinutes: 20,
+                             conductedBy: "Rosa Martinez",
+                             topicsCovered: [.familyGoals, .housingStability],
+                             notes: "Follow-up on housing referral. Family confirmed they submitted Section 8 application.",
+                             goalsMentioned: [], locationVerified: false)
+            ]
+        case "family-2":
+            return [
+                HomeVisitLog(id: "visit-2a", familyId: familyId, visitDate: daysAgo(14),
+                             visitType: .homeVisit, durationMinutes: 85,
+                             conductedBy: "David Okafor",
+                             topicsCovered: [.employment, .childBehavior, .parentingSkills],
+                             notes: "Father James attended this visit. Discussed job search strategies. Emma's behavior at school was reviewed.",
+                             goalsMentioned: [], locationVerified: true),
+                HomeVisitLog(id: "visit-2b", familyId: familyId, visitDate: daysAgo(35),
+                             visitType: .homeVisit, durationMinutes: 90,
+                             conductedBy: "David Okafor",
+                             topicsCovered: [.familyGoals, .crisisSupport],
+                             notes: "Family experiencing stress due to job loss. Discussed mental health referral. Both parents participated.",
+                             goalsMentioned: [], locationVerified: true)
+            ]
+        case "family-3":
+            return [
+                HomeVisitLog(id: "visit-3a", familyId: familyId, visitDate: daysAgo(10),
+                             visitType: .homeVisit, durationMinutes: 100,
+                             conductedBy: "Rosa Martinez",
+                             topicsCovered: [.childDevelopment, .schoolReadiness, .communityResources],
+                             notes: "Visited crowded apartment. Three families sharing space. Reviewed immigration legal aid referral.",
+                             goalsMentioned: [], locationVerified: true)
+            ]
+        case "family-5":
+            return [
+                HomeVisitLog(id: "visit-5a", familyId: familyId, visitDate: daysAgo(5),
+                             visitType: .homeVisit, durationMinutes: 95,
+                             conductedBy: "Rosa Martinez",
+                             topicsCovered: [.familyGoals, .childDevelopment, .healthWellness],
+                             notes: "Alicia is doing very well. Marcus's speech therapy is showing progress. Reviewed family wellness goals.",
+                             goalsMentioned: [], locationVerified: true),
+                HomeVisitLog(id: "visit-5b", familyId: familyId, visitDate: daysAgo(26),
+                             visitType: .groupSocial, durationMinutes: 120,
+                             conductedBy: "Rosa Martinez",
+                             topicsCovered: [.parentingSkills, .schoolReadiness],
+                             notes: "Attended Saturday family socialization event. Alicia connected with other parents.",
+                             goalsMentioned: [], locationVerified: false)
+            ]
+        default:
+            return []
+        }
+    }
+
     // MARK: - Family Needs Assessments
 
     static func fna(for familyId: String) -> FamilyNeedsAssessment? {
@@ -1121,5 +1256,320 @@ enum MockData {
             ]
         )
     ]
+
+    // MARK: - Chronic Absence Alerts
+
+    static func chronicAbsenceAlerts() -> [ChronicAbsenceAlert] {
+        let cal = Calendar.current
+        let today = Date()
+        func daysAgo(_ n: Int) -> Date { cal.date(byAdding: .day, value: -n, to: today)! }
+
+        return [
+            // Severe — 51% attendance
+            ChronicAbsenceAlert(
+                childId: "child-att-1", childName: "Jason Chen", familyId: "family-3",
+                classroom: "Room A", familyAdvocate: "Maria Garcia",
+                totalDaysEnrolled: 90, totalDaysPresent: 46, totalDaysAbsent: 44,
+                unexcusedAbsences: 28, excusedAbsences: 16,
+                weeklyRates: [0.40, 0.60, 0.50, 0.60],
+                hasAIP: true, lastOutreachDate: daysAgo(7), consecutiveAbsences: 3,
+                notes: "Family experiencing transportation issues. AIP in place."
+            ),
+            // High — 72%
+            ChronicAbsenceAlert(
+                childId: "child-att-2", childName: "Marcus Williams", familyId: "family-2",
+                classroom: "Room B", familyAdvocate: "James Wilson",
+                totalDaysEnrolled: 90, totalDaysPresent: 65, totalDaysAbsent: 25,
+                unexcusedAbsences: 12, excusedAbsences: 13,
+                weeklyRates: [0.80, 0.60, 0.80, 0.60],
+                hasAIP: true, lastOutreachDate: daysAgo(14), consecutiveAbsences: 0,
+                notes: "Illness-related absences, family made aware of impact."
+            ),
+            // At-risk — 81%
+            ChronicAbsenceAlert(
+                childId: "child-att-3", childName: "Aaliyah Thompson", familyId: "family-4",
+                classroom: "Room C", familyAdvocate: "Maria Garcia",
+                totalDaysEnrolled: 90, totalDaysPresent: 73, totalDaysAbsent: 17,
+                unexcusedAbsences: 9, excusedAbsences: 8,
+                weeklyRates: [0.80, 0.80, 1.00, 0.80],
+                hasAIP: false, lastOutreachDate: daysAgo(3), consecutiveAbsences: 0,
+                notes: ""
+            ),
+            // Watch — 88%
+            ChronicAbsenceAlert(
+                childId: "child-att-4", childName: "Priya Patel", familyId: "family-5",
+                classroom: "Room A", familyAdvocate: "Dr. Patel",
+                totalDaysEnrolled: 90, totalDaysPresent: 79, totalDaysAbsent: 11,
+                unexcusedAbsences: 4, excusedAbsences: 7,
+                weeklyRates: [0.80, 1.00, 0.80, 1.00],
+                hasAIP: false, lastOutreachDate: nil, consecutiveAbsences: 0,
+                notes: ""
+            ),
+        ]
+    }
+
+    // MARK: - ERSEA Eligibility
+
+    static func eligibilityRecords() -> [EligibilityRecord] {
+        let cal = Calendar.current
+        let today = Date()
+        func daysAgo(_ n: Int) -> Date { cal.date(byAdding: .day, value: -n, to: today)! }
+        func dob(_ years: Int, months: Int = 0) -> Date {
+            cal.date(byAdding: .month, value: -(years * 12 + months), to: today)!
+        }
+
+        return [
+            // 1 — Enrolled, income eligible (68% FPL)
+            EligibilityRecord(
+                id: "er-1", childName: "Liam Rivera", childDateOfBirth: dob(4, months: 2),
+                familyId: "family-1", applicationDate: daysAgo(90),
+                householdSize: 4, annualIncome: 21250, incomeSource: "Employment",
+                categoricalEligibility: .none,
+                priorityScore: 14, riskFactors: [.singleParent, .limitedEnglish],
+                status: .enrolled, enrolledDate: daysAgo(60), classroom: "Room A",
+                waitlistPosition: nil, notes: "Family engaged, on track."
+            ),
+            // 2 — Enrolled, categorical (McKinney-Vento homeless)
+            EligibilityRecord(
+                id: "er-2", childName: "Amara Johnson", childDateOfBirth: dob(3, months: 8),
+                familyId: "family-2", applicationDate: daysAgo(75),
+                householdSize: 3, annualIncome: 18000, incomeSource: "SNAP + Part-time",
+                categoricalEligibility: .homeless,
+                priorityScore: 27, riskFactors: [.homeless, .singleParent, .limitedEnglish],
+                status: .enrolled, enrolledDate: daysAgo(50), classroom: "Room B",
+                waitlistPosition: nil, notes: "Placed in shelter. Transportation arranged."
+            ),
+            // 3 — Waitlist #1, income eligible (91% FPL)
+            EligibilityRecord(
+                id: "er-3", childName: "Ethan Morales", childDateOfBirth: dob(4, months: 5),
+                familyId: nil, applicationDate: daysAgo(30),
+                householdSize: 5, annualIncome: 33200, incomeSource: "Employment",
+                categoricalEligibility: .none,
+                priorityScore: 21, riskFactors: [.singleParent, .childHasIEP],
+                status: .eligible, enrolledDate: nil, classroom: nil,
+                waitlistPosition: 1, notes: "Referral from school district, IEP in progress."
+            ),
+            // 4 — Waitlist #2, IEP categorical
+            EligibilityRecord(
+                id: "er-4", childName: "Priya Sharma", childDateOfBirth: dob(3, months: 11),
+                familyId: nil, applicationDate: daysAgo(22),
+                householdSize: 4, annualIncome: 42000, incomeSource: "Employment",
+                categoricalEligibility: .iepIfsp,
+                priorityScore: 17, riskFactors: [.childHasIEP, .parentWithDisability],
+                status: .eligible, enrolledDate: nil, classroom: nil,
+                waitlistPosition: 2, notes: "IFSP completed. Family awaiting slot."
+            ),
+            // 5 — Pending review
+            EligibilityRecord(
+                id: "er-5", childName: "Jaylen Brooks", childDateOfBirth: dob(4, months: 1),
+                familyId: nil, applicationDate: daysAgo(5),
+                householdSize: 6, annualIncome: 38000, incomeSource: "Employment + TANF",
+                categoricalEligibility: .publicAssistance,
+                priorityScore: 13, riskFactors: [.domesticViolence],
+                status: .pending, enrolledDate: nil, classroom: nil,
+                waitlistPosition: nil, notes: "Application received. DV documentation pending."
+            ),
+            // 6 — Denied (over income limit, no categorical)
+            EligibilityRecord(
+                id: "er-6", childName: "Chloe Warren", childDateOfBirth: dob(4, months: 7),
+                familyId: nil, applicationDate: daysAgo(14),
+                householdSize: 3, annualIncome: 42000, incomeSource: "Employment",
+                categoricalEligibility: .none,
+                priorityScore: 0, riskFactors: [],
+                status: .denied, enrolledDate: nil, classroom: nil,
+                waitlistPosition: nil, notes: "Income at 205% FPL. Referred to community pre-K."
+            ),
+        ]
+    }
+
+    static func suspensionLogs() -> [SuspensionExpulsionLog] {
+        let cal = Calendar.current
+        let today = Date()
+        func daysAgo(_ n: Int) -> Date { cal.date(byAdding: .day, value: -n, to: today)! }
+
+        return [
+            SuspensionExpulsionLog(
+                id: "sl-1", childId: "child-1", childName: "Liam Rivera",
+                incidentDate: daysAgo(30), incidentType: .internalReview,
+                behaviorDescription: "Repeated hitting during free play. 3 incidents in 1 week.",
+                mentalHealthConsultRequested: true, mentalHealthConsultDate: daysAgo(28),
+                familyMeetingHeld: true, familyMeetingDate: daysAgo(25),
+                behaviourSupportPlanCreated: true, behaviourSupportPlanDate: daysAgo(20),
+                stateAgencyNotified: false, stateNotificationDate: nil,
+                outcome: .behaviourSupport, resolutionDate: daysAgo(20),
+                notes: "Behavior support plan in place. Significant improvement observed."
+            ),
+            SuspensionExpulsionLog(
+                id: "sl-2", childId: "child-3", childName: "Sofia Chen",
+                incidentDate: daysAgo(10), incidentType: .suspensionShort,
+                behaviorDescription: "Biting incident resulting in injury to peer. Second occurrence.",
+                mentalHealthConsultRequested: true, mentalHealthConsultDate: daysAgo(8),
+                familyMeetingHeld: true, familyMeetingDate: daysAgo(7),
+                behaviourSupportPlanCreated: false, behaviourSupportPlanDate: nil,
+                stateAgencyNotified: false, stateNotificationDate: nil,
+                outcome: .pending, resolutionDate: nil,
+                notes: "MH consultant observed classroom 11/14. BSP drafting in progress."
+            ),
+        ]
+    }
+
+    // MARK: - Health Compliance
+
+    static func healthCompliance() -> [ChildHealthCompliance] {
+        let cal = Calendar.current
+        let today = Date()
+        func daysAgo(_ n: Int) -> Date { cal.date(byAdding: .day, value: -n, to: today)! }
+        func dob(_ years: Int) -> Date { cal.date(byAdding: .year, value: -years, to: today)! }
+
+        return [
+            // Child 1 — overdue on both health & dental
+            ChildHealthCompliance(
+                childId: "child-1", childName: "Liam Rivera", familyId: "family-1",
+                enrollmentDate: daysAgo(60), dateOfBirth: dob(4),
+                healthScreeningDate: nil,     // 45-day deadline passed
+                dentalScreeningDate: nil,     // 90-day still has 30 days
+                visionScreeningDate: daysAgo(20),
+                hearingScreeningDate: nil,
+                developmentalScreeningDate: daysAgo(10)
+            ),
+            // Child 2 — health done, dental due in 8 days (critical)
+            ChildHealthCompliance(
+                childId: "child-2", childName: "Amara Johnson", familyId: "family-2",
+                enrollmentDate: daysAgo(82), dateOfBirth: dob(3),
+                healthScreeningDate: daysAgo(30),
+                dentalScreeningDate: nil,
+                visionScreeningDate: daysAgo(30),
+                hearingScreeningDate: daysAgo(30),
+                developmentalScreeningDate: daysAgo(30)
+            ),
+            // Child 3 — health due in 5 days (critical), dental on track
+            ChildHealthCompliance(
+                childId: "child-3", childName: "Sofia Chen", familyId: "family-3",
+                enrollmentDate: daysAgo(40), dateOfBirth: dob(4),
+                healthScreeningDate: nil,
+                dentalScreeningDate: nil,
+                visionScreeningDate: nil,
+                hearingScreeningDate: nil,
+                developmentalScreeningDate: nil
+            ),
+            // Child 4 — all complete
+            ChildHealthCompliance(
+                childId: "child-4", childName: "Marcus Thompson", familyId: "family-2",
+                enrollmentDate: daysAgo(120), dateOfBirth: dob(5),
+                healthScreeningDate: daysAgo(100),
+                dentalScreeningDate: daysAgo(60),
+                visionScreeningDate: daysAgo(100),
+                hearingScreeningDate: daysAgo(100),
+                developmentalScreeningDate: daysAgo(90)
+            ),
+            // Child 5 — new enrollment, both on track
+            ChildHealthCompliance(
+                childId: "child-5", childName: "Zara Williams", familyId: "family-4",
+                enrollmentDate: daysAgo(10), dateOfBirth: dob(3),
+                healthScreeningDate: nil,
+                dentalScreeningDate: nil,
+                visionScreeningDate: nil,
+                hearingScreeningDate: nil,
+                developmentalScreeningDate: nil
+            ),
+            // Child 6 — health due in 12 days (warning)
+            ChildHealthCompliance(
+                childId: "child-6", childName: "Kai Nguyen", familyId: "family-5",
+                enrollmentDate: daysAgo(33), dateOfBirth: dob(4),
+                healthScreeningDate: nil,
+                dentalScreeningDate: nil,
+                visionScreeningDate: nil,
+                hearingScreeningDate: nil,
+                developmentalScreeningDate: nil
+            ),
+        ]
+    }
+
+    // MARK: - Safety Drills
+
+    static func safetyDrills() -> [SafetyDrillLog] {
+        let cal = Calendar.current
+        let today = Date()
+        func daysAgo(_ n: Int) -> Date { cal.date(byAdding: .day, value: -n, to: today)! }
+
+        return [
+            SafetyDrillLog(id: "drill-1", drillType: .fireEvacuation,
+                           drillDate: daysAgo(45), conductedBy: "Maria Garcia",
+                           durationMinutes: 4, participantCount: 62,
+                           notes: "All classrooms evacuated within 4 minutes. Children calm.", issuesFound: "",
+                           resolvedDate: nil),
+            SafetyDrillLog(id: "drill-2", drillType: .lockdown,
+                           drillDate: daysAgo(30), conductedBy: "James Wilson",
+                           durationMinutes: 6, participantCount: 58,
+                           notes: "Practiced lockdown with local PD coordination.",
+                           issuesFound: "One classroom door lock was slow — maintenance notified.",
+                           resolvedDate: daysAgo(25)),
+            SafetyDrillLog(id: "drill-3", drillType: .fireEvacuation,
+                           drillDate: daysAgo(120), conductedBy: "Maria Garcia",
+                           durationMinutes: 5, participantCount: 60,
+                           notes: "Quarterly fire drill. Used alternate exit route.", issuesFound: "",
+                           resolvedDate: nil),
+            SafetyDrillLog(id: "drill-4", drillType: .tornadoShelter,
+                           drillDate: daysAgo(15), conductedBy: "Dr. Patel",
+                           durationMinutes: 3, participantCount: 65,
+                           notes: "All children to interior hallway. Excellent response time.", issuesFound: "",
+                           resolvedDate: nil),
+        ]
+    }
+
+    // MARK: - Mental Health Consults
+
+    static func mentalHealthConsults() -> [MentalHealthConsult] {
+        let cal = Calendar.current
+        let today = Date()
+        func daysAgo(_ n: Int) -> Date { cal.date(byAdding: .day, value: -n, to: today)! }
+
+        return [
+            MentalHealthConsult(
+                id: "mhc-1", childId: "child-1", childName: "Liam Rivera",
+                consultDate: daysAgo(20), consultantName: "Dr. Sarah Okafor",
+                consultType: .behaviorSupport,
+                summary: "Discussed strategies for transition difficulties. Implemented visual schedule and 5-minute warnings.",
+                followUpDate: daysAgo(6), followUpNotes: "Significant improvement noted. Continue current strategies."
+            ),
+            MentalHealthConsult(
+                id: "mhc-2", childId: nil, childName: nil,
+                consultDate: daysAgo(45), consultantName: "Dr. Sarah Okafor",
+                consultType: .staffCoaching,
+                summary: "Program-wide trauma-informed care training. All classrooms attended.",
+                followUpDate: nil, followUpNotes: ""
+            ),
+            MentalHealthConsult(
+                id: "mhc-3", childId: "child-3", childName: "Sofia Chen",
+                consultDate: daysAgo(10), consultantName: "Dr. Sarah Okafor",
+                consultType: .familySupport,
+                summary: "Met with parent to discuss separation anxiety. Provided home routine strategies.",
+                followUpDate: cal.date(byAdding: .day, value: 14, to: today),
+                followUpNotes: ""
+            ),
+            MentalHealthConsult(
+                id: "mhc-4", childId: nil, childName: nil,
+                consultDate: daysAgo(5), consultantName: "Dr. Sarah Okafor",
+                consultType: .classroomStrategy,
+                summary: "Reviewed Room 3 classroom management. Introduced calm-down corner and emotion cards.",
+                followUpDate: cal.date(byAdding: .day, value: 7, to: today),
+                followUpNotes: ""
+            ),
+        ]
+    }
+
+    // MARK: - Staff
+    static func staff() -> [StaffMember] {
+        [
+            StaffMember(id:"s1", fullName:"Dr. Patricia Hayes",    role:"Program Director",     roleKey:"director",          email:"p.hayes@sprout.org",  phone:"(555) 200-1001", trainingHours:24, classroom:nil),
+            StaffMember(id:"s2", fullName:"Ms. Carmen Rivera",     role:"Lead Teacher",          roleKey:"teacher",           email:"c.rivera@sprout.org", phone:"(555) 200-1002", trainingHours:18, classroom:"Room 1A"),
+            StaffMember(id:"s3", fullName:"Mr. James Carter",      role:"Lead Teacher",          roleKey:"teacher",           email:"j.carter@sprout.org", phone:"(555) 200-1003", trainingHours:12, classroom:"Room 2B"),
+            StaffMember(id:"s4", fullName:"Ms. Destiny Moore",     role:"Teacher Assistant",     roleKey:"assistant",         email:"d.moore@sprout.org",  phone:"(555) 200-1004", trainingHours:8,  classroom:"Room 1A"),
+            StaffMember(id:"s5", fullName:"Mr. Tyrell Washington", role:"Teacher Assistant",     roleKey:"assistant",         email:"t.wash@sprout.org",   phone:"(555) 200-1005", trainingHours:5,  classroom:"Room 2B"),
+            StaffMember(id:"s6", fullName:"Ms. Sandra Thompson",   role:"Family Service Worker", roleKey:"familyWorker",      email:"s.thomp@sprout.org",  phone:"(555) 200-1006", trainingHours:20, classroom:nil),
+            StaffMember(id:"s7", fullName:"Ms. Angela Kim",        role:"Family Service Worker", roleKey:"familyWorker",      email:"a.kim@sprout.org",    phone:"(555) 200-1007", trainingHours:16, classroom:nil),
+            StaffMember(id:"s8", fullName:"Dr. Marcus Ellis",      role:"Health Coordinator",    roleKey:"healthCoordinator", email:"m.ellis@sprout.org",  phone:"(555) 200-1008", trainingHours:22, classroom:nil),
+        ]
+    }
 }
 #endif

@@ -1,7 +1,7 @@
 import XCTest
-@testable import ChildFlow
+@testable import Sprout
 
-final class ChildFlowTests: XCTestCase {
+final class SproutTests: XCTestCase {
     func testChildInitials() {
         let child = Child(
             id: "1", firstName: "Maria", lastName: "Garcia",

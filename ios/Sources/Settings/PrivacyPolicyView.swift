@@ -57,7 +57,7 @@ struct PrivacyPolicyView: View {
                         .font(.headline)
                     Text("Contact our Privacy Officer:")
                         .foregroundColor(.secondary)
-                    Link("privacy@childflow.org", destination: URL(string: "mailto:privacy@childflow.org")!)
+                    Link("privacy@sprout.org", destination: URL(string: "mailto:privacy@sprout.org")!)
                     Text("Sprout\n47 Lovell Ave\nWindsor, CT 06096")
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

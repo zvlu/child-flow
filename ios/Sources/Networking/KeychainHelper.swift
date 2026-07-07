@@ -9,7 +9,7 @@ import Security
 /// backups — appropriate for a credential that grants access to children's
 /// PII/PHI.
 enum KeychainHelper {
-    private static let service = "org.childflow.session"
+    private static let service = "org.sprout.session"
 
     @discardableResult
     static func set(_ value: String, for account: String) -> Bool {

@@ -51,8 +51,37 @@ struct HealthView: View {
                     .padding(.vertical, 4)
                 }
 
+                // Compliance deadline tracker — 45-day health / 90-day dental
+                Section {
+                    NavigationLink(destination: HealthComplianceView()) {
+                        HStack(spacing: 14) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.cfHealth.opacity(0.12))
+                                    .frame(width: 40, height: 40)
+                                Image(systemName: "calendar.badge.exclamationmark")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundColor(.cfHealth)
+                            }
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Compliance Deadlines")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(.cfTextPrimary)
+                                Text("45-day health · 90-day dental · Drills · MH consults")
+                                    .font(.caption)
+                                    .foregroundColor(.cfTextSecondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.cfTextSecondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+
                 // Category rows — each navigates to its record list
-                Section("Categories") {
+                Section("Records") {
                     ForEach(HealthCategory.allCases, id: \.self) { category in
                         let records = viewModel.filteredRecords(for: category)
                         let allRecords = viewModel.records(for: category)

@@ -1,31 +1,33 @@
 import SwiftUI
 
 struct FamilyTabView: View {
+    @ObservedObject private var l10n = FamilyL10n.shared
+
     var body: some View {
         TabView {
             FamilyTodayView()
                 .tabItem {
-                    Label("Today", systemImage: "sparkles")
+                    Label(L(.tabToday), systemImage: "sparkles")
                 }
 
             FamilyHomeView()
                 .tabItem {
-                    Label("Home", systemImage: "house.fill")
+                    Label(L(.tabHome), systemImage: "house.fill")
                 }
 
             FamilyMessagesView()
                 .tabItem {
-                    Label("Messages", systemImage: "bubble.left.and.bubble.right.fill")
+                    Label(L(.tabMessages), systemImage: "bubble.left.and.bubble.right.fill")
                 }
 
             FamilyProgressView()
                 .tabItem {
-                    Label("Progress", systemImage: "chart.bar.fill")
+                    Label(L(.tabProgress), systemImage: "chart.bar.fill")
                 }
 
             FamilyProfileView()
                 .tabItem {
-                    Label("My Profile", systemImage: "person.fill")
+                    Label(L(.tabProfile), systemImage: "person.fill")
                 }
         }
         .tint(Color("AccentColor"))
