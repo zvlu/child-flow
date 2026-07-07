@@ -2,7 +2,8 @@ import {
   LayoutDashboard, Users, ClipboardCheck, Heart, Home, UserCog, BarChart3,
   ShieldCheck, Settings, Baby, BookOpen, FileText, CalendarDays, DollarSign,
   UtensilsCrossed, Clock, FileSignature, Layers, School, AlertTriangle, Zap,
-  MessageSquare, HandHeart, ClipboardList, Sparkles, NotebookPen, FolderHeart, Landmark, BookText, type LucideIcon,
+  MessageSquare, HandHeart, ClipboardList, Sparkles, NotebookPen, FolderHeart, Landmark, BookText,
+  TrendingDown, Handshake, CalendarClock, Accessibility, PiggyBank, type LucideIcon,
 } from "lucide-react";
 
 export type NavRole = "admin" | "staff" | "parent";
@@ -47,8 +48,11 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
       { path: "/children", label: "Children", icon: Baby },
       { path: "/daily-reports", label: "Daily Reports", icon: Sparkles },
       { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
+      { path: "/chronic-absence", label: "Chronic Absence", icon: TrendingDown },
       { path: "/staff", label: "Staff", icon: UserCog },
       { path: "/family-services", label: "Family Services", icon: Home },
+      { path: "/family-partnership", label: "Partnership Agreements", icon: Handshake },
+      { path: "/policy-council", label: "Policy Council", icon: Landmark },
       { path: "/classrooms", label: "Classrooms", icon: School },
     ],
   },
@@ -57,7 +61,10 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
     items: [
       { path: "/enrollment", label: "Enrollment", icon: BookOpen },
       { path: "/health", label: "Health Records", icon: Heart },
+      { path: "/health-deadlines", label: "Health Deadlines", icon: CalendarClock },
+      { path: "/disability-services", label: "Disability Services", icon: Accessibility },
       { path: "/assessments", label: "Assessments", icon: ClipboardList },
+      { path: "/classroom-quality", label: "Classroom Quality", icon: BarChart3 },
       { path: "/lesson-planning", label: "Lesson Planning", icon: NotebookPen },
       { path: "/portfolios", label: "Portfolios", icon: FolderHeart },
       { path: "/calendar", label: "Calendar", icon: CalendarDays, roles: PARENT_OK },
@@ -73,6 +80,7 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
     items: [
       { path: "/billing", label: "Billing", icon: DollarSign, roles: ADMIN_ONLY },
       { path: "/subsidies", label: "Subsidies", icon: Landmark },
+      { path: "/grant-budget", label: "Grant & Budget", icon: PiggyBank, roles: ADMIN_ONLY },
       { path: "/in-kind", label: "In-Kind", icon: HandHeart },
       { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
       { path: "/staff-operations", label: "Staff Operations", icon: Clock },

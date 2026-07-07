@@ -213,22 +213,47 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-card/10" onClick={() => handleTopNavAction("Print")}>
             <Printer className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-card/10" onClick={() => navigate("/settings")} aria-label="Account & settings">
-            <UserCircle className="h-4 w-4" />
-          </Button>
+          {/* Account menu — identity, settings, theme, sign out. */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-card/10">
-                <MoreHorizontal className="h-4 w-4" />
+              <Button
+                variant="ghost"
+                className="h-9 gap-2 px-1.5 text-white/85 hover:text-white hover:bg-card/10"
+                aria-label="Account menu"
+              >
+                <Avatar className="h-7 w-7">
+                  <AvatarImage src={(user as any)?.avatarUrl ?? undefined} alt={user?.name ?? "Account"} />
+                  <AvatarFallback className="text-[11px] bg-white/15 text-white">{initials}</AvatarFallback>
+                </Avatar>
+                <span className="hidden lg:block max-w-[120px] truncate text-xs font-medium">
+                  {user?.name ?? "Account"}
+                </span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 rounded-xl">
+            <DropdownMenuContent align="end" className="w-60 rounded-xl">
+              <div className="px-3 py-2">
+                <p className="text-sm font-medium truncate">{user?.name ?? "Signed in"}</p>
+                {user?.email && (
+                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                )}
+                <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mt-1">
+                  {(user as any)?.role ?? "staff"}
+                </p>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate("/settings")}>
+                <UserCircle className="h-4 w-4 mr-2" />
+                Account &amp; Settings
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
                 {theme === "dark" ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
                 Toggle Theme
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => logout()}>
+              <DropdownMenuItem
+                onClick={() => logout()}
+                className="text-red-600 focus:text-red-600"
+              >
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
               </DropdownMenuItem>
@@ -411,6 +436,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   <p className="text-[12px] font-bold text-sidebar-foreground truncate">{user?.name || "User"}</p>
                   <p className="text-[10px] text-sidebar-foreground/50 truncate uppercase font-bold tracking-tighter">{user?.role || "Staff"}</p>
                 </div>
+                <button
+                  onClick={() => logout()}
+                  className="p-1.5 rounded-md text-sidebar-foreground/60 hover:text-red-500 hover:bg-sidebar-accent transition-colors flex-shrink-0"
+                  title="Sign out"
+                  aria-label="Sign out"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
               </div>
             </div>
           )}

@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, Search, Clock, CheckCircle2, XCircle, ArrowRight, BookOpen, AlertCircle, Loader2 } from "lucide-react";
+import { Plus, Search, Clock, CheckCircle2, XCircle, ArrowRight, BookOpen, AlertCircle, Loader2, Calculator } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
@@ -50,6 +50,57 @@ function ageFrom(dob: Date | string | null): string {
 
 const fmtDate = (v: Date | string | null) => (v ? new Date(v).toLocaleDateString() : "—");
 
+/**
+ * ERSEA selection score (§1302.14): a transparent point system for ranking
+ * the waitlist by need. Income depth, staff-set priority, waiting time, and
+ * categorical markers (recorded in notes by the eligibility calculator).
+ */
+function selectionScore(app: {
+  incomeLevel: string | null;
+  priority: string | null;
+  appliedDate: Date | string | null;
+  notes: string | null;
+}): { score: number; parts: string[] } {
+  let score = 0;
+  const parts: string[] = [];
+
+  const income: Record<string, number> = { below_100: 40, below_130: 30, below_185: 15, above_185: 0 };
+  if (app.incomeLevel && income[app.incomeLevel] != null) {
+    score += income[app.incomeLevel];
+    if (income[app.incomeLevel] > 0) parts.push(`income +${income[app.incomeLevel]}`);
+  }
+
+  const prio: Record<string, number> = { high: 25, medium: 10, low: 0 };
+  if (app.priority && prio[app.priority] != null && prio[app.priority] > 0) {
+    score += prio[app.priority];
+    parts.push(`priority +${prio[app.priority]}`);
+  }
+
+  // Categorical markers stamped by the eligibility calculator.
+  const notes = (app.notes ?? "").toLowerCase();
+  if (notes.includes("homeless")) { score += 30; parts.push("homeless +30"); }
+  if (notes.includes("foster")) { score += 30; parts.push("foster care +30"); }
+  if (notes.includes("tanf") || notes.includes("ssi")) { score += 25; parts.push("TANF/SSI +25"); }
+  if (notes.includes("iep") || notes.includes("ifsp")) { score += 20; parts.push("IEP/IFSP +20"); }
+
+  // Waiting time: +1 per full month waiting, capped at 10.
+  if (app.appliedDate) {
+    const months = Math.floor((Date.now() - new Date(app.appliedDate).getTime()) / (30 * 24 * 3600 * 1000));
+    const pts = Math.min(10, Math.max(0, months));
+    if (pts > 0) { score += pts; parts.push(`waiting +${pts}`); }
+  }
+
+  return { score, parts };
+}
+
+function scoreBadge(score: number) {
+  const cls =
+    score >= 70 ? "bg-red-100 text-red-700 border-red-200 hover:bg-red-100" :
+    score >= 40 ? "bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-100" :
+    "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-100";
+  return <Badge className={`${cls} text-xs font-mono`}>Score {score}</Badge>;
+}
+
 const BLANK_FORM = {
   childFirstName: "", childLastName: "", dateOfBirth: "", gender: "",
   parentName: "", parentPhone: "", parentEmail: "", address: "",
@@ -61,6 +112,7 @@ export default function Enrollment() {
   const utils = trpc.useUtils();
   const [search, setSearch] = useState("");
   const [showNewForm, setShowNewForm] = useState(false);
+  const [showCalc, setShowCalc] = useState(false);
   const [form, setForm] = useState({ ...BLANK_FORM });
 
   const appsQuery = trpc.enrollment.list.useQuery(orgId);
@@ -115,10 +167,20 @@ export default function Enrollment() {
   const busy = (id: number) => (statusMut.isPending && statusMut.variables?.id === id) || (enrollMut.isPending && enrollMut.variables?.id === id);
 
   const q = search.trim().toLowerCase();
-  const filtered = apps.filter((a) =>
-    `${a.childFirstName} ${a.childLastName}`.toLowerCase().includes(q) ||
-    (a.parentName ?? "").toLowerCase().includes(q)
-  );
+  const filtered = apps
+    .filter((a) =>
+      `${a.childFirstName} ${a.childLastName}`.toLowerCase().includes(q) ||
+      (a.parentName ?? "").toLowerCase().includes(q)
+    )
+    // Ranked by selection score so the greatest need is always at the top
+    // (§1302.14 selection criteria), then by application date.
+    .sort((a, b) => {
+      const active = (s: string) => s === "pending" || s === "reviewing" || s === "approved";
+      if (active(a.status) !== active(b.status)) return active(a.status) ? -1 : 1;
+      const diff = selectionScore(b).score - selectionScore(a).score;
+      if (diff !== 0) return diff;
+      return new Date(a.appliedDate ?? 0).getTime() - new Date(b.appliedDate ?? 0).getTime();
+    });
 
   const count = (s: string) => apps.filter((a) => a.status === s).length;
 
@@ -133,6 +195,10 @@ export default function Enrollment() {
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-1.5">Enrollment <Glossary term="ERSEA" /></h1>
           <p className="text-muted-foreground text-sm mt-0.5">Manage applications, waitlist, and enrollment processes</p>
         </div>
+        <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowCalc(true)}>
+          <Calculator className="h-4 w-4" />Eligibility Calculator
+        </Button>
         <Dialog open={showNewForm} onOpenChange={setShowNewForm}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-2"><Plus className="h-4 w-4" />New Application</Button>
@@ -205,7 +271,18 @@ export default function Enrollment() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      <ErseaCalculatorDialog
+        open={showCalc}
+        onClose={() => setShowCalc(false)}
+        onUseInApplication={(prefill) => {
+          setForm((f) => ({ ...f, ...prefill }));
+          setShowCalc(false);
+          setShowNewForm(true);
+        }}
+      />
 
       {/* Stats — live counts */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -237,6 +314,7 @@ export default function Enrollment() {
           <TabsTrigger value="waitlist">Waitlist & Applications</TabsTrigger>
           <TabsTrigger value="enrolled">Currently Enrolled</TabsTrigger>
           <TabsTrigger value="capacity">Capacity Planning</TabsTrigger>
+          <TabsTrigger value="incidents">§1302.17 Log</TabsTrigger>
         </TabsList>
 
         <TabsContent value="waitlist" className="mt-4 space-y-4">
@@ -268,6 +346,11 @@ export default function Enrollment() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="font-semibold text-foreground">{name}</h3>
+                              {(app.status === "pending" || app.status === "reviewing" || app.status === "approved") && (
+                                <span title={selectionScore(app).parts.join(" · ") || "No scoring factors yet"}>
+                                  {scoreBadge(selectionScore(app).score)}
+                                </span>
+                              )}
                               {priorityBadge(app.priority)}
                               {statusBadge(app.status)}
                             </div>
@@ -386,7 +469,443 @@ export default function Enrollment() {
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="incidents" className="mt-4">
+          <IncidentLogTab childList={(childrenQuery.data ?? []) as Array<{ id: number; firstName: string; lastName: string }>} />
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §1302.17 Suspension / Expulsion Log
+// Programs must prohibit expulsion, severely limit suspension, and document
+// every intervention attempted before any exclusion.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const INCIDENT_TYPES = [
+  { value: "temporary_suspension", label: "Temporary suspension" },
+  { value: "expulsion_prevented", label: "Expulsion prevented (supports in place)" },
+  { value: "transition_out", label: "Transition to another placement" },
+] as const;
+
+const STEP_LABELS: Record<string, string> = {
+  mental_health_consult: "Mental health consultation (§1302.45)",
+  parent_meeting: "Meeting with parents/guardians",
+  individualized_supports: "Individualized supports implemented",
+  community_referrals: "Community service referrals",
+  home_visit: "Home visit conducted",
+};
+
+function IncidentLogTab({ childList }: { childList: Array<{ id: number; firstName: string; lastName: string }> }) {
+  const utils = trpc.useUtils();
+  const incidentsQuery = trpc.suspensionLog.list.useQuery({ organizationId: ORGANIZATION_ID });
+  const createMut = trpc.suspensionLog.create.useMutation({
+    onSuccess: () => { utils.suspensionLog.list.invalidate(); toast.success("Incident documented"); setShowNew(false); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateMut = trpc.suspensionLog.update.useMutation({
+    onSuccess: () => utils.suspensionLog.list.invalidate(),
+    onError: (e) => toast.error(e.message),
+  });
+
+  const [showNew, setShowNew] = useState(false);
+  const [childId, setChildId] = useState("");
+  const [type, setType] = useState<(typeof INCIDENT_TYPES)[number]["value"]>("temporary_suspension");
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [description, setDescription] = useState("");
+  const [steps, setSteps] = useState<Set<string>>(new Set());
+
+  const incidents = incidentsQuery.data ?? [];
+  const open = incidents.filter((i) => i.status === "open").length;
+
+  const toggleStep = (s: string) =>
+    setSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      return next;
+    });
+
+  const submit = () => {
+    if (!childId || !description.trim()) {
+      toast.error("Child and description are required.");
+      return;
+    }
+    createMut.mutate({
+      organizationId: ORGANIZATION_ID,
+      childId: Number(childId),
+      incidentDate: dateInputToLocal(date) ?? new Date(),
+      type,
+      description: description.trim(),
+      stepsTaken: Array.from(steps),
+    });
+  };
+
+  const toggleIncidentStep = (incident: { id: number; stepsTaken: string[] | null }, step: string) => {
+    const current = new Set(incident.stepsTaken ?? []);
+    if (current.has(step)) current.delete(step);
+    else current.add(step);
+    updateMut.mutate({ id: incident.id, organizationId: ORGANIZATION_ID, stepsTaken: Array.from(current) });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          {open > 0
+            ? `${open} open incident${open === 1 ? "" : "s"} — complete the required interventions below.`
+            : "Every incident must document the interventions attempted before exclusion."}
+        </p>
+        <Button
+          size="sm"
+          className="gap-2"
+          onClick={() => {
+            // Fresh form every time — never pre-filled with the last incident.
+            setChildId("");
+            setType("temporary_suspension");
+            setDate(new Date().toISOString().slice(0, 10));
+            setDescription("");
+            setSteps(new Set());
+            setShowNew(true);
+          }}
+        >
+          <Plus className="h-4 w-4" />Document Incident
+        </Button>
+      </div>
+
+      {incidentsQuery.isLoading ? (
+        <div className="py-12 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+      ) : incidents.length === 0 ? (
+        <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">
+          No incidents documented. That's the goal — §1302.17 requires programs to minimize exclusionary discipline.
+        </CardContent></Card>
+      ) : (
+        <div className="space-y-3">
+          {incidents.map((incident) => {
+            const done = new Set(incident.stepsTaken ?? []);
+            const typeLabel = INCIDENT_TYPES.find((t) => t.value === incident.type)?.label ?? incident.type;
+            return (
+              <Card key={incident.id}>
+                <CardContent className="p-5 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{incident.childName}</h3>
+                      <Badge variant="outline" className="text-xs">{typeLabel}</Badge>
+                      {incident.status === "open" ? (
+                        <Badge className="bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-100 text-xs">Open</Badge>
+                      ) : (
+                        <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100 text-xs">Resolved</Badge>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(incident.incidentDate).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{incident.description}</p>
+                  <div className="grid gap-1.5 sm:grid-cols-2">
+                    {Object.entries(STEP_LABELS).map(([step, label]) => (
+                      <button
+                        key={step}
+                        onClick={() => incident.status === "open" && toggleIncidentStep(incident, step)}
+                        disabled={incident.status !== "open" || updateMut.isPending}
+                        className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors ${
+                          done.has(step)
+                            ? "border-green-200 bg-green-50 text-green-700"
+                            : "border-border text-muted-foreground hover:bg-muted/40"
+                        }`}
+                      >
+                        {done.has(step) ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : <Clock className="h-3.5 w-3.5 shrink-0" />}
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {incident.status === "open" && (
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={updateMut.isPending || done.size < 2}
+                        title={done.size < 2 ? "Complete at least two interventions before resolving" : undefined}
+                        onClick={() => updateMut.mutate({ id: incident.id, organizationId: ORGANIZATION_ID, status: "resolved" })}
+                      >
+                        Mark resolved
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={showNew} onOpenChange={setShowNew}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Document a §1302.17 Incident</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Child</Label>
+                <Select value={childId} onValueChange={setChildId}>
+                  <SelectTrigger><SelectValue placeholder="Select child" /></SelectTrigger>
+                  <SelectContent>
+                    {childList.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.firstName} {c.lastName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Incident date</Label>
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={type} onValueChange={(v) => setType(v as typeof type)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {INCIDENT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>What happened & context</Label>
+              <Input placeholder="Brief factual description of the behavior and circumstances" value={description} onChange={(e) => setDescription(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Interventions already attempted</Label>
+              <div className="grid gap-1.5 sm:grid-cols-2">
+                {Object.entries(STEP_LABELS).map(([step, label]) => (
+                  <button
+                    key={step}
+                    type="button"
+                    onClick={() => toggleStep(step)}
+                    className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs ${
+                      steps.has(step) ? "border-green-200 bg-green-50 text-green-700" : "border-border text-muted-foreground"
+                    }`}
+                  >
+                    {steps.has(step) ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : <Plus className="h-3.5 w-3.5 shrink-0" />}
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
+              <Button onClick={submit} disabled={createMut.isPending} className="gap-2">
+                {createMut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}Save Incident
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ERSEA Eligibility Calculator (45 CFR §1302.12)
+// 2025 HHS Poverty Guidelines — 48 contiguous states + D.C.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FPL_2025: Record<number, number> = {
+  1: 15_650, 2: 21_150, 3: 26_650, 4: 32_150,
+  5: 37_650, 6: 43_150, 7: 48_650, 8: 54_150,
+};
+const FPL_EXTRA_PERSON = 5_500;
+
+function fplFor(householdSize: number): number {
+  if (householdSize <= 8) return FPL_2025[Math.max(1, householdSize)];
+  return FPL_2025[8] + (householdSize - 8) * FPL_EXTRA_PERSON;
+}
+
+type CategoricalFlag = "homeless" | "foster" | "public_assistance";
+
+const CATEGORICAL_LABELS: Record<CategoricalFlag, string> = {
+  homeless: "Experiencing homelessness (McKinney-Vento)",
+  foster: "Child in foster care",
+  public_assistance: "Family receives TANF or SSI",
+};
+
+interface Determination {
+  fplPercent: number;
+  eligible: boolean;
+  basis: string;
+  detail: string;
+  incomeLevel: "below_100" | "below_130" | "below_185" | "above_185";
+  priority: "high" | "medium" | "low";
+}
+
+function determine(income: number, householdSize: number, flags: Set<CategoricalFlag>, hasIepIfsp: boolean): Determination {
+  const fpl = fplFor(householdSize);
+  const pct = Math.round((income / fpl) * 100);
+  const incomeLevel = pct <= 100 ? "below_100" : pct <= 130 ? "below_130" : pct <= 185 ? "below_185" : "above_185";
+
+  if (flags.size > 0) {
+    const which = Array.from(flags).map((f) => CATEGORICAL_LABELS[f]).join("; ");
+    return {
+      fplPercent: pct,
+      eligible: true,
+      basis: "Categorically eligible",
+      detail: `${which}. Eligible regardless of income (§1302.12(c)).`,
+      incomeLevel,
+      priority: "high",
+    };
+  }
+  if (pct <= 100) {
+    return {
+      fplPercent: pct,
+      eligible: true,
+      basis: "Income eligible",
+      detail: `Household income is at or below 100% of the federal poverty line ($${fpl.toLocaleString()} for ${householdSize}).`,
+      incomeLevel,
+      priority: hasIepIfsp ? "high" : "medium",
+    };
+  }
+  if (pct <= 130) {
+    return {
+      fplPercent: pct,
+      eligible: true,
+      basis: "Eligible under the 130% provision",
+      detail: "Between 100–130% FPL — programs may fill up to 35% of slots from this band (§1302.12(d)). Document the determination.",
+      incomeLevel,
+      priority: hasIepIfsp ? "high" : "low",
+    };
+  }
+  return {
+    fplPercent: pct,
+    eligible: false,
+    basis: "Over income",
+    detail: hasIepIfsp
+      ? "Above 130% FPL — but a child with an IEP/IFSP may be enrolled under the 10% over-income allowance (§1302.12(e)); disability enrollment also counts toward the 10% requirement (§1302.14(b))."
+      : "Above 130% FPL. Up to 10% of enrollment may be over-income if all eligible families are served (§1302.12(e)).",
+    incomeLevel,
+    priority: hasIepIfsp ? "medium" : "low",
+  };
+}
+
+function ErseaCalculatorDialog({
+  open,
+  onClose,
+  onUseInApplication,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onUseInApplication: (prefill: { incomeLevel: string; householdSize: string; priority: string; notes: string }) => void;
+}) {
+  const [income, setIncome] = useState("");
+  const [size, setSize] = useState("4");
+  const [flags, setFlags] = useState<Set<CategoricalFlag>>(new Set());
+  const [iep, setIep] = useState(false);
+
+  const incomeNum = Number(income.replace(/[^0-9.]/g, ""));
+  const sizeNum = Math.max(1, Number(size) || 1);
+  const ready = income !== "" && !Number.isNaN(incomeNum);
+  const result = ready ? determine(incomeNum, sizeNum, flags, iep) : null;
+
+  const toggleFlag = (f: CategoricalFlag) => {
+    setFlags((prev) => {
+      const next = new Set(prev);
+      if (next.has(f)) next.delete(f);
+      else next.add(f);
+      return next;
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Calculator className="h-5 w-5" /> ERSEA Eligibility Calculator
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Annual household income</Label>
+              <Input placeholder="e.g. 28000" inputMode="numeric" value={income} onChange={(e) => setIncome(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Household size</Label>
+              <Input type="number" min={1} max={20} value={size} onChange={(e) => setSize(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Categorical eligibility (auto-eligible)</Label>
+            <div className="space-y-1.5">
+              {(Object.keys(CATEGORICAL_LABELS) as CategoricalFlag[]).map((f) => (
+                <Button
+                  key={f}
+                  type="button"
+                  variant={flags.has(f) ? "default" : "outline"}
+                  size="sm"
+                  className="w-full justify-start text-xs h-8"
+                  onClick={() => toggleFlag(f)}
+                >
+                  {flags.has(f) ? <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                  {CATEGORICAL_LABELS[f]}
+                </Button>
+              ))}
+              <Button
+                type="button"
+                variant={iep ? "default" : "outline"}
+                size="sm"
+                className="w-full justify-start text-xs h-8"
+                onClick={() => setIep(!iep)}
+              >
+                {iep ? <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                Child has an IEP / IFSP (disability priority)
+              </Button>
+            </div>
+          </div>
+
+          {result && (
+            <Card className={result.eligible ? "border-green-200 bg-green-50/50" : "border-red-200 bg-red-50/50"}>
+              <CardContent className="pt-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className={`font-semibold ${result.eligible ? "text-green-700" : "text-red-700"}`}>
+                    {result.basis}
+                  </span>
+                  <Badge variant="outline" className="text-xs">
+                    {result.fplPercent}% FPL
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">{result.detail}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  2025 HHS Poverty Guidelines (48 contiguous states + D.C.). Verify with source documents
+                  (pay stubs, W-2, TANF/SSI letters) and keep them with the application.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button
+              disabled={!result}
+              onClick={() => {
+                if (!result) return;
+                onUseInApplication({
+                  incomeLevel: result.incomeLevel,
+                  householdSize: String(sizeNum),
+                  priority: result.priority,
+                  notes: `Eligibility: ${result.basis} (${result.fplPercent}% FPL)${flags.size > 0 ? ` — ${Array.from(flags).map((f) => CATEGORICAL_LABELS[f]).join("; ")}` : ""}${iep ? " — has IEP/IFSP" : ""}`,
+                });
+              }}
+              className="gap-2"
+            >
+              <ArrowRight className="h-4 w-4" /> Use in application
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

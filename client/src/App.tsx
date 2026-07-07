@@ -15,7 +15,14 @@ import Portfolios from "./pages/Portfolios";
 import Subsidies from "./pages/Subsidies";
 import GlossaryPage from "./pages/GlossaryPage";
 import Attendance from "./pages/Attendance";
+import ChronicAbsence from "./pages/ChronicAbsence";
+import FamilyPartnership from "./pages/FamilyPartnership";
+import PolicyCouncil from "./pages/PolicyCouncil";
+import DisabilityServices from "./pages/DisabilityServices";
+import GrantBudget from "./pages/GrantBudget";
+import ClassroomQuality from "./pages/ClassroomQuality";
 import Health from "./pages/Health";
+import HealthDeadlines from "./pages/HealthDeadlines";
 import FamilyServices from "./pages/FamilyServices";
 import Staff from "./pages/Staff";
 import Reports from "./pages/Reports";
@@ -161,6 +168,48 @@ function Router() {
           </AppLayout>
         )}
       </Route>
+      <Route path="/chronic-absence">
+        {() => (
+          <AppLayout>
+            <ChronicAbsence />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/family-partnership">
+        {() => (
+          <AppLayout>
+            <FamilyPartnership />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/policy-council">
+        {() => (
+          <AppLayout>
+            <PolicyCouncil />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/disability-services">
+        {() => (
+          <AppLayout>
+            <DisabilityServices />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/grant-budget">
+        {() => (
+          <AppLayout>
+            <GrantBudget />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/classroom-quality">
+        {() => (
+          <AppLayout>
+            <ClassroomQuality />
+          </AppLayout>
+        )}
+      </Route>
       <Route path="/communication">
         {() => (
           <AppLayout>
@@ -172,6 +221,13 @@ function Router() {
         {() => (
           <AppLayout>
             <Health />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/health-deadlines">
+        {() => (
+          <AppLayout>
+            <HealthDeadlines />
           </AppLayout>
         )}
       </Route>

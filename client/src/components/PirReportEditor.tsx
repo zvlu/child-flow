@@ -11,7 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShieldCheck, FileText, Loader2, Lock, RotateCcw, Search, Check } from "lucide-react";
+import { ShieldCheck, FileText, Loader2, Lock, RotateCcw, Search, Check, Sparkles } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 /** What the editor needs from each catalog row (a subset of pirQuestions + value). */
 interface PirQuestion {
@@ -44,6 +48,7 @@ export default function PirReportEditor() {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
   const [onlyUnanswered, setOnlyUnanswered] = useState(false);
+  const [showSmartFill, setShowSmartFill] = useState(false);
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
@@ -199,6 +204,12 @@ export default function PirReportEditor() {
                   {years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {canEdit && (
+                <Button size="sm" variant="outline" className="gap-2 border-primary/40 text-primary hover:text-primary"
+                  onClick={() => setShowSmartFill(true)}>
+                  <Sparkles className="h-4 w-4" />Smart Fill
+                </Button>
+              )}
               {locked ? (
                 <Button size="sm" variant="outline" className="gap-2" disabled={!isAdmin || reopen.isPending}
                   onClick={() => reopen.mutate({ organizationId: ORGANIZATION_ID, year })}>
@@ -303,6 +314,152 @@ export default function PirReportEditor() {
           </Card>
         ));
       })()}
+
+      {showSmartFill && (
+        <SmartFillDialog
+          year={year}
+          onClose={(applied) => {
+            setShowSmartFill(false);
+            if (applied) {
+              setEdits({});
+              utils.compliance.getReport.invalidate();
+            }
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Smart Fill — reviews values computed from live program data (enrollment,
+ * attendance, health records, family services) and applies the checked ones.
+ */
+function SmartFillDialog({ year, onClose }: { year: string; onClose: (applied: boolean) => void }) {
+  const suggestionsQuery = trpc.compliance.autoPopulate.useQuery({
+    organizationId: ORGANIZATION_ID,
+    year,
+  });
+  const applyMutation = trpc.compliance.applyAutoPopulate.useMutation();
+
+  const suggestions = suggestionsQuery.data ?? [];
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const toggle = (code: string) =>
+    setExcluded((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+
+  const selected = suggestions.filter((s) => !excluded.has(s.code));
+  const overwrites = selected.filter((s) => s.currentValue != null && s.currentValue !== s.value).length;
+
+  const apply = async () => {
+    try {
+      const result = await applyMutation.mutateAsync({
+        organizationId: ORGANIZATION_ID,
+        year,
+        items: selected.map((s) => ({ section: s.section, questionId: s.code, value: s.value })),
+      });
+      toast.success(`Smart Fill applied ${result.applied} PIR fields`);
+      onClose(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Smart Fill failed");
+    }
+  };
+
+  // Group by section for display.
+  const bySection = new Map<string, typeof suggestions>();
+  for (const s of suggestions) {
+    if (!bySection.has(s.section)) bySection.set(s.section, []);
+    bySection.get(s.section)!.push(s);
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose(false)}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" /> Smart Fill — PIR {year}
+          </DialogTitle>
+          <DialogDescription>
+            Values computed from your live program data. Review, uncheck anything you don't
+            trust, then apply. Nothing is written until you click Apply.
+          </DialogDescription>
+        </DialogHeader>
+
+        {suggestionsQuery.isLoading ? (
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin mr-2" />Computing from program data…
+          </div>
+        ) : suggestions.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Not enough program data yet — add children, attendance, and health records first.
+          </p>
+        ) : (
+          <div className="space-y-5">
+            {Array.from(bySection.entries()).map(([section, items]) => (
+              <div key={section}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                  {section}
+                </p>
+                <div className="space-y-1">
+                  {items.map((s) => {
+                    const isOverwrite = s.currentValue != null && s.currentValue !== s.value;
+                    return (
+                      <label
+                        key={s.code}
+                        className="flex items-start gap-3 p-2.5 rounded-lg odd:bg-muted/30 cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={!excluded.has(s.code)}
+                          onCheckedChange={() => toggle(s.code)}
+                          className="mt-0.5"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm">{s.label}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {s.source}
+                            {s.confidence === "medium" && " · verify before submitting"}
+                          </p>
+                          {isOverwrite && (
+                            <p className="text-[11px] text-orange-600">
+                              Replaces current answer: {s.currentValue}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-sm font-semibold">{s.value}</span>
+                          <Badge
+                            variant="outline"
+                            className={`ml-2 text-[10px] ${s.confidence === "high" ? "border-green-300 text-green-700" : "border-yellow-300 text-yellow-700"}`}
+                          >
+                            {s.confidence}
+                          </Badge>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onClose(false)}>Cancel</Button>
+          <Button
+            onClick={apply}
+            disabled={selected.length === 0 || applyMutation.isPending}
+            className="gap-2"
+          >
+            {applyMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Apply {selected.length} field{selected.length === 1 ? "" : "s"}
+            {overwrites > 0 && ` (${overwrites} overwrite${overwrites === 1 ? "" : "s"})`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
