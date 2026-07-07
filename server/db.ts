@@ -161,6 +161,11 @@ export async function updateUserSettings(
 
   if (patch.twoFactorEnabled !== undefined) merged.twoFactorEnabled = patch.twoFactorEnabled;
 
+  if (patch.preferredLanguage !== undefined) {
+    if (patch.preferredLanguage) merged.preferredLanguage = patch.preferredLanguage;
+    else delete merged.preferredLanguage;
+  }
+
   // Notification toggles merge key-by-key so changing one preference never
   // resets the others.
   if (patch.notifications !== undefined) {

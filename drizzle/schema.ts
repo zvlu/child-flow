@@ -57,6 +57,12 @@ export const users = mysqlTable("users", {
 export type UserSettings = {
   /** Whether the user has opted into two-factor auth (flag only; not a TOTP secret). */
   twoFactorEnabled?: boolean;
+  /**
+   * Preferred language for messages and app content (BCP-47-ish codes matching
+   * the family app: en, es, ht, zh-Hans, vi, ar). Messages from the other side
+   * of a conversation are auto-translated into this language on read.
+   */
+  preferredLanguage?: string;
   /** Notification channel/topic toggles keyed by a stable preference id. */
   notifications?: Record<string, boolean>;
   /**
@@ -445,6 +451,12 @@ export const chatMessages = mysqlTable("chat_messages", {
   senderUserId: int("senderUserId").notNull(),
   senderRole: mysqlEnum("senderRole", ["staff", "family"]).notNull(),
   body: text("body").notNull(),
+  /**
+   * Cached AI translations of `body`, keyed by language code
+   * (e.g. { "es": "...", "en": "..." }). Populated lazily on first read by a
+   * viewer whose preferred language differs from the message's language.
+   */
+  translations: json("translations").$type<Record<string, string>>(),
   /** Millisecond precision; set by the application on insert. */
   sentAt: timestamp("sentAt", { fsp: 3 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1080,3 +1092,197 @@ export type InsertReportResult = typeof reportResults.$inferInsert;
 // resourceId / actorOpenId / detail — matches migration 0003 and the
 // insertAuditLog/auditAccess code). A duplicate scaffold definition that a
 // parallel branch added here was removed; do not re-add it.
+
+/**
+ * Family Partnership Agreements (Head Start §1302.52).
+ * One active agreement per family; goals live in family_goals and home visits
+ * in family_services (type "home_visit") — this row ties them together with
+ * strengths, needs, signatures, and a review cadence.
+ */
+export const familyPartnershipAgreements = mysqlTable("family_partnership_agreements", {
+  id: int("id").autoincrement().primaryKey(),
+  familyId: int("familyId").notNull().references(() => families.id),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  status: mysqlEnum("status", ["draft", "active", "review_due", "completed", "expired"])
+    .default("draft")
+    .notNull(),
+  /** Family strengths identified during the assessment (JSON string array). */
+  strengths: json("strengths").$type<string[]>(),
+  needsAssessment: text("needsAssessment"),
+  /** Home visits promised for the program year (Head Start home-based: 46; center-based: 2). */
+  targetVisits: int("targetVisits").default(2).notNull(),
+  parentSigned: int("parentSigned").default(0).notNull(),
+  parentSignedAt: timestamp("parentSignedAt"),
+  staffSigned: int("staffSigned").default(0).notNull(),
+  staffSignedAt: timestamp("staffSignedAt"),
+  reviewDate: timestamp("reviewDate"),
+  createdBy: int("createdBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FamilyPartnershipAgreement = typeof familyPartnershipAgreements.$inferSelect;
+export type InsertFamilyPartnershipAgreement = typeof familyPartnershipAgreements.$inferInsert;
+
+/**
+ * Suspension / expulsion incidents (Head Start §1302.17).
+ * Programs must prohibit expulsion, severely limit suspension, and document
+ * the steps taken to address behavior before any exclusion. `stepsTaken`
+ * records which required interventions happened (JSON string array).
+ */
+export const suspensionExpulsionLogs = mysqlTable("suspension_expulsion_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  childId: int("childId").notNull().references(() => children.id),
+  incidentDate: timestamp("incidentDate").notNull(),
+  type: mysqlEnum("type", ["temporary_suspension", "expulsion_prevented", "transition_out"]).notNull(),
+  description: text("description").notNull(),
+  /** Which §1302.17 interventions were completed (e.g. mental_health_consult). */
+  stepsTaken: json("stepsTaken").$type<string[]>(),
+  outcome: text("outcome"),
+  status: mysqlEnum("status", ["open", "resolved"]).default("open").notNull(),
+  resolvedAt: timestamp("resolvedAt"),
+  recordedBy: int("recordedBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SuspensionExpulsionLog = typeof suspensionExpulsionLogs.$inferSelect;
+export type InsertSuspensionExpulsionLog = typeof suspensionExpulsionLogs.$inferInsert;
+
+/**
+ * Policy Council (Head Start §1302.50–51). Programs must maintain a council
+ * where parents of currently enrolled children hold the majority of seats.
+ */
+export const policyCouncilMembers = mysqlTable("policy_council_members", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 200 }).notNull(),
+  memberType: mysqlEnum("memberType", ["parent", "community_rep"]).notNull(),
+  councilRole: mysqlEnum("councilRole", ["chair", "vice_chair", "secretary", "treasurer", "member"])
+    .default("member")
+    .notNull(),
+  familyId: int("familyId").references(() => families.id),
+  termStart: timestamp("termStart"),
+  termEnd: timestamp("termEnd"),
+  status: mysqlEnum("status", ["active", "ended"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PolicyCouncilMember = typeof policyCouncilMembers.$inferSelect;
+export type InsertPolicyCouncilMember = typeof policyCouncilMembers.$inferInsert;
+
+export const policyCouncilMeetings = mysqlTable("policy_council_meetings", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  meetingDate: timestamp("meetingDate").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  minutes: text("minutes"),
+  attendeeCount: int("attendeeCount").default(0).notNull(),
+  quorumMet: int("quorumMet").default(0).notNull(),
+  /** Open follow-ups from the meeting (JSON string array). */
+  actionItems: json("actionItems").$type<string[]>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PolicyCouncilMeeting = typeof policyCouncilMeetings.$inferSelect;
+export type InsertPolicyCouncilMeeting = typeof policyCouncilMeetings.$inferInsert;
+
+/**
+ * Children with disabilities — IEP/IFSP coordination (Head Start §1302.60–63).
+ * Tracks the 10% enrollment requirement, plan expirations, LEA coordination,
+ * parent rights notification (in the family's language), and kindergarten
+ * transition planning.
+ */
+export const disabilityServices = mysqlTable("disability_services", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  childId: int("childId").notNull().references(() => children.id),
+  planType: mysqlEnum("planType", ["iep", "ifsp", "section_504"]).notNull(),
+  status: mysqlEnum("status", ["pending_evaluation", "active", "expired", "exited"])
+    .default("active")
+    .notNull(),
+  primaryDisability: varchar("primaryDisability", { length: 200 }),
+  effectiveDate: timestamp("effectiveDate"),
+  /** Annual review / plan expiration date. */
+  expirationDate: timestamp("expirationDate"),
+  leaAgency: varchar("leaAgency", { length: 200 }),
+  leaContact: varchar("leaContact", { length: 200 }),
+  parentRightsNotifiedAt: timestamp("parentRightsNotifiedAt"),
+  parentRightsLanguage: varchar("parentRightsLanguage", { length: 32 }),
+  /** Completed kindergarten-transition steps (JSON string array). */
+  transitionChecklist: json("transitionChecklist").$type<string[]>(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type DisabilityService = typeof disabilityServices.$inferSelect;
+export type InsertDisabilityService = typeof disabilityServices.$inferInsert;
+
+/**
+ * Head Start grant budget compliance (Tier-3 roadmap #12).
+ * Budget lines per fiscal year and Head Start cost category, plus expenses
+ * recorded against them. Non-federal share combines expenses flagged as
+ * match with in_kind_contributions (§75.306 — 20% match requirement).
+ */
+export const grantBudgetLines = mysqlTable("grant_budget_lines", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  /** e.g. "2025-2026" — matches the PIR program-year format. */
+  fiscalYear: varchar("fiscalYear", { length: 9 }).notNull(),
+  category: mysqlEnum("category", [
+    "education", "health", "disability_services", "family_services",
+    "program_management", "transportation", "facilities", "tta", "other",
+  ]).notNull(),
+  budgetedCents: int("budgetedCents").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type GrantBudgetLine = typeof grantBudgetLines.$inferSelect;
+export type InsertGrantBudgetLine = typeof grantBudgetLines.$inferInsert;
+
+export const grantExpenses = mysqlTable("grant_expenses", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  fiscalYear: varchar("fiscalYear", { length: 9 }).notNull(),
+  category: mysqlEnum("category", [
+    "education", "health", "disability_services", "family_services",
+    "program_management", "transportation", "facilities", "tta", "other",
+  ]).notNull(),
+  description: varchar("description", { length: 500 }).notNull(),
+  amountCents: int("amountCents").notNull(),
+  expenseDate: timestamp("expenseDate").notNull(),
+  /** 1 = paid from local funds; counts toward the 20% non-federal share. */
+  nonFederalShare: int("nonFederalShare").default(0).notNull(),
+  recordedBy: int("recordedBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type GrantExpense = typeof grantExpenses.$inferSelect;
+export type InsertGrantExpense = typeof grantExpenses.$inferInsert;
+
+/**
+ * Classroom quality observations (Tier-3 roadmap #13).
+ * CLASS® (1–7 per dimension, three domains) and ECERS checklists. OHS uses
+ * CLASS scores in federal reviews — tracking proactively beats being surprised.
+ */
+export const classroomAssessments = mysqlTable("classroom_assessments", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  classroomId: int("classroomId").notNull().references(() => classrooms.id),
+  tool: mysqlEnum("tool", ["class", "ecers"]).notNull(),
+  assessmentDate: timestamp("assessmentDate").notNull(),
+  observer: varchar("observer", { length: 200 }),
+  /** Dimension/subscale → score (1–7), keyed by stable slug. */
+  scores: json("scores").$type<Record<string, number>>().notNull(),
+  coachingNotes: text("coachingNotes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ClassroomAssessment = typeof classroomAssessments.$inferSelect;
+export type InsertClassroomAssessment = typeof classroomAssessments.$inferInsert;

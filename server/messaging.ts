@@ -11,7 +11,12 @@ import {
 } from "../drizzle/schema";
 import { clientIpFromReq } from "./_core/audit";
 import { sdk } from "./_core/sdk";
-import { getDb, insertAuditLog } from "./db";
+import { getDb, insertAuditLog, updateUserSettings } from "./db";
+import {
+  isSupportedLanguage,
+  translateThreadForViewer,
+  type SupportedLanguage,
+} from "./translation";
 
 /**
  * Two-way in-app messaging between staff and families.
@@ -101,11 +106,18 @@ async function serializeConversation(conversation: Conversation, viewer: Viewer)
   };
 }
 
+/** The viewer's preferred message language (users.settings.preferredLanguage). */
+function viewerLanguage(viewer: Viewer): SupportedLanguage {
+  const pref = viewer.user.settings?.preferredLanguage;
+  return pref && isSupportedLanguage(pref) ? pref : "en";
+}
+
 function serializeMessage(
   m: typeof chatMessages.$inferSelect,
   senderName: string,
   viewer: Viewer,
-  conversation: Conversation
+  conversation: Conversation,
+  translation?: { body: string; translated: boolean }
 ) {
   // The viewer's own messages count as read once the OTHER side has seen the
   // thread; everything the viewer is fetching right now is read by definition.
@@ -122,7 +134,10 @@ function serializeMessage(
     senderId: String(m.senderUserId),
     senderName,
     senderRole: m.senderRole,
-    body: m.body,
+    body: translation?.body ?? m.body,
+    // Original text so clients can offer a "show original" toggle.
+    bodyOriginal: translation?.translated ? m.body : undefined,
+    isTranslated: translation?.translated ?? false,
     sentAt: m.sentAt.toISOString(),
     isRead,
   };
@@ -201,6 +216,12 @@ export function registerMessagingRoutes(app: Express) {
         .orderBy(chatMessages.sentAt);
       const names = await senderNames(Array.from(new Set(msgs.map(m => m.senderUserId))));
 
+      // Real-time translation: messages from the other side render in the
+      // viewer's preferred language (staff default to English). Source-language
+      // stamps let same-language messages skip the LLM entirely.
+      const lang = viewerLanguage(viewer);
+      const translationsByMessage = await translateThreadForViewer(msgs, viewer.side, lang);
+
       // Mark the viewer's side as caught up.
       await db
         .update(conversations)
@@ -213,7 +234,13 @@ export function registerMessagingRoutes(app: Express) {
 
       res.json(
         msgs.map(m =>
-          serializeMessage(m, names.get(m.senderUserId) ?? "Unknown", viewer, conversation)
+          serializeMessage(
+            m,
+            names.get(m.senderUserId) ?? "Unknown",
+            viewer,
+            conversation,
+            translationsByMessage.get(m.id)
+          )
         )
       );
     }
@@ -346,6 +373,9 @@ export function registerMessagingRoutes(app: Express) {
       senderUserId: viewer.user.id,
       senderRole: viewer.side,
       body,
+      // Stamp the sender's language so readers in the same language never
+      // trigger a pointless LLM round-trip (see translateThreadForViewer).
+      translations: { __source: viewerLanguage(viewer) },
       sentAt: new Date(),
     });
     await db
@@ -358,5 +388,24 @@ export function registerMessagingRoutes(app: Express) {
       .where(eq(conversations.id, conversation!.id));
 
     res.json(await serializeConversation(conversation!, viewer));
+  });
+
+  /**
+   * Set the caller's preferred message language. The family app calls this
+   * whenever the user changes language; staff messages then arrive translated.
+   */
+  app.post("/api/messaging/language", async (req: Request, res: Response) => {
+    const viewer = await requireViewer(req);
+    if (!viewer) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const language = typeof req.body?.language === "string" ? req.body.language : "";
+    if (!isSupportedLanguage(language)) {
+      res.status(400).json({ error: `Unsupported language: ${language}` });
+      return;
+    }
+    await updateUserSettings(viewer.user.openId, { preferredLanguage: language });
+    res.json({ ok: true, language });
   });
 }

@@ -43,6 +43,15 @@ import * as mod from "./moduleDb";
 import { createFamilyInvitation, listFamilyInvitations } from "./family";
 import { computeDashboard } from "./dashboard";
 import { CommunicationService } from "./services/communication";
+import { getChronicAbsenceSummary } from "./chronicAbsence";
+import { listFpas, getFpaDetail, upsertFpa } from "./fpaDb";
+import { getHealthDeadlineSummary } from "./healthDeadlines";
+import { computePirSuggestions } from "./pirAutoPopulate";
+import { listIncidents, createIncident, updateIncident } from "./suspensionLog";
+import * as pc from "./policyCouncil";
+import * as ds from "./disabilityServices";
+import { getGrantSummary, setBudgetLine, addExpense, GRANT_CATEGORIES } from "./grantBudget";
+import { listAssessments, createAssessment } from "./classroomQuality";
 
 /** Block creation when it would push the org past its plan's child limit. */
 async function assertChildCapacity(organizationId: number, adding: number) {
@@ -770,6 +779,269 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         return mod.saveAttendanceForDate(input.organizationId, input.date, input.records);
+      }),
+  }),
+
+  // Health compliance deadlines (Head Start §1302.42: 45-day screening / 90-day dental).
+  healthDeadlines: router({
+    summary: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => {
+        return getHealthDeadlineSummary(input.organizationId);
+      }),
+  }),
+
+  // Chronic Absence Alert System (Head Start §1302.16 attendance analysis).
+  chronicAbsence: router({
+    summary: orgStaffProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          windowDays: z.number().int().min(7).max(120).optional(),
+        })
+      )
+      .query(async ({ input }) => {
+        return getChronicAbsenceSummary(input.organizationId, input.windowDays ?? 30);
+      }),
+  }),
+
+  // CLASS / ECERS classroom quality observations.
+  classroomQuality: router({
+    list: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => listAssessments(input.organizationId)),
+    create: orgStaffProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          classroomId: z.number(),
+          tool: z.enum(["class", "ecers"]),
+          assessmentDate: z.date(),
+          observer: z.string().max(200).nullable().optional(),
+          scores: z.record(z.string(), z.number().min(1).max(7)),
+          coachingNotes: z.string().max(10000).nullable().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, {
+          action: "create",
+          resourceType: "classroom_assessment",
+          resourceId: String(input.classroomId),
+          detail: input.tool,
+        });
+        return createAssessment(input);
+      }),
+  }),
+
+  // Grant & budget compliance (burn rate, 20% non-federal share, carryover).
+  grantBudget: router({
+    summary: orgAdminProcedure
+      .input(z.object({ organizationId: z.number(), fiscalYear: z.string().regex(/^\d{4}-\d{4}$/) }))
+      .query(async ({ input }) => getGrantSummary(input.organizationId, input.fiscalYear)),
+    setBudgetLine: orgAdminProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          fiscalYear: z.string().regex(/^\d{4}-\d{4}$/),
+          category: z.enum(GRANT_CATEGORIES),
+          budgetedCents: z.number().int().min(0).max(2_000_000_000),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "update", resourceType: "grant_budget", resourceId: `${input.fiscalYear}/${input.category}` });
+        return setBudgetLine(input);
+      }),
+    addExpense: orgAdminProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          fiscalYear: z.string().regex(/^\d{4}-\d{4}$/),
+          category: z.enum(GRANT_CATEGORIES),
+          description: z.string().min(1).max(500),
+          amountCents: z.number().int().min(1).max(2_000_000_000),
+          expenseDate: z.date(),
+          nonFederalShare: z.boolean(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "create", resourceType: "grant_expense", resourceId: `${input.fiscalYear}/${input.category}`, detail: input.description.slice(0, 80) });
+        return addExpense(input);
+      }),
+  }),
+
+  // IEP/IFSP coordination (Head Start §1302.60–63).
+  disabilityServices: router({
+    summary: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => ds.getDisabilitySummary(input.organizationId)),
+    upsert: orgStaffProcedure
+      .input(
+        z.object({
+          id: z.number().nullable().optional(),
+          organizationId: z.number(),
+          childId: z.number(),
+          planType: z.enum(["iep", "ifsp", "section_504"]),
+          status: z.enum(["pending_evaluation", "active", "expired", "exited"]).optional(),
+          primaryDisability: z.string().max(200).nullable().optional(),
+          effectiveDate: z.date().nullable().optional(),
+          expirationDate: z.date().nullable().optional(),
+          leaAgency: z.string().max(200).nullable().optional(),
+          leaContact: z.string().max(200).nullable().optional(),
+          notes: z.string().max(5000).nullable().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, {
+          action: input.id ? "update" : "create",
+          resourceType: "disability_service",
+          resourceId: String(input.childId),
+          detail: input.planType,
+        });
+        return ds.upsertDisabilityRecord(input);
+      }),
+    markParentRights: orgStaffProcedure
+      .input(z.object({ id: z.number(), organizationId: z.number(), language: z.string().min(1).max(32) }))
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "update", resourceType: "disability_service", resourceId: String(input.id), detail: "parent_rights" });
+        return ds.markParentRights(input);
+      }),
+    setTransition: orgStaffProcedure
+      .input(z.object({ id: z.number(), organizationId: z.number(), steps: z.array(z.string()).max(10) }))
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "update", resourceType: "disability_service", resourceId: String(input.id), detail: "transition" });
+        return ds.setTransitionChecklist(input);
+      }),
+  }),
+
+  // Policy Council (Head Start §1302.50–51).
+  policyCouncil: router({
+    members: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => pc.listMembers(input.organizationId)),
+    addMember: orgStaffProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          name: z.string().min(1).max(200),
+          memberType: z.enum(["parent", "community_rep"]),
+          councilRole: z.enum(["chair", "vice_chair", "secretary", "treasurer", "member"]).optional(),
+          familyId: z.number().nullable().optional(),
+          termStart: z.date().nullable().optional(),
+          termEnd: z.date().nullable().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "create", resourceType: "policy_council_member", resourceId: input.name });
+        return pc.addMember(input);
+      }),
+    updateMember: orgStaffProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          organizationId: z.number(),
+          councilRole: z.enum(["chair", "vice_chair", "secretary", "treasurer", "member"]).optional(),
+          status: z.enum(["active", "ended"]).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "update", resourceType: "policy_council_member", resourceId: String(input.id) });
+        return pc.updateMember(input);
+      }),
+    meetings: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => pc.listMeetings(input.organizationId)),
+    addMeeting: orgStaffProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          meetingDate: z.date(),
+          title: z.string().min(1).max(255),
+          minutes: z.string().max(20000).nullable().optional(),
+          attendeeCount: z.number().int().min(0).max(500).optional(),
+          quorumMet: z.boolean().optional(),
+          actionItems: z.array(z.string().min(1).max(500)).max(30).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "create", resourceType: "policy_council_meeting", resourceId: input.title });
+        return pc.addMeeting(input);
+      }),
+  }),
+
+  // Suspension/expulsion documentation (Head Start §1302.17).
+  suspensionLog: router({
+    list: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => listIncidents(input.organizationId)),
+    create: orgStaffProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          childId: z.number(),
+          incidentDate: z.date(),
+          type: z.enum(["temporary_suspension", "expulsion_prevented", "transition_out"]),
+          description: z.string().min(1).max(5000),
+          stepsTaken: z.array(z.string()).max(10).optional(),
+          outcome: z.string().max(5000).nullable().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, {
+          action: "create",
+          resourceType: "suspension_expulsion_log",
+          resourceId: String(input.childId),
+          detail: input.type,
+        });
+        return createIncident(input);
+      }),
+    update: orgStaffProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          organizationId: z.number(),
+          stepsTaken: z.array(z.string()).max(10).optional(),
+          outcome: z.string().max(5000).nullable().optional(),
+          status: z.enum(["open", "resolved"]).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, {
+          action: "update",
+          resourceType: "suspension_expulsion_log",
+          resourceId: String(input.id),
+        });
+        return updateIncident(input);
+      }),
+  }),
+
+  // Family Partnership Agreements (Head Start §1302.52).
+  fpa: router({
+    list: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => {
+        return listFpas(input.organizationId);
+      }),
+    detail: orgStaffProcedure
+      .input(z.object({ organizationId: z.number(), familyId: z.number() }))
+      .query(async ({ input }) => {
+        return getFpaDetail(input.organizationId, input.familyId);
+      }),
+    upsert: orgStaffProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          familyId: z.number(),
+          status: z.enum(["draft", "active", "review_due", "completed", "expired"]).optional(),
+          strengths: z.array(z.string().min(1).max(255)).max(20).optional(),
+          needsAssessment: z.string().max(5000).nullable().optional(),
+          targetVisits: z.number().int().min(1).max(52).optional(),
+          reviewDate: z.date().nullable().optional(),
+          parentSigned: z.boolean().optional(),
+          staffSigned: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return upsertFpa(input);
       }),
   }),
 
@@ -1575,6 +1847,48 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         await auditAccess(ctx, { action: "update", resourceType: "pir_report", resourceId: input.year, detail: "reopen" });
         return mod.reopenPirReport(input.organizationId, input.year);
+      }),
+    // Smart Fill: compute PIR values from live program data. Read-only; the
+    // admin reviews and applies suggestions explicitly.
+    autoPopulate: orgStaffProcedure
+      .input(z.object({ organizationId: z.number(), year: z.string() }))
+      .query(async ({ input }) => {
+        return computePirSuggestions(input.organizationId, input.year);
+      }),
+    applyAutoPopulate: orgAdminProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          year: z.string(),
+          items: z
+            .array(
+              z.object({
+                section: z.string(),
+                questionId: z.string(),
+                value: z.string(),
+              })
+            )
+            .min(1)
+            .max(200),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, {
+          action: "update",
+          resourceType: "pir_data",
+          resourceId: `${input.year}/smart-fill`,
+          detail: `${input.items.length} fields`,
+        });
+        for (const item of input.items) {
+          await mod.upsertPirValue(
+            input.organizationId,
+            input.year,
+            item.section,
+            item.questionId,
+            item.value
+          );
+        }
+        return { applied: input.items.length };
       }),
     // PIR is federal reporting data — edits are administrative.
     setPirValue: orgAdminProcedure

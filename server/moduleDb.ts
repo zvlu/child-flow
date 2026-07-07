@@ -1085,6 +1085,11 @@ export async function upsertPirValue(organizationId: number, year: string, secti
   const db = await requireDb();
   // Every value belongs to the (org, year) report envelope; create it lazily.
   const report = await ensurePirReport(organizationId, year);
+  // Federal reports are immutable once submitted — enforce at the data layer
+  // so direct API calls can't bypass the UI's disabled state. Reopen first.
+  if (report.status !== "draft") {
+    throw new Error(`PIR ${year} is ${report.status} and locked. Reopen the report to edit values.`);
+  }
   const existing = await db.select().from(pirData).where(and(
     eq(pirData.organizationId, organizationId),
     eq(pirData.year, year),

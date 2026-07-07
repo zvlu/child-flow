@@ -176,6 +176,55 @@
       "when": 1782389643879,
       "tag": "0024_family_service_contact_types",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1783444457708,
+      "tag": "0025_family_partnership_agreements",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1783447444774,
+      "tag": "0026_message_translations",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "5",
+      "when": 1783448181214,
+      "tag": "0027_suspension_expulsion_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "5",
+      "when": 1783448590642,
+      "tag": "0028_policy_council",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "5",
+      "when": 1783449078293,
+      "tag": "0029_disability_services",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "5",
+      "when": 1783449286968,
+      "tag": "0030_grant_budget",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "5",
+      "when": 1783449456255,
+      "tag": "0031_classroom_assessments",
+      "breakpoints": true
     }
   ]
 }
