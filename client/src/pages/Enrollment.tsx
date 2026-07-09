@@ -15,6 +15,7 @@ import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { dateInputToLocal } from "@/lib/date";
 import { Glossary } from "@/components/Glossary";
+import { useOrgModules } from "@/hooks/useOrgModules";
 
 const INCOME_LABEL: Record<string, string> = {
   below_100: "Below 100% FPL",
@@ -114,6 +115,8 @@ export default function Enrollment() {
   const [showNewForm, setShowNewForm] = useState(false);
   const [showCalc, setShowCalc] = useState(false);
   const [form, setForm] = useState({ ...BLANK_FORM });
+  // ERSEA calculator + §1302.17 incident log are Head Start module features.
+  const hasHeadStart = useOrgModules().has("head_start");
 
   const appsQuery = trpc.enrollment.list.useQuery(orgId);
   const apps = appsQuery.data ?? [];
@@ -192,13 +195,15 @@ export default function Enrollment() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-1.5">Enrollment <Glossary term="ERSEA" /></h1>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-1.5">Enrollment {hasHeadStart && <Glossary term="ERSEA" />}</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Manage applications, waitlist, and enrollment processes</p>
         </div>
         <div className="flex items-center gap-2">
+        {hasHeadStart && (
         <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowCalc(true)}>
           <Calculator className="h-4 w-4" />Eligibility Calculator
         </Button>
+        )}
         <Dialog open={showNewForm} onOpenChange={setShowNewForm}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-2"><Plus className="h-4 w-4" />New Application</Button>
@@ -314,7 +319,7 @@ export default function Enrollment() {
           <TabsTrigger value="waitlist">Waitlist & Applications</TabsTrigger>
           <TabsTrigger value="enrolled">Currently Enrolled</TabsTrigger>
           <TabsTrigger value="capacity">Capacity Planning</TabsTrigger>
-          <TabsTrigger value="incidents">§1302.17 Log</TabsTrigger>
+          {hasHeadStart && <TabsTrigger value="incidents">§1302.17 Log</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="waitlist" className="mt-4 space-y-4">
@@ -346,7 +351,7 @@ export default function Enrollment() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="font-semibold text-foreground">{name}</h3>
-                              {(app.status === "pending" || app.status === "reviewing" || app.status === "approved") && (
+                              {hasHeadStart && (app.status === "pending" || app.status === "reviewing" || app.status === "approved") && (
                                 <span title={selectionScore(app).parts.join(" · ") || "No scoring factors yet"}>
                                   {scoreBadge(selectionScore(app).score)}
                                 </span>
@@ -470,9 +475,11 @@ export default function Enrollment() {
           )}
         </TabsContent>
 
+        {hasHeadStart && (
         <TabsContent value="incidents" className="mt-4">
           <IncidentLogTab childList={(childrenQuery.data ?? []) as Array<{ id: number; firstName: string; lastName: string }>} />
         </TabsContent>
+        )}
       </Tabs>
     </div>
   );

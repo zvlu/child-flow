@@ -17,7 +17,7 @@ export function ReportBuilder() {
     { id: "enrollment", label: "Enrollment", description: "Track enrollment numbers and capacity" },
     { id: "attendance", label: "Attendance", description: "Analyze attendance patterns and absences" },
     { id: "health", label: "Health", description: "Monitor health screenings and compliance" },
-    { id: "compliance", label: "Compliance", description: "Federal reporting and PIR data" },
+    { id: "compliance", label: "Compliance", description: "Licensing, state, and (if enabled) Head Start PIR reporting" },
     { id: "financial", label: "Financial", description: "Tuition and payment tracking" },
     { id: "custom", label: "Custom", description: "Build your own report" },
   ];

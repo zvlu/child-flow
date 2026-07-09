@@ -109,7 +109,7 @@ export interface FpaDetail {
     id: number;
     title: string;
     progress: number;
-    status: "active" | "completed" | "paused";
+    status: "not_started" | "in_progress" | "completed" | "on_hold";
   }>;
   visits: Array<{
     id: number;

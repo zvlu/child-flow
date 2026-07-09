@@ -112,8 +112,8 @@ struct FamilyPartnershipView: View {
                 }
             } footer: {
                 let overdue = vm.referrals.filter {
-                    $0.status == .pending,
-                    let fu = $0.followUpDate, fu < Date()
+                    guard $0.status == .pending, let fu = $0.followUpDate else { return false }
+                    return fu < Date()
                 }.count
                 if overdue > 0 {
                     Label("\(overdue) referral follow-up\(overdue == 1 ? "" : "s") overdue",
@@ -224,6 +224,9 @@ struct FamilyPartnershipView: View {
                 vm.updateSignatures(parent: parentSig, staff: staffSig)
             }
         }
+        .alert("Couldn't Save Signatures", isPresented: .constant(vm.errorMessage != nil)) {
+            Button("OK") { vm.errorMessage = nil }
+        } message: { Text(vm.errorMessage ?? "") }
         .sheet(isPresented: $showEditStrengths) {
             EditStrengthsSheet(strengths: vm.strengths) { updated in
                 vm.strengths = updated
@@ -461,6 +464,7 @@ struct ReferralDetailView: View {
     @State private var editNotes = ""
     @State private var editOutcome = ""
     @State private var isEditing = false
+    @State private var errorMessage: String?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -504,12 +508,21 @@ struct ReferralDetailView: View {
         .listStyle(.insetGrouped)
         .navigationTitle(referral.serviceType.rawValue)
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Couldn't Save Change", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") { errorMessage = nil }
+        } message: { Text(errorMessage ?? "") }
     }
 
     private func save() {
         Task {
-            try? await APIClient.shared.updateReferral(referral)
-            onUpdate()
+            do {
+                try await APIClient.shared.updateReferral(referral)
+                onUpdate()
+            } catch {
+                // Previously swallowed via `try?` — the status/notes edit looked
+                // saved even when it never reached the server. Surface it instead.
+                errorMessage = "This change wasn't saved. Check your connection and try again."
+            }
         }
     }
 }
@@ -648,6 +661,7 @@ struct AddReferralSheet: View {
     @State private var followUpDate = Date().addingTimeInterval(14 * 24 * 3600)
     @State private var hasFollowUp = true
     @State private var isSaving = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -691,6 +705,9 @@ struct AddReferralSheet: View {
                         .disabled(agencyName.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
                 }
             }
+            .alert("Couldn't Add Referral", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 
@@ -705,11 +722,20 @@ struct AddReferralSheet: View {
             status: .pending, notes: notes, outcomeNotes: ""
         )
         Task {
-            try? await APIClient.shared.addReferral(ref)
-            await MainActor.run {
-                onAdd(ref)
-                dismiss()
+            do {
+                try await APIClient.shared.addReferral(ref)
+                await MainActor.run {
+                    onAdd(ref)
+                    dismiss()
+                }
+            } catch {
+                // `try?` used to swallow this — the referral looked added even
+                // when it never reached the server. Keep the form open instead.
+                await MainActor.run {
+                    errorMessage = "This referral wasn't added. Check your connection and try again."
+                }
             }
+            isSaving = false
         }
     }
 }
@@ -728,6 +754,7 @@ struct LogVisitSheet: View {
     @State private var notes = ""
     @State private var captureGPS = true
     @State private var isSaving = false
+    @State private var errorMessage: String?
 
     var totalMinutes: Int { durationHours * 60 + durationMinutes }
 
@@ -818,6 +845,9 @@ struct LogVisitSheet: View {
                         .disabled(totalMinutes < 15 || isSaving)
                 }
             }
+            .alert("Couldn't Save Visit Log", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 
@@ -833,11 +863,20 @@ struct LogVisitSheet: View {
             locationVerified: visitType == .homeVisit && captureGPS
         )
         Task {
-            try? await APIClient.shared.logHomeVisit(visit)
-            await MainActor.run {
-                onSave(visit)
-                dismiss()
+            do {
+                try await APIClient.shared.logHomeVisit(visit)
+                await MainActor.run {
+                    onSave(visit)
+                    dismiss()
+                }
+            } catch {
+                // A home-visit log documents required contact hours — losing it
+                // silently (the old `try?` behavior) is a compliance risk.
+                await MainActor.run {
+                    errorMessage = "This visit log wasn't saved. Check your connection and try again."
+                }
             }
+            isSaving = false
         }
     }
 }
@@ -994,6 +1033,7 @@ final class FPAViewModel: ObservableObject {
     @Published var goals: [FamilyGoal] = []
     @Published var strengths: [String] = []
     @Published var isLoading = false
+    @Published var errorMessage: String?
 
     // Head Start visit requirements by program type
     var programType: String { "Center-Based" }
@@ -1021,8 +1061,9 @@ final class FPAViewModel: ObservableObject {
 
     func updateSignatures(parent: Bool, staff: Bool) {
         guard let existing = fpa else { return }
+        let previous = fpa
         let newStatus: FamilyPartnershipAgreement.FPAStatus = (parent && staff) ? .active : .inProgress
-        fpa = FamilyPartnershipAgreement(
+        let updated = FamilyPartnershipAgreement(
             id: existing.id, familyId: existing.familyId,
             familyName: existing.familyName,
             completedDate: (parent && staff) ? Date() : existing.completedDate,
@@ -1030,27 +1071,64 @@ final class FPAViewModel: ObservableObject {
             familyAdvocate: existing.familyAdvocate,
             status: newStatus, parentSigned: parent, staffSigned: staff
         )
-        Task { try? await APIClient.shared.updateFPA(fpa!) }
+        fpa = updated
+        Task {
+            do {
+                try await APIClient.shared.updateFPA(updated)
+            } catch {
+                // This used to be a fire-and-forget `try?` — the sheet would show
+                // "fully signed" even if the signature never reached the server.
+                // A signature is a legal record; revert and tell the user.
+                await MainActor.run {
+                    self.fpa = previous
+                    self.errorMessage = "Signatures weren't saved. Check your connection and try again."
+                }
+            }
+        }
     }
 
     // MARK: private loaders
     private func loadFPA() async -> FamilyPartnershipAgreement? {
         do { return try await APIClient.shared.getFPA(familyId: family.id) }
-        catch { return MockData.fpa(for: family.id) }
+        catch {
+            #if DEBUG
+            return MockData.fpa(for: family.id)
+            #else
+            return nil
+            #endif
+        }
     }
 
     private func loadReferrals() async -> [FamilyReferral] {
         do { return try await APIClient.shared.getReferrals(familyId: family.id) }
-        catch { return MockData.referrals(for: family.id) }
+        catch {
+            #if DEBUG
+            return MockData.referrals(for: family.id)
+            #else
+            return []
+            #endif
+        }
     }
 
     private func loadVisits() async -> [HomeVisitLog] {
         do { return try await APIClient.shared.getVisitLogs(familyId: family.id) }
-        catch { return MockData.visitLogs(for: family.id) }
+        catch {
+            #if DEBUG
+            return MockData.visitLogs(for: family.id)
+            #else
+            return []
+            #endif
+        }
     }
 
     private func loadGoals() async -> [FamilyGoal] {
         do { return try await APIClient.shared.getGoals(familyId: family.id) }
-        catch { return MockData.goals(for: family.id) }
+        catch {
+            #if DEBUG
+            return MockData.goals(for: family.id)
+            #else
+            return []
+            #endif
+        }
     }
 }

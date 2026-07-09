@@ -15,6 +15,7 @@ import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { objectsToCsv, downloadCsv } from "@/lib/csv";
 import { StaffActivityReport } from "@/components/StaffActivityReport";
+import { useOrgModules } from "@/hooks/useOrgModules";
 
 const attendanceByMonth = [
   { month: "Sep", rate: 88 }, { month: "Oct", rate: 91 }, { month: "Nov", rate: 87 },
@@ -32,23 +33,25 @@ const HEALTH_TYPE_LABELS: Record<string, string> = {
   immunization: "Immunizations",
 };
 
-const savedReports = [
+// `module` marks entries that only make sense with Head Start compliance on
+// (PIR, income eligibility) — filtered out below for core-only orgs.
+const savedReports: Array<{ name: string; type: string; lastRun: string; format: string; module?: "head_start" }> = [
   { name: "Monthly Attendance Summary", type: "Attendance", lastRun: "Nov 1, 2024", format: "PDF" },
   { name: "Health Compliance Report", type: "Health", lastRun: "Oct 31, 2024", format: "Excel" },
-  { name: "PIR Data Extract", type: "Compliance", lastRun: "Oct 15, 2024", format: "CSV" },
-  { name: "Family Services Log", type: "Family Services", lastRun: "Nov 1, 2024", format: "PDF" },
+  { name: "PIR Data Extract", type: "Compliance", lastRun: "Oct 15, 2024", format: "CSV", module: "head_start" },
+  { name: "Family Services Log", type: "Family Services", lastRun: "Nov 1, 2024", format: "PDF", module: "head_start" },
   { name: "Staff Training Hours", type: "Staff", lastRun: "Oct 30, 2024", format: "Excel" },
 ];
 
-const reportTemplates = [
-  { name: "Program Information Report (PIR)", description: "Annual federal reporting for Head Start programs", icon: ShieldCheck, color: "text-red-500 bg-red-50" },
+const reportTemplates: Array<{ name: string; description: string; icon: typeof ShieldCheck; color: string; module?: "head_start" }> = [
+  { name: "Program Information Report (PIR)", description: "Annual federal reporting for Head Start programs", icon: ShieldCheck, color: "text-red-500 bg-red-50", module: "head_start" },
   { name: "Attendance Report", description: "Daily, weekly, and monthly attendance summaries", icon: ClipboardCheck, color: "text-blue-500 bg-blue-50" },
   { name: "Health Screening Report", description: "Compliance tracking for all health screenings", icon: Heart, color: "text-pink-500 bg-pink-50" },
   { name: "Enrollment Report", description: "Current enrollment, waitlist, and capacity data", icon: Users, color: "text-green-500 bg-green-50" },
-  { name: "Family Services Report", description: "Home visits, contacts, and service referrals", icon: FileText, color: "text-purple-500 bg-purple-50" },
+  { name: "Family Services Report", description: "Home visits, contacts, and service referrals", icon: FileText, color: "text-purple-500 bg-purple-50", module: "head_start" },
   { name: "Child Assessment Report", description: "Developmental assessment results and trends", icon: BarChart3, color: "text-amber-500 bg-amber-50" },
   { name: "Staff Training Report", description: "Training hours, certifications, and compliance", icon: TrendingUp, color: "text-[#5E8C6A] bg-[#F1F6F2]" },
-  { name: "Income Eligibility Report", description: "Family income levels and eligibility verification", icon: FileText, color: "text-indigo-500 bg-indigo-50" },
+  { name: "Income Eligibility Report", description: "Family income levels and eligibility verification", icon: FileText, color: "text-indigo-500 bg-indigo-50", module: "head_start" },
 ];
 
 export default function Reports() {
@@ -56,6 +59,8 @@ export default function Reports() {
   const utils = trpc.useUtils();
   const [, navigate] = useLocation();
   const [busy, setBusy] = useState<string | null>(null);
+  // Staff Activity (family-advocate workload) is a Head Start module feature.
+  const hasHeadStart = useOrgModules().has("head_start");
 
   // Live data behind the analytics charts (the attendance-trend line below is
   // still illustrative — true monthly rates need a heavier aggregation).
@@ -188,14 +193,16 @@ export default function Reports() {
       <Tabs defaultValue="analytics">
         <TabsList>
           <TabsTrigger value="analytics">Analytics Dashboard</TabsTrigger>
-          <TabsTrigger value="staff-activity">Staff Activity</TabsTrigger>
+          {hasHeadStart && <TabsTrigger value="staff-activity">Staff Activity</TabsTrigger>}
           <TabsTrigger value="templates">Report Templates</TabsTrigger>
           <TabsTrigger value="saved">Saved Reports</TabsTrigger>
         </TabsList>
 
+        {hasHeadStart && (
         <TabsContent value="staff-activity" className="mt-4">
           <StaffActivityReport />
         </TabsContent>
+        )}
 
         <TabsContent value="analytics" className="mt-4 space-y-4">
           {/* Attendance Trend */}
@@ -302,7 +309,7 @@ export default function Reports() {
 
         <TabsContent value="templates" className="mt-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {reportTemplates.map(template => {
+            {reportTemplates.filter(t => !t.module || hasHeadStart).map(template => {
               const Icon = template.icon;
               const [iconColor, bgColor] = template.color.split(" ");
               return (
@@ -331,7 +338,7 @@ export default function Reports() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border">
-                {savedReports.map((report, i) => (
+                {savedReports.filter(r => !r.module || hasHeadStart).map((report, i) => (
                   <div key={i} className="flex items-center gap-4 px-6 py-4 hover:bg-muted/20 transition-colors">
                     <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                       <FileText className="h-4 w-4 text-primary" />

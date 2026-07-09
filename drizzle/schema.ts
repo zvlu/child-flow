@@ -107,7 +107,8 @@ export type InsertAuditLog = typeof auditLogs.$inferInsert;
 
 /**
  * Organizations table for multi-tenant support.
- * Each organization represents a Head Start program or agency.
+ * Each organization represents a school, childcare center, or agency; optional
+ * feature modules (e.g. Head Start compliance) are toggled via enabledModules.
  */
 export const organizations = mysqlTable("organizations", {
   id: int("id").autoincrement().primaryKey(),
@@ -125,6 +126,8 @@ export const organizations = mysqlTable("organizations", {
   maxChildren: int("maxChildren").default(100),
   maxStaff: int("maxStaff").default(20),
   isActive: int("isActive").default(1),
+  /** Optional feature modules enabled for this org, e.g. ["head_start"]. Null/empty = core only. */
+  enabledModules: json("enabledModules").$type<string[]>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -265,6 +268,39 @@ export const enrollmentApplications = mysqlTable("enrollment_applications", {
 });
 
 export type EnrollmentApplication = typeof enrollmentApplications.$inferSelect;
+
+/**
+ * Document-verification checklist for one application (ERSEA eligibility
+ * paperwork). primaryAdult/secondaryAdult/childChecklist are opaque JSON
+ * blobs owned entirely by the client (iOS AdultVerification /
+ * ChildDocVerification structs) — the server just stores and returns them,
+ * so their shape can evolve without a migration.
+ *
+ * id is a client-generated UUID string (not autoincrement) because the iOS
+ * app creates a verification locally before it's ever persisted and reuses
+ * that same id on every subsequent save — see ApplicationVerificationView.
+ * status values are the exact display strings the iOS enum encodes
+ * ("Pending" / "In Progress" / "Complete" / "Needs Info"), so the server
+ * doesn't need any translation layer.
+ */
+export const applicationVerifications = mysqlTable("application_verifications", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  childName: varchar("childName", { length: 200 }).notNull(),
+  applicationDate: timestamp("applicationDate").defaultNow().notNull(),
+  verifiedBy: varchar("verifiedBy", { length: 160 }).default("").notNull(),
+  verifiedDate: timestamp("verifiedDate"),
+  primaryAdult: json("primaryAdult").notNull(),
+  secondaryAdult: json("secondaryAdult"),
+  childChecklist: json("childChecklist").notNull(),
+  status: mysqlEnum("status", ["Pending", "In Progress", "Complete", "Needs Info"]).default("Pending").notNull(),
+  notes: text("notes").default(""),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ApplicationVerificationRow = typeof applicationVerifications.$inferSelect;
+export type InsertApplicationVerificationRow = typeof applicationVerifications.$inferInsert;
 export type InsertEnrollmentApplication = typeof enrollmentApplications.$inferInsert;
 
 /**
@@ -380,12 +416,15 @@ export type InsertHealthRecord = typeof healthRecords.$inferInsert;
 
 /**
  * Family Services table for tracking home visits, contacts, and resource referrals.
+ * Backs the general staff-activity/contact log (web + iOS "Contacts").
+ * Richer, single-purpose logs (home visiting curriculum, referrals) live in
+ * their own tables below — see familyHomeVisits, familyReferrals.
  */
 export const familyServices = mysqlTable("family_services", {
   id: int("id").autoincrement().primaryKey(),
   familyId: int("familyId").notNull().references(() => families.id),
   organizationId: int("organizationId").notNull().references(() => organizations.id),
-  type: mysqlEnum("type", ["home_visit", "office_visit", "phone_call", "email", "referral", "coordinated_services", "monthly_contact", "other"]).notNull(),
+  type: mysqlEnum("type", ["home_visit", "office_visit", "phone_call", "email", "referral", "coordinated_services", "monthly_contact", "other", "in_person", "text", "zoom", "voicemail"]).notNull(),
   serviceDate: timestamp("serviceDate").notNull(),
   description: text("description").notNull(),
   outcome: text("outcome"),
@@ -398,6 +437,156 @@ export const familyServices = mysqlTable("family_services", {
 
 export type FamilyService = typeof familyServices.$inferSelect;
 export type InsertFamilyService = typeof familyServices.$inferInsert;
+
+/**
+ * Resource/community-service referrals (housing, food, mental health, etc.) —
+ * §1302.14 community partnerships. Distinct from the general contact log:
+ * referrals track an external agency relationship through to an outcome.
+ */
+export const familyReferrals = mysqlTable("family_referrals", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id),
+  agencyName: varchar("agencyName", { length: 255 }).notNull(),
+  serviceType: mysqlEnum("serviceType", [
+    "housing", "food_assistance", "mental_health", "substance_use", "domestic_violence",
+    "legal_aid", "employment", "adult_education", "childcare", "medical_care",
+    "dental_care", "vision_care", "transportation", "utility_assistance",
+    "financial_counseling", "other",
+  ]).notNull(),
+  referredBy: int("referredBy").references(() => staff.id),
+  referralDate: timestamp("referralDate").notNull(),
+  followUpDate: timestamp("followUpDate"),
+  status: mysqlEnum("status", ["pending", "contacted", "enrolled", "declined", "unavailable", "completed"]).default("pending").notNull(),
+  notes: text("notes"),
+  outcomeNotes: text("outcomeNotes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FamilyReferral = typeof familyReferrals.$inferSelect;
+export type InsertFamilyReferral = typeof familyReferrals.$inferInsert;
+
+/**
+ * Structured home-visiting curriculum log (§1302.36) — richer than a general
+ * contact: duration, topics covered, goals discussed, and a GPS-verified
+ * location stamp for programs that require visit verification.
+ */
+export const familyHomeVisits = mysqlTable("family_home_visits", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id),
+  visitDate: timestamp("visitDate").notNull(),
+  visitType: mysqlEnum("visitType", ["home_visit", "office_visit", "phone_call", "group_social", "community_event"]).notNull(),
+  durationMinutes: int("durationMinutes").default(0).notNull(),
+  conductedBy: int("conductedBy").references(() => staff.id),
+  /** Raw topic-enum strings, e.g. ["child_development", "family_goals"]. */
+  topicsCovered: json("topicsCovered").$type<string[]>(),
+  notes: text("notes"),
+  /** family_goals ids referenced during the visit. */
+  goalsMentioned: json("goalsMentioned").$type<string[]>(),
+  locationVerified: int("locationVerified").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type FamilyHomeVisit = typeof familyHomeVisits.$inferSelect;
+export type InsertFamilyHomeVisit = typeof familyHomeVisits.$inferInsert;
+
+/**
+ * Family Needs Assessment (FNA) — one current assessment per family, rating
+ * six domains (safety, health, learning, engagement, well-being, community).
+ * Re-running the assessment overwrites ratings/notes on the same row rather
+ * than versioning, matching the iOS "current FNA" model.
+ */
+export const familyNeedsAssessments = mysqlTable("family_needs_assessments", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id).unique(),
+  conductedBy: int("conductedBy").references(() => staff.id),
+  conductedDate: timestamp("conductedDate").defaultNow().notNull(),
+  reviewDate: timestamp("reviewDate"),
+  /** [{id, domain, level (1-4), notes}] — one entry per FNA domain. */
+  ratings: json("ratings").$type<Array<{ id: string; domain: string; level: number; notes: string }>>().notNull(),
+  notes: text("notes"),
+  isComplete: int("isComplete").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FamilyNeedsAssessment = typeof familyNeedsAssessments.$inferSelect;
+export type InsertFamilyNeedsAssessment = typeof familyNeedsAssessments.$inferInsert;
+
+/**
+ * CFCR — Child & Family Case Review. A periodic team meeting (teacher, family
+ * advocate, health/disabilities staff, family) reviewing one child's progress
+ * across attendance, health, behavior, and development, with action items.
+ */
+export const cfcrRecords = mysqlTable("cfcr_records", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  childId: int("childId").notNull().references(() => children.id),
+  meetingDate: timestamp("meetingDate").notNull(),
+  /** [{id, name, role, attended}]. */
+  participants: json("participants").$type<Array<{ id: string; name: string; role: string; attended: boolean }>>(),
+  attendanceNotes: text("attendanceNotes"),
+  healthNotes: text("healthNotes"),
+  behaviorNotes: text("behaviorNotes"),
+  developmentalNotes: text("developmentalNotes"),
+  familyGoalNotes: text("familyGoalNotes"),
+  /** [{id, description, assignedTo, dueDate, isCompleted}]. */
+  actionItems: json("actionItems").$type<Array<{ id: string; description: string; assignedTo: string; dueDate: string | null; isCompleted: boolean }>>(),
+  conductedBy: int("conductedBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CfcrRecord = typeof cfcrRecords.$inferSelect;
+export type InsertCfcrRecord = typeof cfcrRecords.$inferInsert;
+
+/**
+ * Family case notes — narrative case-management entries distinct from the
+ * general contact log, with a confidentiality flag (sensitive notes, e.g.
+ * safety/DV concerns) and follow-up tracking.
+ */
+export const familyCaseNotes = mysqlTable("family_case_notes", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id),
+  authorId: int("authorId").references(() => staff.id),
+  type: mysqlEnum("type", ["home_visit", "phone_call", "office_visit", "incident", "general"]).notNull(),
+  confidentiality: mysqlEnum("confidentiality", ["standard", "sensitive"]).default("standard").notNull(),
+  body: text("body").notNull(),
+  followUpRequired: int("followUpRequired").default(0).notNull(),
+  followUpDue: timestamp("followUpDue"),
+  followUpCompleted: int("followUpCompleted").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type FamilyCaseNote = typeof familyCaseNotes.$inferSelect;
+export type InsertFamilyCaseNote = typeof familyCaseNotes.$inferInsert;
+
+/**
+ * Attendance Improvement Plans (AIP) — §1302.16 requires programs to work
+ * with families of chronically absent children on a documented improvement
+ * plan: barriers, strategies, and a review cadence.
+ */
+export const attendancePlans = mysqlTable("attendance_plans", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  childId: int("childId").notNull().references(() => children.id),
+  familyAdvocate: int("familyAdvocate").references(() => staff.id),
+  createdDate: timestamp("createdDate").defaultNow().notNull(),
+  reviewDate: timestamp("reviewDate"),
+  /** Free-text barrier descriptions, e.g. ["Transportation", "Housing instability"]. */
+  barriers: json("barriers").$type<string[]>(),
+  /** [{id, description, isImplemented, targetDate}]. */
+  strategies: json("strategies").$type<Array<{ id: string; description: string; isImplemented: boolean; targetDate: string | null }>>(),
+  status: mysqlEnum("status", ["active", "resolved", "closed"]).default("active").notNull(),
+  notes: text("notes"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AttendancePlan = typeof attendancePlans.$inferSelect;
+export type InsertAttendancePlan = typeof attendancePlans.$inferInsert;
 
 /**
  * Communication Logs table for tracking sent SMS and Emails.
@@ -495,14 +684,24 @@ export type InsertAbsenceReport = typeof absenceReports.$inferInsert;
 /**
  * Family goals with simple progress tracking, shown as progress graphs in the
  * family app. Staff update progress during home visits / case management.
+ * Also backs the staff-side SMART-goal editor (Family Services, Head Start
+ * module) — description/category/targetDate/completedDate/steps support that
+ * richer view; the family app only reads title/progress/status.
  */
 export const familyGoals = mysqlTable("family_goals", {
   id: int("id").autoincrement().primaryKey(),
   familyId: int("familyId").notNull().references(() => families.id),
+  organizationId: int("organizationId").references(() => organizations.id),
   title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 50 }),
   /** 0–100. */
   progress: int("progress").default(0).notNull(),
-  status: mysqlEnum("status", ["active", "completed", "paused"]).default("active").notNull(),
+  status: mysqlEnum("status", ["not_started", "in_progress", "completed", "on_hold"]).default("not_started").notNull(),
+  targetDate: timestamp("targetDate"),
+  completedDate: timestamp("completedDate"),
+  /** Ordered checklist: [{id, title, isCompleted, dueDate, notes}]. */
+  steps: json("steps").$type<Array<{ id: string; title: string; isCompleted: boolean; dueDate: string | null; notes: string | null }>>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -751,9 +950,11 @@ export type InsertFamilyContactAddress = typeof familyContactAddresses.$inferIns
  */
 export const documents = mysqlTable("documents", {
   id: int("id").autoincrement().primaryKey(),
-  childId: int("childId").notNull().references(() => children.id),
+  // Nullable: the iOS "upload now, file to a child's profile later" flow
+  // creates a document before a child is chosen.
+  childId: int("childId").references(() => children.id),
   organizationId: int("organizationId").notNull().references(() => organizations.id),
-  documentType: mysqlEnum("documentType", ["birth_certificate", "immunization_record", "consent_form", "medical_record", "assessment", "other"]).notNull(),
+  documentType: mysqlEnum("documentType", ["birth_certificate", "immunization_record", "consent_form", "medical_record", "assessment", "other", "iep", "enrollment"]).notNull(),
   fileName: varchar("fileName", { length: 255 }).notNull(),
   fileUrl: text("fileUrl").notNull(), // S3 or cloud storage URL
   fileSize: int("fileSize"), // in bytes
@@ -876,7 +1077,7 @@ export const digitalDocuments = mysqlTable("digitalDocuments", {
   id: int("id").autoincrement().primaryKey(),
   organizationId: int("organizationId").notNull().references(() => organizations.id),
   familyId: int("familyId").notNull().references(() => families.id),
-  documentType: mysqlEnum("documentType", ["enrollment", "consent", "waiver", "health_form"]).notNull(),
+  documentType: mysqlEnum("documentType", ["enrollment", "consent", "waiver", "health_form", "iep"]).notNull(),
   documentUrl: varchar("documentUrl", { length: 512 }).notNull(),
   signatureUrl: varchar("signatureUrl", { length: 512 }),
   signedBy: varchar("signedBy", { length: 255 }),

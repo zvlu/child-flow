@@ -448,7 +448,17 @@ struct ChildFamilyTab: View {
             }
         }
         .task {
-            let families = (try? await APIClient.shared.getFamilies()) ?? MockData.families
+            var families: [Family] = []
+            do {
+                families = try await APIClient.shared.getFamilies()
+            } catch {
+                // This fallback used to run unconditionally — a failed request
+                // in a real deployment would silently show demo family data to
+                // real staff. Only fall back to mock data in debug builds.
+                #if DEBUG
+                families = MockData.families
+                #endif
+            }
             family = families.first { f in
                 if let fid = child.familyId, !fid.isEmpty { return f.id == fid }
                 // Demo fallback when the child carries no familyId.

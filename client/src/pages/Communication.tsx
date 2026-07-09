@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
+import { useOrgModules } from "@/hooks/useOrgModules";
 
 const initialMessages = [
   { id: 1, sender: "Maria Rodriguez", subject: "Absence Note - Marcus", preview: "Marcus will be out today due to a doctor's appointment...", time: "10:30 AM", unread: true, type: "Message", category: "Attendance" },
@@ -56,6 +57,8 @@ export default function Communication() {
   const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
   const [isNewLogOpen, setIsNewLogOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState("messages");
+  // Contact logs are backed by familyServices (family-advocate workflows) — a Head Start module feature.
+  const hasHeadStart = useOrgModules().has("head_start");
 
   // API Queries & Mutations
   const utils = trpc.useUtils();
@@ -253,7 +256,7 @@ export default function Communication() {
             <TabsTrigger value="messages" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
               Inbox <Badge className="ml-2 bg-card/20 text-white border-none h-4 px-1.5">{messages.filter(m => m.unread).length}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="logs" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Contact Logs</TabsTrigger>
+            {hasHeadStart && <TabsTrigger value="logs" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Contact Logs</TabsTrigger>}
             <TabsTrigger value="history" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">History</TabsTrigger>
             <TabsTrigger value="broadcast" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Broadcasts</TabsTrigger>
           </TabsList>
@@ -341,6 +344,7 @@ export default function Communication() {
           </Card>
         </TabsContent>
 
+        {hasHeadStart && (
         <TabsContent value="logs" className="mt-0">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredLogs.length === 0 && (
@@ -455,6 +459,7 @@ export default function Communication() {
             </Dialog>
           </div>
         </TabsContent>
+        )}
 
         <TabsContent value="history" className="mt-0">
           <Card className="border-none shadow-sm rounded-xl overflow-hidden bg-card">

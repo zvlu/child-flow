@@ -74,6 +74,9 @@ struct ApplicationVerificationView: View {
         }
         .task { await viewModel.load() }
         .overlay { if viewModel.isLoading { ProgressView() } }
+        .alert("Not Saved", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") { viewModel.errorMessage = nil }
+        } message: { Text(viewModel.errorMessage ?? "") }
     }
 }
 
@@ -326,6 +329,7 @@ extension ToggleStyle where Self == CheckmarkToggleStyle {
 class VerificationViewModel: ObservableObject {
     @Published var verifications: [ApplicationVerification] = []
     @Published var isLoading = false
+    @Published var errorMessage: String?
 
     func load() async {
         isLoading = true
@@ -344,7 +348,16 @@ class VerificationViewModel: ObservableObject {
             verifications[idx] = verification
         }
         Task {
-            do { _ = try await APIClient.shared.saveVerification(verification: verification) } catch {}
+            do {
+                _ = try await APIClient.shared.saveVerification(verification: verification)
+            } catch {
+                // NOTE: there is currently no backend route for
+                // /api/enrollment/verifications — this call always fails.
+                // Surfacing the error (instead of swallowing it) at least stops
+                // the checklist from silently lying about being saved; the
+                // underlying feature still needs a real server-side endpoint.
+                errorMessage = "This checklist isn't connected to the server yet — changes aren't saved."
+            }
         }
     }
 

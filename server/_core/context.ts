@@ -65,20 +65,28 @@ export async function createContext(
   }
 
   if (!user && devAuthBypassEnabled()) {
-    if (!warnedAboutDevBypass) {
-      console.warn(
-        "[Auth] ALLOW_DEV_AUTH_BYPASS is enabled — injecting a mock admin for " +
-          "unauthenticated requests. NEVER enable this outside local development."
-      );
-      warnedAboutDevBypass = true;
-    }
-    // Prefer the persisted row so profile/settings edits made during local dev
-    // actually round-trip (the static literal would otherwise mask every write).
-    // Fall back to the in-memory mock when the DB is unavailable or unseeded.
-    try {
-      user = (await getUserByOpenId(DEV_MOCK_USER.openId)) ?? DEV_MOCK_USER;
-    } catch {
-      user = DEV_MOCK_USER;
+    // When the user explicitly signs out we set a short-lived opt-out cookie so
+    // the bypass doesn't immediately re-inject a session. The cookie is cleared
+    // on the next successful sign-in (web-login / web-signup).
+    const noBypass = (opts.req.cookies as Record<string, string> | undefined)?.[
+      "__sprout_no_bypass"
+    ];
+    if (!noBypass) {
+      if (!warnedAboutDevBypass) {
+        console.warn(
+          "[Auth] ALLOW_DEV_AUTH_BYPASS is enabled — injecting a mock admin for " +
+            "unauthenticated requests. NEVER enable this outside local development."
+        );
+        warnedAboutDevBypass = true;
+      }
+      // Prefer the persisted row so profile/settings edits made during local dev
+      // actually round-trip (the static literal would otherwise mask every write).
+      // Fall back to the in-memory mock when the DB is unavailable or unseeded.
+      try {
+        user = (await getUserByOpenId(DEV_MOCK_USER.openId)) ?? DEV_MOCK_USER;
+      } catch {
+        user = DEV_MOCK_USER;
+      }
     }
   }
 

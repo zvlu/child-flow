@@ -8,6 +8,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Children from "./pages/Children";
+import DataImport from "./pages/DataImport";
 import ChildDetail from "./pages/ChildDetail";
 import DailyReports from "./pages/DailyReports";
 import LessonPlanning from "./pages/LessonPlanning";
@@ -49,6 +50,7 @@ import OrgAdmin from "./pages/OrgAdmin";
 import RequestProgram from "./pages/RequestProgram";
 import SignIn from "./pages/SignIn";
 import AppLayout from "./components/AppLayout";
+import ModuleGate from "./components/ModuleGate";
 
 function Router() {
   return (
@@ -88,6 +90,13 @@ function Router() {
         {() => (
           <AppLayout>
             <Children />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/data-import">
+        {() => (
+          <AppLayout>
+            <DataImport />
           </AppLayout>
         )}
       </Route>
@@ -143,7 +152,9 @@ function Router() {
       <Route path="/in-kind">
         {() => (
           <AppLayout>
-            <InKind />
+            <ModuleGate module="head_start">
+              <InKind />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>
@@ -171,42 +182,54 @@ function Router() {
       <Route path="/chronic-absence">
         {() => (
           <AppLayout>
-            <ChronicAbsence />
+            <ModuleGate module="head_start">
+              <ChronicAbsence />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>
       <Route path="/family-partnership">
         {() => (
           <AppLayout>
-            <FamilyPartnership />
+            <ModuleGate module="head_start">
+              <FamilyPartnership />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>
       <Route path="/policy-council">
         {() => (
           <AppLayout>
-            <PolicyCouncil />
+            <ModuleGate module="head_start">
+              <PolicyCouncil />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>
       <Route path="/disability-services">
         {() => (
           <AppLayout>
-            <DisabilityServices />
+            <ModuleGate module="head_start">
+              <DisabilityServices />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>
       <Route path="/grant-budget">
         {() => (
           <AppLayout>
-            <GrantBudget />
+            <ModuleGate module="head_start">
+              <GrantBudget />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>
       <Route path="/classroom-quality">
         {() => (
           <AppLayout>
-            <ClassroomQuality />
+            <ModuleGate module="head_start">
+              <ClassroomQuality />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>
@@ -227,14 +250,18 @@ function Router() {
       <Route path="/health-deadlines">
         {() => (
           <AppLayout>
-            <HealthDeadlines />
+            <ModuleGate module="head_start">
+              <HealthDeadlines />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>
       <Route path="/family-services">
         {() => (
           <AppLayout>
-            <FamilyServices />
+            <ModuleGate module="head_start">
+              <FamilyServices />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>
@@ -255,7 +282,9 @@ function Router() {
       <Route path="/compliance">
         {() => (
           <AppLayout>
-            <Compliance />
+            <ModuleGate module="head_start">
+              <Compliance />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>

@@ -72,6 +72,10 @@ export function StaffOperations() {
   const activeStaff = (staff ?? []).filter((s) => s.isActive === 1);
   const today = new Date();
 
+  const certExpiredCount = (certifications ?? []).filter((c) => c.status === "expired").length;
+  const certExpiringSoonCount = (certifications ?? []).filter((c) => c.status === "expiring_soon").length;
+  const certActiveCount = (certifications ?? []).filter((c) => c.status === "active").length;
+
   const timeByStaff = useMemo(() => {
     const map = new Map<
       number,
@@ -226,6 +230,31 @@ export function StaffOperations() {
               </button>
             )}
           </div>
+          {!certsLoading && (certifications ?? []).length > 0 && (
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                <div>
+                  <p className="text-xl font-bold text-foreground">{certExpiredCount}</p>
+                  <p className="text-xs text-muted-foreground">Expired</p>
+                </div>
+              </div>
+              <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0" />
+                <div>
+                  <p className="text-xl font-bold text-foreground">{certExpiringSoonCount}</p>
+                  <p className="text-xs text-muted-foreground">Expiring within 60 days</p>
+                </div>
+              </div>
+              <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                <div>
+                  <p className="text-xl font-bold text-foreground">{certActiveCount}</p>
+                  <p className="text-xs text-muted-foreground">Active</p>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
             {certsLoading ? (
               <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">

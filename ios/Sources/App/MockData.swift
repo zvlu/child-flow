@@ -15,6 +15,54 @@ enum MockData {
     }
     private static func weeksAgo(_ n: Int) -> Date { daysAgo(n * 7) }
 
+    // MARK: - Digital Documents (E-Sign)
+    // The pending Johnson IEP backs the "Sign Sofia Johnson's IEP" dashboard task.
+
+    static let digitalDocuments: [DigitalDocumentItem] = [
+        DigitalDocumentItem(id: "dd1", familyId: "family-1", familyName: "Johnson Family",
+                            documentType: "iep",
+                            documentUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+                            status: "pending", signedBy: nil, signedAt: nil,
+                            expiresAt: nil, createdAt: "2026-06-01T09:00:00Z"),
+        DigitalDocumentItem(id: "dd2", familyId: "family-3", familyName: "Rodriguez Family",
+                            documentType: "consent",
+                            documentUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+                            status: "pending", signedBy: nil, signedAt: nil,
+                            expiresAt: nil, createdAt: "2026-06-05T09:00:00Z"),
+        DigitalDocumentItem(id: "dd3", familyId: "family-2", familyName: "Williams Family",
+                            documentType: "health_form",
+                            documentUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+                            status: "signed", signedBy: "Keisha Williams", signedAt: "2026-05-20T14:00:00Z",
+                            expiresAt: nil, createdAt: "2026-05-18T09:00:00Z"),
+    ]
+
+    // MARK: - Disability Services (IEP/IFSP)
+
+    static let disabilityServices = DisabilityServiceSummary(
+        activeEnrollment: 42,
+        childrenWithPlans: 5,
+        pctOfEnrollment: 12,
+        meetsTenPercent: true,
+        expiringSoon: 1,
+        parentRightsPending: 1,
+        records: [
+            DisabilityRecord(id: "ds1", childId: "child-1", childName: "Sofia Johnson",
+                              planType: "iep", status: "active", primaryDisability: "Speech/Language Impairment",
+                              effectiveDate: "2025-09-01", expirationDate: "2026-08-15",
+                              leaAgency: "Sacramento City USD", leaContact: "R. Alvarez",
+                              parentRightsNotifiedAt: "2025-09-01T00:00:00Z", parentRightsLanguage: "English",
+                              transitionChecklist: ["Referral submitted", "Evaluation scheduled"],
+                              notes: nil),
+            DisabilityRecord(id: "ds2", childId: "child-4", childName: "Diego Rodriguez",
+                              planType: "ifsp", status: "pending_evaluation", primaryDisability: nil,
+                              effectiveDate: nil, expirationDate: nil,
+                              leaAgency: nil, leaContact: nil,
+                              parentRightsNotifiedAt: nil, parentRightsLanguage: nil,
+                              transitionChecklist: [],
+                              notes: "Awaiting Part C evaluation."),
+        ]
+    )
+
     // MARK: - Families
 
     static let families: [Family] = [

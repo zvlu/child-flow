@@ -198,6 +198,9 @@ struct ConversationView: View {
         .navigationTitle(conversation.familyName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await viewModel.load() }
+        .alert("Message Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") { viewModel.errorMessage = nil }
+        } message: { Text(viewModel.errorMessage ?? "") }
     }
 }
 
@@ -316,13 +319,15 @@ struct NewMessageView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Send") {
-                        viewModel.send()
-                        dismiss()
+                        viewModel.send { dismiss() }
                     }
                     .fontWeight(.semibold)
-                    .disabled(!viewModel.canSend)
+                    .disabled(!viewModel.canSend || viewModel.isSending)
                 }
             }
+            .alert("Couldn't Send Message", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK") { viewModel.errorMessage = nil }
+            } message: { Text(viewModel.errorMessage ?? "") }
         }
     }
 }
@@ -368,9 +373,11 @@ class MessagingViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var showBroadcast = false
 
+    /// BroadcastAnnouncementSheet already sent the message to the server before
+    /// calling this — the broadcast created/updated a real conversation per
+    /// target family, so just reload to pick those up in the list.
     func addBroadcast(_ message: String) {
-        // In production: call API to send to all families.
-        // Locally append a sentinel conversation entry.
+        Task { await load() }
     }
 
     var filteredConversations: [Conversation] {
@@ -405,12 +412,16 @@ struct BroadcastAnnouncementSheet: View {
     @State private var messageText = ""
     @State private var audience: BroadcastAudience = .allFamilies
     @State private var isSending = false
+    @State private var errorMessage: String?
 
     enum BroadcastAudience: String, CaseIterable {
         case allFamilies   = "All Families"
         case myFamilies    = "My Caseload Families"
         var icon: String {
             self == .allFamilies ? "person.3.fill" : "person.2.fill"
+        }
+        var apiValue: String {
+            self == .allFamilies ? "all" : "caseload"
         }
     }
 
@@ -490,14 +501,30 @@ struct BroadcastAnnouncementSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .alert("Couldn't Send Announcement", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 
     private func send() {
         isSending = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            onSend(messageText)
-            dismiss()
+        let text = messageText
+        Task {
+            do {
+                _ = try await APIClient.shared.sendBroadcast(body: text, audience: audience.apiValue)
+                await MainActor.run {
+                    onSend(text)
+                    dismiss()
+                }
+            } catch {
+                // This used to fake a 0.5s "send" with no network call at all —
+                // every broadcast looked sent whether or not any family got it.
+                await MainActor.run {
+                    errorMessage = "This announcement wasn't sent. Check your connection and try again."
+                }
+            }
+            isSending = false
         }
     }
 }
@@ -508,18 +535,28 @@ class NewMessageViewModel: ObservableObject {
     @Published var includePrimary = true
     @Published var includeSecondary = false
     @Published var messageBody = ""
+    @Published var isSending = false
+    @Published var errorMessage: String?
 
     var canSend: Bool {
         selectedFamily != nil && (includePrimary || includeSecondary) && !messageBody.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
-    func send() {
+    /// `onSuccess` dismisses the sheet — only called once the message is
+    /// actually confirmed sent. The old `try?` version dismissed unconditionally
+    /// and dropped the error, so a failed send looked identical to a real one.
+    func send(onSuccess: @escaping () -> Void) {
         guard let family = selectedFamily else { return }
+        isSending = true
         Task {
-            _ = try? await APIClient.shared.newConversation(
-                familyId: family.id,
-                body: messageBody
-            )
+            do {
+                _ = try await APIClient.shared.newConversation(familyId: family.id, body: messageBody)
+                isSending = false
+                onSuccess()
+            } catch {
+                isSending = false
+                errorMessage = "This message wasn't sent. Check your connection and try again."
+            }
         }
     }
 }

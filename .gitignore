@@ -106,6 +106,10 @@ temp/
 *.sqlite
 *.sqlite3
 
+# Locally-stored uploads (server/fileStorage.ts) — not source, and may contain
+# real user files in a dev environment.
+/uploads
+
 # Webdev artifacts (checkpoint zips, migrations, etc.)
 .webdev/
 

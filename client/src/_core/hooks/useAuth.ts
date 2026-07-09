@@ -27,7 +27,7 @@ export function useAuth() {
       try {
         await logoutMutation.mutateAsync();
       } finally {
-        window.location.href = "/";
+        window.location.href = "/signin";
       }
     },
   };

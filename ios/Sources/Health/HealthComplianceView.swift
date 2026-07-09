@@ -858,16 +858,34 @@ final class HealthComplianceViewModel: ObservableObject {
 
     private func loadChildren() async -> [ChildHealthCompliance] {
         do { return try await APIClient.shared.getHealthCompliance() }
-        catch { return MockData.healthCompliance() }
+        catch {
+            #if DEBUG
+            return MockData.healthCompliance()
+            #else
+            return []
+            #endif
+        }
     }
 
     private func loadDrills() async -> [SafetyDrillLog] {
         do { return try await APIClient.shared.getSafetyDrills() }
-        catch { return MockData.safetyDrills() }
+        catch {
+            #if DEBUG
+            return MockData.safetyDrills()
+            #else
+            return []
+            #endif
+        }
     }
 
     private func loadConsults() async -> [MentalHealthConsult] {
         do { return try await APIClient.shared.getMentalHealthConsults() }
-        catch { return MockData.mentalHealthConsults() }
+        catch {
+            #if DEBUG
+            return MockData.mentalHealthConsults()
+            #else
+            return []
+            #endif
+        }
     }
 }

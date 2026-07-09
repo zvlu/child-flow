@@ -53,8 +53,9 @@ export function ActionQueue() {
   });
   const { data: documents, isLoading: documentsLoading } = trpc.digitalDocuments.list.useQuery(ORGANIZATION_ID);
   const { data: families } = trpc.families.list.useQuery(ORGANIZATION_ID);
+  const { data: certifications, isLoading: certsLoading } = trpc.staffOps.certifications.useQuery(ORGANIZATION_ID);
 
-  const isLoading = followUpsLoading || insightsLoading || documentsLoading;
+  const isLoading = followUpsLoading || insightsLoading || documentsLoading || certsLoading;
 
   const utils = trpc.useUtils();
   const dismissInsight = trpc.aiInsights.dismiss.useMutation({
@@ -134,9 +135,30 @@ export function ActionQueue() {
       }
     }
 
+    // Staff certifications: expired or expiring within 60 days need renewal.
+    for (const cert of certifications ?? []) {
+      if (cert.status === "active") continue;
+      items.push({
+        id: `cert-${cert.id}`,
+        title: `${cert.certificationType} ${cert.status === "expired" ? "expired" : "expiring soon"} — ${cert.staffName}`,
+        owner: cert.staffName,
+        area: "Staff",
+        due:
+          cert.status === "expired"
+            ? `Expired ${formatDate(cert.expiryDate)}`
+            : `Expires ${formatDate(cert.expiryDate)}`,
+        status: cert.status === "expired" ? "urgent" : "pending",
+        detail:
+          cert.status === "expired"
+            ? `${cert.staffName}'s ${cert.certificationType} certification has expired and needs renewal.`
+            : `${cert.staffName}'s ${cert.certificationType} certification expires soon — renew before it lapses.`,
+        href: "/staff-operations",
+      });
+    }
+
     const rank: Record<QueueStatus, number> = { urgent: 0, pending: 1, completed: 2 };
     return items.sort((a, b) => rank[a.status] - rank[b.status]);
-  }, [followUps, insights, documents, families]);
+  }, [followUps, insights, documents, families, certifications]);
 
   const filteredItems = useMemo(() => {
     return queueItems.filter((item) => {

@@ -14,6 +14,10 @@ import { registerActivityRoutes } from "../activity";
 import { registerProgramModuleRoutes } from "../programModules";
 import { registerAbsenceRoutes } from "../absences";
 import { registerAttendanceRoutes } from "../attendance";
+import { registerFamilyCaseManagementRoutes } from "../familyCaseManagementRest";
+import { registerSettingsRoutes } from "../settingsRest";
+import { registerEnrollmentVerificationRoutes } from "../enrollmentVerificationsRest";
+import { UPLOADS_ROOT } from "../fileStorage";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -56,6 +60,9 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // Coarse per-IP rate limit across the API (auth routes keep stricter limits).
   app.use("/api", apiRateLimiter);
+  // Locally-stored document uploads (server/fileStorage.ts) — see that file
+  // for why this is disk-based instead of S3/GCS.
+  app.use("/uploads", express.static(UPLOADS_ROOT));
   // Email/password sign-in for mobile clients under /api/auth/login
   registerAuthRoutes(app);
   // Parent (family app) onboarding + scoped data under /api/family/*
@@ -76,6 +83,13 @@ async function startServer() {
   registerAbsenceRoutes(app);
   // Teacher attendance + quick notes under /api/attendance, /api/children/:id/notes
   registerAttendanceRoutes(app);
+  // Family case management (goals, referrals, home visits, FPA, FNA, CFCR,
+  // case notes) + AIP/chronic-absence (iOS) — all Head Start module-gated
+  registerFamilyCaseManagementRoutes(app);
+  // Settings screen (program name/fiscal year, password change) under /api/settings
+  registerSettingsRoutes(app);
+  // ERSEA application-verification checklist (iOS) under /api/enrollment/verifications
+  registerEnrollmentVerificationRoutes(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API

@@ -1,8 +1,10 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
 import {
   chatMessages,
   children,
+  childClassroomAssignments,
+  classrooms,
   conversations,
   families,
   users,
@@ -12,6 +14,7 @@ import {
 import { clientIpFromReq } from "./_core/audit";
 import { sdk } from "./_core/sdk";
 import { getDb, insertAuditLog, updateUserSettings } from "./db";
+import { resolveStaffId } from "./moduleDb";
 import {
   isSupportedLanguage,
   translateThreadForViewer,
@@ -388,6 +391,119 @@ export function registerMessagingRoutes(app: Express) {
       .where(eq(conversations.id, conversation!.id));
 
     res.json(await serializeConversation(conversation!, viewer));
+  });
+
+  /**
+   * Broadcast an announcement to many families at once (staff/admin only).
+   * Reuses the same "one active thread per family" model as a 1:1 message —
+   * a broadcast just fans the same body out into each target family's thread,
+   * so families see it exactly like any other staff message.
+   */
+  app.post("/api/messaging/broadcast", async (req: Request, res: Response) => {
+    const viewer = await requireViewer(req);
+    if (!viewer || viewer.side !== "staff") {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const body = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+    const audience = req.body?.audience === "caseload" ? "caseload" : "all";
+    if (!body) {
+      res.status(400).json({ error: "body is required" });
+      return;
+    }
+    const orgId = viewer.user.organizationId;
+    if (!orgId) {
+      res.status(400).json({ error: "No organization on this account" });
+      return;
+    }
+
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+
+    let targetFamilyIds: number[];
+    if (audience === "caseload") {
+      const staffId = await resolveStaffId(orgId, viewer.user.id);
+      let familyIdSet = new Set<number>();
+      if (staffId != null) {
+        const myRooms = await db
+          .select({ id: classrooms.id })
+          .from(classrooms)
+          .where(
+            and(eq(classrooms.organizationId, orgId), or(eq(classrooms.teacherId, staffId), eq(classrooms.assistantId, staffId)))
+          );
+        if (myRooms.length > 0) {
+          const roomIds = myRooms.map(r => r.id);
+          const assigned = await db
+            .select({ childId: childClassroomAssignments.childId })
+            .from(childClassroomAssignments)
+            .where(and(inArray(childClassroomAssignments.classroomId, roomIds), eq(childClassroomAssignments.isActive, 1)));
+          const childIds = assigned.map(a => a.childId);
+          if (childIds.length > 0) {
+            const kids = await db
+              .select({ familyId: children.familyId })
+              .from(children)
+              .where(inArray(children.id, childIds));
+            familyIdSet = new Set(kids.map(k => k.familyId).filter((id): id is number => id != null));
+          }
+        }
+      }
+      // No resolvable classroom assignment (admin, family advocate, etc.) —
+      // fall back to the full org roster rather than silently sending to nobody.
+      if (familyIdSet.size === 0) {
+        const all = await db.select({ id: families.id }).from(families).where(eq(families.organizationId, orgId));
+        targetFamilyIds = all.map(f => f.id);
+      } else {
+        targetFamilyIds = Array.from(familyIdSet);
+      }
+    } else {
+      const all = await db.select({ id: families.id }).from(families).where(eq(families.organizationId, orgId));
+      targetFamilyIds = all.map(f => f.id);
+    }
+
+    let sentCount = 0;
+    for (const familyId of targetFamilyIds) {
+      let [conversation] = await db
+        .select()
+        .from(conversations)
+        .where(and(eq(conversations.familyId, familyId), eq(conversations.isActive, 1)))
+        .limit(1);
+      if (!conversation) {
+        await db.insert(conversations).values({ organizationId: orgId, familyId, createdBy: viewer.user.id });
+        [conversation] = await db
+          .select()
+          .from(conversations)
+          .where(and(eq(conversations.familyId, familyId), eq(conversations.isActive, 1)))
+          .orderBy(desc(conversations.id))
+          .limit(1);
+      }
+      await db.insert(chatMessages).values({
+        conversationId: conversation!.id,
+        senderUserId: viewer.user.id,
+        senderRole: "staff",
+        body,
+        translations: { __source: viewerLanguage(viewer) },
+        sentAt: new Date(),
+      });
+      await db
+        .update(conversations)
+        .set({ staffLastReadAt: new Date() })
+        .where(eq(conversations.id, conversation!.id));
+      sentCount++;
+    }
+
+    await insertAuditLog({
+      userId: viewer.user.id,
+      actorOpenId: viewer.user.openId,
+      action: "create",
+      resourceType: "broadcast",
+      resourceId: audience,
+      ipAddress: clientIpFromReq(req),
+    });
+
+    res.json({ ok: true, sentCount, audience });
   });
 
   /**

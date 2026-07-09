@@ -32,6 +32,25 @@ actor APIClient {
         return d
     }()
 
+    // Matches `decoder`'s expected format. Without this, `post()` used to fall
+    // back to JSONEncoder's default .deferredToDate strategy, which encodes
+    // Date as a raw number of seconds since 2001 — the server's `new Date(x)`
+    // then reads that number as *milliseconds since 1970*, silently landing on
+    // a date in January 1970 for every Date field sent in a POST body (visit
+    // dates, referral dates, meeting dates, etc.). This never showed up in
+    // testing because the test scripts construct their own ISO-string JSON
+    // bodies directly and never actually exercise this Swift encoder.
+    private let encoder: JSONEncoder = {
+        let e = JSONEncoder()
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        e.dateEncodingStrategy = .custom { date, enc in
+            var container = enc.singleValueContainer()
+            try container.encode(fractional.string(from: date))
+        }
+        return e
+    }()
+
     // MARK: - Auth
     private let tokenAccount = "auth_token"
 
@@ -273,6 +292,36 @@ actor APIClient {
         let _: SuccessResponse = try await post("subsidies", body: Req(familyId: familyId, agencyName: agencyName, authorizedAmount: authorizedAmount, copayAmount: copayAmount, status: status, notes: notes))
     }
 
+    // MARK: - Digital Documents (E-Sign)
+    func getDigitalDocuments() async throws -> [DigitalDocumentItem] {
+        try await get("digital-documents")
+    }
+    func signDigitalDocument(id: String, signedBy: String) async throws {
+        struct Req: Encodable { let signedBy: String }
+        let _: SuccessResponse = try await post("digital-documents/\(id)/sign", body: Req(signedBy: signedBy))
+    }
+
+    // MARK: - Disability Services (IEP/IFSP)
+    func getDisabilityServices() async throws -> DisabilityServiceSummary {
+        try await get("disability-services")
+    }
+    func upsertDisabilityRecord(id: String?, childId: String, planType: String, status: String?, primaryDisability: String?, effectiveDate: String?, expirationDate: String?, leaAgency: String?, leaContact: String?, notes: String?) async throws {
+        struct Req: Encodable {
+            let id: String?; let childId: String; let planType: String; let status: String?
+            let primaryDisability: String?; let effectiveDate: String?; let expirationDate: String?
+            let leaAgency: String?; let leaContact: String?; let notes: String?
+        }
+        let _: SuccessResponse = try await post("disability-services", body: Req(id: id, childId: childId, planType: planType, status: status, primaryDisability: primaryDisability, effectiveDate: effectiveDate, expirationDate: expirationDate, leaAgency: leaAgency, leaContact: leaContact, notes: notes))
+    }
+    func markDisabilityParentRights(id: String, language: String) async throws {
+        struct Req: Encodable { let language: String }
+        let _: SuccessResponse = try await post("disability-services/\(id)/parent-rights", body: Req(language: language))
+    }
+    func setDisabilityTransitionChecklist(id: String, steps: [String]) async throws {
+        struct Req: Encodable { let steps: [String] }
+        let _: SuccessResponse = try await post("disability-services/\(id)/transition", body: Req(steps: steps))
+    }
+
     // MARK: - Assessments
     func getAssessments(childId: String? = nil) async throws -> [AssessmentItem] {
         var path = "assessments"
@@ -312,6 +361,13 @@ actor APIClient {
         try await get("settings")
     }
 
+    struct ChangePasswordRequest: Codable { let currentPassword: String?; let newPassword: String }
+    struct ChangePasswordResponse: Codable { let success: Bool }
+    @discardableResult
+    func changePassword(currentPassword: String?, newPassword: String) async throws -> ChangePasswordResponse {
+        try await post("settings/password", body: ChangePasswordRequest(currentPassword: currentPassword, newPassword: newPassword))
+    }
+
     // MARK: - Messaging
     func getConversations() async throws -> [Conversation] {
         try await get("messaging/conversations")
@@ -329,6 +385,15 @@ actor APIClient {
     func newConversation(familyId: String, body: String) async throws -> Conversation {
         let req = NewConversationRequest(familyId: familyId, recipientIds: [], body: body)
         return try await post("messaging/conversations", body: req)
+    }
+
+    /// Drops one announcement into every target family's message thread —
+    /// this is an in-app broadcast, not SMS/email (see BroadcastAnnouncementSheet).
+    struct BroadcastRequest: Codable { let body: String; let audience: String }
+    struct BroadcastResponse: Codable { let ok: Bool; let sentCount: Int; let audience: String }
+    @discardableResult
+    func sendBroadcast(body: String, audience: String) async throws -> BroadcastResponse {
+        try await post("messaging/broadcast", body: BroadcastRequest(body: body, audience: audience))
     }
 
     /// Sync the user's preferred message language — the server then auto-
@@ -444,6 +509,22 @@ actor APIClient {
     // MARK: - Chronic Absence Alerts
     func getChronicAbsenceAlerts() async throws -> [ChronicAbsenceAlert] {
         try await get("attendance/chronic-absence")
+    }
+
+    // MARK: - Documents (staff file library)
+    func getDocuments() async throws -> [StaffDocumentDTO] {
+        try await get("documents")
+    }
+
+    /// `fileBase64` may be a raw base64 string or a `data:<mime>;base64,...` URL — the server accepts either.
+    func uploadDocument(name: String, documentType: String, fileBase64: String, mimeType: String?, childId: String?) async throws -> StaffDocumentDTO {
+        struct Req: Encodable { let name: String; let documentType: String; let fileBase64: String; var mimeType: String?; var childId: String? }
+        return try await post("documents", body: Req(name: name, documentType: documentType, fileBase64: fileBase64, mimeType: mimeType, childId: childId))
+    }
+
+    func assignDocument(id: String, childId: String) async throws {
+        struct Req: Encodable { let childId: String }
+        let _: EmptyResponse = try await post("documents/\(id)/assign", body: Req(childId: childId))
     }
 
     // MARK: - Application Verification
@@ -659,7 +740,7 @@ actor APIClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         addAuthHeader(&request)
-        request.httpBody = try JSONEncoder().encode(body)
+        request.httpBody = try encoder.encode(body)
         let (data, response) = try await URLSession.shared.data(for: request)
         try validate(response)
         return try decoder.decode(T.self, from: data)

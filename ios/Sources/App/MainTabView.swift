@@ -81,24 +81,36 @@ struct AppMenuSheet: View {
                         )
                     }
 
-                    // Families & Engagement
+                    // Families & Engagement — Family Services (FNA/CFCR) and
+                    // Chronic Absence are Head Start compliance features;
+                    // Family Events is general and always shown.
                     MenuSection(title: "Families") {
-                        ModuleCard(
-                            label: "Family Services",
-                            subtitle: "Records, goals & case notes",
-                            icon: "house.fill",
-                            color: .cfPrimary,
-                            bgColor: .cfPrimaryLight,
-                            destination: AnyView(FamilyServicesView())
-                        )
-                        ModuleCard(
-                            label: "Chronic Absence",
-                            subtitle: "85% threshold alerts & AIP",
-                            icon: "exclamationmark.triangle.fill",
-                            color: .orange,
-                            bgColor: Color.orange.opacity(0.1),
-                            destination: AnyView(ChronicAbsenceView())
-                        )
+                        if appState.hasModule(.headStart) {
+                            ModuleCard(
+                                label: "Family Services",
+                                subtitle: "Records, goals & case notes",
+                                icon: "house.fill",
+                                color: .cfPrimary,
+                                bgColor: .cfPrimaryLight,
+                                destination: AnyView(FamilyServicesView())
+                            )
+                            ModuleCard(
+                                label: "Chronic Absence",
+                                subtitle: "85% threshold alerts & AIP",
+                                icon: "exclamationmark.triangle.fill",
+                                color: .orange,
+                                bgColor: Color.orange.opacity(0.1),
+                                destination: AnyView(ChronicAbsenceView())
+                            )
+                            ModuleCard(
+                                label: "Disability Services",
+                                subtitle: "IEP/IFSP tracking & LEA coordination",
+                                icon: "figure.roll",
+                                color: .cfFamily,
+                                bgColor: .cfFamilyBg,
+                                destination: AnyView(DisabilityServicesView())
+                            )
+                        }
                         ModuleCard(
                             label: "Family Events",
                             subtitle: "Plan & track engagement",
@@ -126,6 +138,14 @@ struct AppMenuSheet: View {
                             color: .cfFamily,
                             bgColor: .cfFamilyBg,
                             destination: AnyView(DocumentsView())
+                        )
+                        ModuleCard(
+                            label: "E-Signatures",
+                            subtitle: "Review & sign documents",
+                            icon: "signature",
+                            color: .cfPrimary,
+                            bgColor: .cfPrimaryLight,
+                            destination: AnyView(DigitalDocumentsView())
                         )
                     }
 
@@ -155,14 +175,17 @@ struct AppMenuSheet: View {
                             bgColor: .cfChildrenBg,
                             destination: AnyView(ApplicationVerificationView())
                         )
-                        ModuleCard(
-                            label: "Attendance Plans",
-                            subtitle: "Chronic absence support",
-                            icon: "chart.line.uptrend.xyaxis",
-                            color: .cfAttendance,
-                            bgColor: .cfAttendanceBg,
-                            destination: AnyView(AttendancePlansView())
-                        )
+                        // Attendance Improvement Plans are a §1302.16 Head Start requirement.
+                        if appState.hasModule(.headStart) {
+                            ModuleCard(
+                                label: "Attendance Plans",
+                                subtitle: "Chronic absence support",
+                                icon: "chart.line.uptrend.xyaxis",
+                                color: .cfAttendance,
+                                bgColor: .cfAttendanceBg,
+                                destination: AnyView(AttendancePlansView())
+                            )
+                        }
                     }
 
                     // Health & Nutrition
@@ -226,14 +249,17 @@ struct AppMenuSheet: View {
                             bgColor: .cfChildrenBg,
                             destination: AnyView(CalendarView())
                         )
-                        ModuleCard(
-                            label: "Compliance",
-                            subtitle: "PIR & checklists",
-                            icon: "checkmark.seal.fill",
-                            color: .cfCompliance,
-                            bgColor: .cfComplianceBg,
-                            destination: AnyView(ComplianceView())
-                        )
+                        // PIR is Head Start's federal compliance report.
+                        if appState.hasModule(.headStart) {
+                            ModuleCard(
+                                label: "Compliance",
+                                subtitle: "PIR & checklists",
+                                icon: "checkmark.seal.fill",
+                                color: .cfCompliance,
+                                bgColor: .cfComplianceBg,
+                                destination: AnyView(ComplianceView())
+                            )
+                        }
                         ModuleCard(
                             label: "Reports",
                             subtitle: "Exports & summaries",
@@ -242,14 +268,17 @@ struct AppMenuSheet: View {
                             bgColor: .cfComplianceBg,
                             destination: AnyView(ReportsView())
                         )
-                        ModuleCard(
-                            label: "Staff Activity",
-                            subtitle: "Advocate workload & contacts",
-                            icon: "person.2.badge.gearshape.fill",
-                            color: .cfPrimary,
-                            bgColor: .cfPrimaryLight,
-                            destination: AnyView(StaffActivityView())
-                        )
+                        // Family-advocate workload reporting is a Head Start feature (mirrors web familyServices.staffActivity).
+                        if appState.hasModule(.headStart) {
+                            ModuleCard(
+                                label: "Staff Activity",
+                                subtitle: "Advocate workload & contacts",
+                                icon: "person.2.badge.gearshape.fill",
+                                color: .cfPrimary,
+                                bgColor: .cfPrimaryLight,
+                                destination: AnyView(StaffActivityView())
+                            )
+                        }
                     }
 
                     // Settings

@@ -13,14 +13,14 @@ export const getLoginUrl = () => {
   
   // Basic check for existence
   if (!oauthPortalUrl || !appId) {
-    return "/dashboard";
+    return "/signin";
   }
 
   try {
     // Ensure oauthPortalUrl is a valid URL string before passing to URL constructor
     const baseUrl = oauthPortalUrl.startsWith('http') ? oauthPortalUrl : `https://${oauthPortalUrl}`;
     const url = new URL(`${baseUrl}/app-auth`);
-    
+
     const redirectUri = `${window.location.origin}/api/oauth/callback`;
     const state = btoa(redirectUri);
 
@@ -28,10 +28,10 @@ export const getLoginUrl = () => {
     url.searchParams.set("redirectUri", redirectUri);
     url.searchParams.set("state", state);
     url.searchParams.set("type", "signIn");
-    
+
     return url.toString();
   } catch (e) {
     console.error("Failed to construct login URL:", e);
-    return "/dashboard";
+    return "/signin";
   }
 };

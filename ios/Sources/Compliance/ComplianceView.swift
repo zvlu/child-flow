@@ -712,45 +712,102 @@ final class PIRAutoPopulationEngine: ObservableObject {
         ]
     }
 
-    // MARK: Data loaders (API first, mock fallback)
+    // MARK: Data loaders (real API first; mock fallback only in debug builds —
+    // this feeds a federal compliance report, so a release build that can't
+    // reach the server should show zero/empty rather than fabricated numbers.)
     private func loadEnrollment() async -> Int {
         do { return try await APIClient.shared.getEnrollmentApplications()
                 .filter { $0.status == "Enrolled" }.count }
-        catch { return 62 }
+        catch {
+            #if DEBUG
+            return 62
+            #else
+            return 0
+            #endif
+        }
     }
 
     private func loadAttendance() async -> Double {
         // Derive average attendance from chronic absence alerts (rate = 1 - absence rate).
-        // Falls back to 87% if no data available.
-        let alerts = MockData.chronicAbsenceAlerts()
-        guard !alerts.isEmpty else { return 0.87 }
-        let avg = alerts.map { $0.attendanceRate }.reduce(0, +) / Double(alerts.count)
-        return avg
+        // This used to call MockData directly with no network attempt at all.
+        do {
+            let alerts = try await APIClient.shared.getChronicAbsenceAlerts()
+            guard !alerts.isEmpty else { return 0 }
+            return alerts.map { $0.attendanceRate }.reduce(0, +) / Double(alerts.count)
+        } catch {
+            #if DEBUG
+            let alerts = MockData.chronicAbsenceAlerts()
+            guard !alerts.isEmpty else { return 0.87 }
+            return alerts.map { $0.attendanceRate }.reduce(0, +) / Double(alerts.count)
+            #else
+            return 0
+            #endif
+        }
     }
 
     private func loadHealth() async -> [ChildHealthCompliance] {
         do { return try await APIClient.shared.getHealthCompliance() }
-        catch { return MockData.healthCompliance() }
+        catch {
+            #if DEBUG
+            return MockData.healthCompliance()
+            #else
+            return []
+            #endif
+        }
     }
 
+    /// Aggregate visit logs across every family in the org. There's no bulk
+    /// "all visits" endpoint yet, so this fetches the real roster and fans out
+    /// per-family — real network calls, not a hardcoded fixture family list.
     private func loadVisits() async -> [HomeVisitLog] {
-        // Aggregate all family visit logs
-        let families = ["family-1", "family-2", "family-3", "family-4", "family-5"]
-        var all: [HomeVisitLog] = []
-        for fid in families {
-            all += MockData.visitLogs(for: fid)
+        do {
+            let families = try await APIClient.shared.getFamilies()
+            var all: [HomeVisitLog] = []
+            for family in families {
+                if let visits = try? await APIClient.shared.getVisitLogs(familyId: family.id) {
+                    all += visits
+                }
+            }
+            return all
+        } catch {
+            #if DEBUG
+            let families = ["family-1", "family-2", "family-3", "family-4", "family-5"]
+            return families.flatMap { MockData.visitLogs(for: $0) }
+            #else
+            return []
+            #endif
         }
-        return all
     }
 
     private func loadFPAs() async -> [FamilyPartnershipAgreement] {
-        let families = ["family-1", "family-2", "family-3", "family-4", "family-5"]
-        return families.compactMap { MockData.fpa(for: $0) }
+        do {
+            let families = try await APIClient.shared.getFamilies()
+            var all: [FamilyPartnershipAgreement] = []
+            for family in families {
+                if let fpa = try? await APIClient.shared.getFPA(familyId: family.id) {
+                    all.append(fpa)
+                }
+            }
+            return all
+        } catch {
+            #if DEBUG
+            let families = ["family-1", "family-2", "family-3", "family-4", "family-5"]
+            return families.compactMap { MockData.fpa(for: $0) }
+            #else
+            return []
+            #endif
+        }
     }
 
     private func loadStaff() async -> [StaffMember] {
         do { return try await APIClient.shared.getStaff() }
-        catch { return MockData.staff() }
+        catch {
+            #if DEBUG
+            return MockData.staff()
+            #else
+            return []
+            #endif
+        }
     }
 }
 

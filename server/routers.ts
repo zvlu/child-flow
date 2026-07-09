@@ -1,9 +1,12 @@
 import { COOKIE_NAME, NOT_ADMIN_ERR_MSG } from "@shared/const";
+import { MODULE_IDS } from "@shared/modules";
 import { TRPCError } from "@trpc/server";
+import { randomUUID } from "crypto";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router, staffProcedure, adminProcedure, superAdminProcedure, orgStaffProcedure, orgAdminProcedure, parentProcedure } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router, staffProcedure, adminProcedure, superAdminProcedure, orgStaffProcedure, orgAdminProcedure, hsStaffProcedure, hsAdminProcedure, parentProcedure } from "./_core/trpc";
 import { isPlatformOwner } from "./_core/env";
+import { invalidateModuleCache } from "./_core/modules";
 import { auditAccess } from "./_core/audit";
 import { hashPassword, verifyPassword } from "./_core/password";
 import { persistMediaDataUrl } from "./storage";
@@ -40,6 +43,7 @@ import {
   getPirData,
 } from "./db";
 import * as mod from "./moduleDb";
+import { importRoster } from "./dataImport";
 import { createFamilyInvitation, listFamilyInvitations } from "./family";
 import { computeDashboard } from "./dashboard";
 import { CommunicationService } from "./services/communication";
@@ -52,6 +56,8 @@ import * as pc from "./policyCouncil";
 import * as ds from "./disabilityServices";
 import { getGrantSummary, setBudgetLine, addExpense, GRANT_CATEGORIES } from "./grantBudget";
 import { listAssessments, createAssessment } from "./classroomQuality";
+import * as fcm from "./familyCaseManagement";
+import * as ap from "./attendancePlans";
 
 /** Block creation when it would push the org past its plan's child limit. */
 async function assertChildCapacity(organizationId: number, adding: number) {
@@ -113,6 +119,13 @@ export const appRouter = router({
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      // Prevent the dev-auth bypass from immediately re-injecting a session after
+      // an explicit sign-out. The opt-out cookie is cleared on the next real login.
+      ctx.res.cookie("__sprout_no_bypass", "1", {
+        httpOnly: true,
+        sameSite: "strict",
+        maxAge: 24 * 60 * 60 * 1000, // 24 h — reset on next sign-in
+      });
       return {
         success: true,
       } as const;
@@ -257,6 +270,7 @@ export const appRouter = router({
           maxStaff: z.number().int().min(0).max(100000).optional(),
           classroomCount: z.number().int().min(0).max(10000).nullable().optional(),
           subscriptionTier: z.enum(["starter", "professional", "enterprise"]).optional(),
+          enabledModules: z.array(z.enum(MODULE_IDS)).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -269,7 +283,14 @@ export const appRouter = router({
         // Normalize empty director email to null so we don't store "".
         if (data.directorEmail === "") data.directorEmail = null;
         await updateOrganization(id, data);
-        await auditAccess(ctx, { action: "update", resourceType: "organization", resourceId: id, detail: "program_settings" });
+        if (data.enabledModules) {
+          // Module gates cache per-org module lists — bust so toggles apply immediately.
+          invalidateModuleCache(id);
+        }
+        await auditAccess(ctx, {
+          action: "update", resourceType: "organization", resourceId: id,
+          detail: data.enabledModules ? `program_settings modules:${data.enabledModules.join(",") || "none"}` : "program_settings",
+        });
         return { success: true };
       }),
   }),
@@ -485,6 +506,58 @@ export const appRouter = router({
       }),
   }),
 
+  // One-upload roster migration: children + family contacts + health exam
+  // dates from a single spreadsheet. See server/dataImport.ts.
+  dataImport: router({
+    roster: orgStaffProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          rows: z
+            .array(
+              z.object({
+                firstName: z.string().trim().min(1).max(100),
+                lastName: z.string().trim().min(1).max(100),
+                dateOfBirth: z.date().optional(),
+                gender: z.enum(["male", "female", "other", "prefer_not_to_say"]).optional(),
+                status: z.enum(["active", "inactive", "graduated", "withdrawn"]).optional(),
+                notes: z.string().max(1000).optional(),
+                familyContactName: z.string().trim().max(100).optional(),
+                familyContactPhone: z.string().trim().max(20).optional(),
+                familyContactEmail: z.string().trim().max(320).optional(),
+                secondaryContactName: z.string().trim().max(100).optional(),
+                address: z.string().max(500).optional(),
+                city: z.string().max(100).optional(),
+                state: z.string().max(2).optional(),
+                zipCode: z.string().max(10).optional(),
+                health: z
+                  .object({
+                    physicalDate: z.date().optional(),
+                    immunizationDate: z.date().optional(),
+                    dentalDate: z.date().optional(),
+                    visionDate: z.date().optional(),
+                    hearingDate: z.date().optional(),
+                  })
+                  .optional(),
+                healthProvider: z.string().max(255).optional(),
+              })
+            )
+            .min(1)
+            .max(1000),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await assertChildCapacity(input.organizationId, input.rows.length);
+        const result = await importRoster(input.organizationId, input.rows);
+        await auditAccess(ctx, {
+          action: "create",
+          resourceType: "child",
+          detail: `roster_import:children=${result.childrenCreated},families=${result.familiesCreated},health=${result.healthRecordsCreated}`,
+        });
+        return result;
+      }),
+  }),
+
   // Enrollment applications / waitlist. Triage prospective children and, on
   // approval, enroll them (creates real family + child records).
   enrollment: router({
@@ -548,12 +621,12 @@ export const appRouter = router({
 
   // In-kind (non-federal share) contributions toward the Head Start match.
   inKind: router({
-    list: orgStaffProcedure
+    list: hsStaffProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return mod.getInKindContributions(organizationId);
       }),
-    create: orgStaffProcedure
+    create: hsStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -579,7 +652,7 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "create", resourceType: "in_kind", detail: `${input.type}:${input.value}` });
         return result;
       }),
-    delete: orgStaffProcedure
+    delete: hsStaffProcedure
       .input(z.object({ id: z.number(), organizationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await mod.deleteInKindContribution(input.id, input.organizationId);
@@ -784,7 +857,7 @@ export const appRouter = router({
 
   // Health compliance deadlines (Head Start §1302.42: 45-day screening / 90-day dental).
   healthDeadlines: router({
-    summary: orgStaffProcedure
+    summary: hsStaffProcedure
       .input(z.object({ organizationId: z.number() }))
       .query(async ({ input }) => {
         return getHealthDeadlineSummary(input.organizationId);
@@ -793,7 +866,7 @@ export const appRouter = router({
 
   // Chronic Absence Alert System (Head Start §1302.16 attendance analysis).
   chronicAbsence: router({
-    summary: orgStaffProcedure
+    summary: hsStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -807,10 +880,10 @@ export const appRouter = router({
 
   // CLASS / ECERS classroom quality observations.
   classroomQuality: router({
-    list: orgStaffProcedure
+    list: hsStaffProcedure
       .input(z.object({ organizationId: z.number() }))
       .query(async ({ input }) => listAssessments(input.organizationId)),
-    create: orgStaffProcedure
+    create: hsStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -835,10 +908,10 @@ export const appRouter = router({
 
   // Grant & budget compliance (burn rate, 20% non-federal share, carryover).
   grantBudget: router({
-    summary: orgAdminProcedure
+    summary: hsAdminProcedure
       .input(z.object({ organizationId: z.number(), fiscalYear: z.string().regex(/^\d{4}-\d{4}$/) }))
       .query(async ({ input }) => getGrantSummary(input.organizationId, input.fiscalYear)),
-    setBudgetLine: orgAdminProcedure
+    setBudgetLine: hsAdminProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -851,7 +924,7 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "update", resourceType: "grant_budget", resourceId: `${input.fiscalYear}/${input.category}` });
         return setBudgetLine(input);
       }),
-    addExpense: orgAdminProcedure
+    addExpense: hsAdminProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -871,10 +944,10 @@ export const appRouter = router({
 
   // IEP/IFSP coordination (Head Start §1302.60–63).
   disabilityServices: router({
-    summary: orgStaffProcedure
+    summary: hsStaffProcedure
       .input(z.object({ organizationId: z.number() }))
       .query(async ({ input }) => ds.getDisabilitySummary(input.organizationId)),
-    upsert: orgStaffProcedure
+    upsert: hsStaffProcedure
       .input(
         z.object({
           id: z.number().nullable().optional(),
@@ -899,13 +972,13 @@ export const appRouter = router({
         });
         return ds.upsertDisabilityRecord(input);
       }),
-    markParentRights: orgStaffProcedure
+    markParentRights: hsStaffProcedure
       .input(z.object({ id: z.number(), organizationId: z.number(), language: z.string().min(1).max(32) }))
       .mutation(async ({ input, ctx }) => {
         await auditAccess(ctx, { action: "update", resourceType: "disability_service", resourceId: String(input.id), detail: "parent_rights" });
         return ds.markParentRights(input);
       }),
-    setTransition: orgStaffProcedure
+    setTransition: hsStaffProcedure
       .input(z.object({ id: z.number(), organizationId: z.number(), steps: z.array(z.string()).max(10) }))
       .mutation(async ({ input, ctx }) => {
         await auditAccess(ctx, { action: "update", resourceType: "disability_service", resourceId: String(input.id), detail: "transition" });
@@ -915,10 +988,10 @@ export const appRouter = router({
 
   // Policy Council (Head Start §1302.50–51).
   policyCouncil: router({
-    members: orgStaffProcedure
+    members: hsStaffProcedure
       .input(z.object({ organizationId: z.number() }))
       .query(async ({ input }) => pc.listMembers(input.organizationId)),
-    addMember: orgStaffProcedure
+    addMember: hsStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -934,7 +1007,7 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "create", resourceType: "policy_council_member", resourceId: input.name });
         return pc.addMember(input);
       }),
-    updateMember: orgStaffProcedure
+    updateMember: hsStaffProcedure
       .input(
         z.object({
           id: z.number(),
@@ -947,10 +1020,10 @@ export const appRouter = router({
         await auditAccess(ctx, { action: "update", resourceType: "policy_council_member", resourceId: String(input.id) });
         return pc.updateMember(input);
       }),
-    meetings: orgStaffProcedure
+    meetings: hsStaffProcedure
       .input(z.object({ organizationId: z.number() }))
       .query(async ({ input }) => pc.listMeetings(input.organizationId)),
-    addMeeting: orgStaffProcedure
+    addMeeting: hsStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -970,10 +1043,10 @@ export const appRouter = router({
 
   // Suspension/expulsion documentation (Head Start §1302.17).
   suspensionLog: router({
-    list: orgStaffProcedure
+    list: hsStaffProcedure
       .input(z.object({ organizationId: z.number() }))
       .query(async ({ input }) => listIncidents(input.organizationId)),
-    create: orgStaffProcedure
+    create: hsStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -994,7 +1067,7 @@ export const appRouter = router({
         });
         return createIncident(input);
       }),
-    update: orgStaffProcedure
+    update: hsStaffProcedure
       .input(
         z.object({
           id: z.number(),
@@ -1016,17 +1089,17 @@ export const appRouter = router({
 
   // Family Partnership Agreements (Head Start §1302.52).
   fpa: router({
-    list: orgStaffProcedure
+    list: hsStaffProcedure
       .input(z.object({ organizationId: z.number() }))
       .query(async ({ input }) => {
         return listFpas(input.organizationId);
       }),
-    detail: orgStaffProcedure
+    detail: hsStaffProcedure
       .input(z.object({ organizationId: z.number(), familyId: z.number() }))
       .query(async ({ input }) => {
         return getFpaDetail(input.organizationId, input.familyId);
       }),
-    upsert: orgStaffProcedure
+    upsert: hsStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -1053,7 +1126,7 @@ export const appRouter = router({
       }),
     // Aggregated actionable alerts for the notification bell (shared with iOS).
     alerts: staffProcedure.query(async ({ ctx }) => {
-      const data = await computeDashboard(ctx.user.organizationId);
+      const data = await computeDashboard(ctx.user);
       return data?.alerts ?? [];
     }),
   }),
@@ -1139,7 +1212,7 @@ export const appRouter = router({
         z.object({
           organizationId: z.number(),
           childId: z.number(),
-          documentType: z.enum(["birth_certificate", "immunization_record", "consent_form", "medical_record", "assessment", "other"]),
+          documentType: z.enum(["birth_certificate", "immunization_record", "consent_form", "medical_record", "assessment", "other", "iep", "enrollment"]),
           fileName: z.string().min(1),
           fileUrl: z.string().min(1),
           fileSize: z.number().optional(),
@@ -1180,7 +1253,7 @@ export const appRouter = router({
         z.object({
           organizationId: z.number(),
           familyId: z.number(),
-          documentType: z.enum(["enrollment", "consent", "waiver", "health_form"]),
+          documentType: z.enum(["enrollment", "consent", "waiver", "health_form", "iep"]),
           documentUrl: z.string().min(1),
           expiresAt: z.string().optional(),
         })
@@ -1486,6 +1559,12 @@ export const appRouter = router({
       .query(async ({ input: organizationId }) => {
         return mod.getCertifications(organizationId);
       }),
+    // Expired/expiring-soon counts — backs the Staff Ops summary card and the Action Queue.
+    certificationExpirySummary: orgStaffProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId }) => {
+        return mod.getCertificationExpirySummary(organizationId);
+      }),
     // Certification (HR training) records are administrative.
     createCertification: orgAdminProcedure
       .input(
@@ -1701,12 +1780,12 @@ export const appRouter = router({
   }),
 
   familyServices: router({
-    list: orgStaffProcedure
+    list: hsStaffProcedure
       .input(z.object({ organizationId: z.number(), familyId: z.number().optional() }))
       .query(async ({ input }) => {
         return getFamilyServices(input.organizationId, input.familyId);
       }),
-    create: orgStaffProcedure
+    create: hsStaffProcedure
       .input(z.any())
       .mutation(async ({ input, ctx }) => {
         // The family must belong to the caller's org.
@@ -1727,7 +1806,7 @@ export const appRouter = router({
       }),
     // Per-staff workload over a date range — supervisor view (everyone) plus a
     // single advocate's contact log when `staffId` is supplied.
-    staffActivity: orgStaffProcedure
+    staffActivity: hsStaffProcedure
       .input(z.object({
         organizationId: z.number(),
         start: z.date(),
@@ -1740,6 +1819,295 @@ export const appRouter = router({
           end: input.end,
           staffId: input.staffId ?? null,
         });
+      }),
+    // Contacts — a filtered view of the same log the create/staffActivity
+    // procedures above use, joined with the recording staff member's name.
+    contacts: hsStaffProcedure
+      .input(z.object({ familyId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.familyId);
+        return fcm.getFamilyContacts(input.familyId);
+      }),
+  }),
+
+  // SMART goals a family is working toward, tracked during home visits /
+  // case management. Head Start module feature; the family app reads the
+  // same table read-only via server/family.ts (general, not gated).
+  familyGoals: router({
+    list: hsStaffProcedure
+      .input(z.object({ familyId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.familyId);
+        return fcm.getFamilyGoals(input.familyId);
+      }),
+    create: hsStaffProcedure
+      .input(z.object({
+        familyId: z.number(),
+        title: z.string().min(1).max(255),
+        description: z.string().max(2000).optional(),
+        category: z.string().max(50).optional(),
+        targetDate: z.date().nullable().optional(),
+        steps: z.array(z.string().min(1).max(255)).max(20).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.familyId);
+        const orgId = ctx.user.organizationId!;
+        const steps = (input.steps ?? []).map((title) => ({ id: randomUUID(), title, isCompleted: false, dueDate: null, notes: null }));
+        const result = await fcm.createFamilyGoal({ organizationId: orgId, familyId: input.familyId, title: input.title, description: input.description, category: input.category, targetDate: input.targetDate, steps });
+        await auditAccess(ctx, { action: "create", resourceType: "family_goal", resourceId: result.id, detail: `family:${input.familyId}` });
+        return result;
+      }),
+    updateStep: hsStaffProcedure
+      .input(z.object({ goalId: z.number(), stepId: z.string(), completed: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "familyGoal", input.goalId);
+        return fcm.updateGoalStep(input.goalId, input.stepId, input.completed);
+      }),
+  }),
+
+  // Resource/community-service referrals — §1302.14 community partnerships.
+  familyReferrals: router({
+    list: hsStaffProcedure
+      .input(z.object({ familyId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.familyId);
+        return fcm.getFamilyReferrals(input.familyId);
+      }),
+    create: hsStaffProcedure
+      .input(z.object({
+        familyId: z.number(),
+        agencyName: z.string().min(1).max(255),
+        serviceType: z.enum([
+          "housing", "food_assistance", "mental_health", "substance_use", "domestic_violence",
+          "legal_aid", "employment", "adult_education", "childcare", "medical_care",
+          "dental_care", "vision_care", "transportation", "utility_assistance",
+          "financial_counseling", "other",
+        ]),
+        referralDate: z.date(),
+        followUpDate: z.date().nullable().optional(),
+        notes: z.string().max(2000).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.familyId);
+        const orgId = ctx.user.organizationId!;
+        const referredBy = await mod.resolveStaffId(orgId, ctx.user.id);
+        const result = await fcm.createFamilyReferral({
+          organizationId: orgId, familyId: input.familyId, agencyName: input.agencyName,
+          serviceType: input.serviceType, referralDate: input.referralDate,
+          followUpDate: input.followUpDate ?? undefined, notes: input.notes ?? undefined,
+          referredBy: referredBy ?? undefined,
+        });
+        await auditAccess(ctx, { action: "create", resourceType: "family_referral", resourceId: result.id, detail: `family:${input.familyId}` });
+        return result;
+      }),
+    update: hsStaffProcedure
+      .input(z.object({
+        id: z.number(),
+        status: z.enum(["pending", "contacted", "enrolled", "declined", "unavailable", "completed"]).optional(),
+        followUpDate: z.date().nullable().optional(),
+        notes: z.string().max(2000).optional(),
+        outcomeNotes: z.string().max(2000).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "familyReferral", input.id);
+        const { id, ...patch } = input;
+        await fcm.updateFamilyReferral(id, ctx.user.organizationId!, patch);
+        await auditAccess(ctx, { action: "update", resourceType: "family_referral", resourceId: id, detail: patch.status ?? "update" });
+        return { success: true };
+      }),
+  }),
+
+  // Structured home-visiting curriculum log (§1302.36).
+  familyHomeVisits: router({
+    list: hsStaffProcedure
+      .input(z.object({ familyId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.familyId);
+        return fcm.getFamilyHomeVisits(input.familyId);
+      }),
+    create: hsStaffProcedure
+      .input(z.object({
+        familyId: z.number(),
+        visitDate: z.date(),
+        visitType: z.enum(["home_visit", "office_visit", "phone_call", "group_social", "community_event"]),
+        durationMinutes: z.number().int().min(0).max(1440).optional(),
+        topicsCovered: z.array(z.string()).max(20).optional(),
+        notes: z.string().max(5000).optional(),
+        goalsMentioned: z.array(z.string()).max(20).optional(),
+        locationVerified: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.familyId);
+        const orgId = ctx.user.organizationId!;
+        const conductedBy = await mod.resolveStaffId(orgId, ctx.user.id);
+        const result = await fcm.createFamilyHomeVisit({
+          organizationId: orgId, familyId: input.familyId, visitDate: input.visitDate, visitType: input.visitType,
+          durationMinutes: input.durationMinutes ?? 0, topicsCovered: input.topicsCovered ?? [],
+          notes: input.notes ?? undefined, goalsMentioned: input.goalsMentioned ?? [],
+          locationVerified: input.locationVerified ? 1 : 0, conductedBy: conductedBy ?? undefined,
+        });
+        await auditAccess(ctx, { action: "create", resourceType: "family_home_visit", resourceId: result.id, detail: `family:${input.familyId}` });
+        return result;
+      }),
+  }),
+
+  // Family Needs Assessment (FNA) — one current assessment per family.
+  fna: router({
+    get: hsStaffProcedure
+      .input(z.object({ familyId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.familyId);
+        return fcm.getFamilyNeedsAssessment(input.familyId);
+      }),
+    save: hsStaffProcedure
+      .input(z.object({
+        familyId: z.number(),
+        ratings: z.array(z.object({
+          id: z.string(),
+          domain: z.enum(["familySafety", "familyHealth", "familyLearning", "familyEngagement", "familyWellbeing", "communityConnections"]),
+          level: z.number().int().min(1).max(4),
+          notes: z.string().max(1000),
+        })).max(12),
+        notes: z.string().max(5000).optional(),
+        isComplete: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.familyId);
+        const orgId = ctx.user.organizationId!;
+        const conductedBy = await mod.resolveStaffId(orgId, ctx.user.id);
+        const result = await fcm.saveFamilyNeedsAssessment({
+          organizationId: orgId, familyId: input.familyId, conductedBy,
+          ratings: input.ratings, notes: input.notes ?? "", isComplete: input.isComplete ?? false,
+        });
+        await auditAccess(ctx, { action: "update", resourceType: "family_needs_assessment", resourceId: result.id, detail: `family:${input.familyId}` });
+        return result;
+      }),
+  }),
+
+  // CFCR — Child & Family Case Review meetings.
+  cfcr: router({
+    list: hsStaffProcedure
+      .input(z.object({ childId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const orgId = ctx.user.organizationId!;
+        if (!(await fcm.childBelongsToOrg(input.childId, orgId)) && !isPlatformOwner(ctx.user.openId)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have access to that child." });
+        }
+        return fcm.getCfcrRecords(input.childId);
+      }),
+    create: hsStaffProcedure
+      .input(z.object({
+        childId: z.number(),
+        meetingDate: z.date(),
+        participants: z.array(z.object({ id: z.string(), name: z.string(), role: z.string(), attended: z.boolean() })).max(20).optional(),
+        attendanceNotes: z.string().max(2000).optional(),
+        healthNotes: z.string().max(2000).optional(),
+        behaviorNotes: z.string().max(2000).optional(),
+        developmentalNotes: z.string().max(2000).optional(),
+        familyGoalNotes: z.string().max(2000).optional(),
+        actionItems: z.array(z.object({ id: z.string(), description: z.string(), assignedTo: z.string(), dueDate: z.string().nullable(), isCompleted: z.boolean() })).max(20).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const orgId = ctx.user.organizationId!;
+        if (!(await fcm.childBelongsToOrg(input.childId, orgId)) && !isPlatformOwner(ctx.user.openId)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have access to that child." });
+        }
+        const conductedBy = await mod.resolveStaffId(orgId, ctx.user.id);
+        const result = await fcm.createCfcrRecord({
+          organizationId: orgId, childId: input.childId, meetingDate: input.meetingDate,
+          participants: input.participants ?? [], attendanceNotes: input.attendanceNotes ?? undefined,
+          healthNotes: input.healthNotes ?? undefined, behaviorNotes: input.behaviorNotes ?? undefined,
+          developmentalNotes: input.developmentalNotes ?? undefined, familyGoalNotes: input.familyGoalNotes ?? undefined,
+          actionItems: input.actionItems ?? [], conductedBy: conductedBy ?? undefined,
+        });
+        await auditAccess(ctx, { action: "create", resourceType: "cfcr_record", resourceId: result.id, detail: `child:${input.childId}` });
+        return result;
+      }),
+  }),
+
+  // Narrative case-management notes, distinct from the general contact log.
+  familyCaseNotes: router({
+    list: hsStaffProcedure
+      .input(z.object({ familyId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.familyId);
+        return fcm.getFamilyCaseNotes(input.familyId);
+      }),
+    create: hsStaffProcedure
+      .input(z.object({
+        familyId: z.number(),
+        type: z.enum(["home_visit", "phone_call", "office_visit", "incident", "general"]),
+        confidentiality: z.enum(["standard", "sensitive"]).optional(),
+        body: z.string().min(1).max(5000),
+        followUpRequired: z.boolean().optional(),
+        followUpDue: z.date().nullable().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.familyId);
+        const orgId = ctx.user.organizationId!;
+        const authorId = await mod.resolveStaffId(orgId, ctx.user.id);
+        const result = await fcm.createFamilyCaseNote({
+          organizationId: orgId, familyId: input.familyId, type: input.type,
+          confidentiality: input.confidentiality ?? "standard", body: input.body,
+          followUpRequired: input.followUpRequired ? 1 : 0, followUpDue: input.followUpDue ?? undefined,
+          authorId: authorId ?? undefined,
+        });
+        await auditAccess(ctx, { action: "create", resourceType: "family_case_note", resourceId: result.id, detail: `family:${input.familyId}` });
+        return result;
+      }),
+    setFollowUpCompleted: hsStaffProcedure
+      .input(z.object({ id: z.number(), completed: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "familyCaseNote", input.id);
+        const row = await fcm.setCaseNoteFollowUpCompleted(input.id, ctx.user.organizationId!, input.completed);
+        await auditAccess(ctx, { action: "update", resourceType: "family_case_note", resourceId: input.id, detail: "followup" });
+        return row;
+      }),
+  }),
+
+  // Attendance Improvement Plans (AIP) — §1302.16.
+  attendancePlans: router({
+    list: hsStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => {
+        return ap.getAttendancePlans(input.organizationId);
+      }),
+    create: hsStaffProcedure
+      .input(z.object({
+        childId: z.number(),
+        reviewDate: z.date().nullable().optional(),
+        barriers: z.array(z.string().max(255)).max(20).optional(),
+        strategies: z.array(z.string().max(255)).max(20).optional(),
+        notes: z.string().max(2000).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const orgId = ctx.user.organizationId!;
+        if (!(await fcm.childBelongsToOrg(input.childId, orgId)) && !isPlatformOwner(ctx.user.openId)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have access to that child." });
+        }
+        const familyAdvocate = await mod.resolveStaffId(orgId, ctx.user.id);
+        const strategies = (input.strategies ?? []).map((description) => ({ id: randomUUID(), description, isImplemented: false, targetDate: null }));
+        const result = await ap.createAttendancePlan({
+          organizationId: orgId, childId: input.childId, familyAdvocate: familyAdvocate ?? undefined,
+          reviewDate: input.reviewDate ?? undefined, barriers: input.barriers ?? [], strategies,
+          notes: input.notes ?? undefined,
+        });
+        await auditAccess(ctx, { action: "create", resourceType: "attendance_plan", resourceId: result.id, detail: `child:${input.childId}` });
+        return result;
+      }),
+    update: hsStaffProcedure
+      .input(z.object({
+        id: z.number(),
+        status: z.enum(["active", "resolved", "closed"]).optional(),
+        reviewDate: z.date().nullable().optional(),
+        notes: z.string().max(2000).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "attendancePlan", input.id);
+        const { id, ...patch } = input;
+        await ap.updateAttendancePlan(id, ctx.user.organizationId!, patch);
+        await auditAccess(ctx, { action: "update", resourceType: "attendance_plan", resourceId: id, detail: patch.status ?? "update" });
+        return { success: true };
       }),
   }),
 
@@ -1814,35 +2182,35 @@ export const appRouter = router({
   }),
 
   compliance: router({
-    getPir: orgStaffProcedure
+    getPir: hsStaffProcedure
       .input(z.object({ organizationId: z.number(), year: z.string() }))
       .query(async ({ input }) => {
         return await getPirData(input.organizationId, input.year);
       }),
     // PIR question catalog (federal reference data, seeded from the form). Not
     // org-specific, so no tenant scope — any internal staff may read it.
-    questions: staffProcedure.query(async () => {
+    questions: hsStaffProcedure.query(async () => {
       return mod.getPirQuestions();
     }),
     // Full report for a program year: envelope + catalog + saved values.
-    getReport: orgStaffProcedure
+    getReport: hsStaffProcedure
       .input(z.object({ organizationId: z.number(), year: z.string() }))
       .query(async ({ input }) => {
         return mod.getPirReport(input.organizationId, input.year);
       }),
     // All reports for the org, with completion counts — drives the history list.
-    listReports: orgStaffProcedure
+    listReports: hsStaffProcedure
       .input(z.object({ organizationId: z.number() }))
       .query(async ({ input }) => {
         return mod.listPirReports(input.organizationId);
       }),
-    submitReport: orgAdminProcedure
+    submitReport: hsAdminProcedure
       .input(z.object({ organizationId: z.number(), year: z.string() }))
       .mutation(async ({ input, ctx }) => {
         await auditAccess(ctx, { action: "update", resourceType: "pir_report", resourceId: input.year, detail: "submit" });
         return mod.submitPirReport(input.organizationId, input.year);
       }),
-    reopenReport: orgAdminProcedure
+    reopenReport: hsAdminProcedure
       .input(z.object({ organizationId: z.number(), year: z.string() }))
       .mutation(async ({ input, ctx }) => {
         await auditAccess(ctx, { action: "update", resourceType: "pir_report", resourceId: input.year, detail: "reopen" });
@@ -1850,12 +2218,12 @@ export const appRouter = router({
       }),
     // Smart Fill: compute PIR values from live program data. Read-only; the
     // admin reviews and applies suggestions explicitly.
-    autoPopulate: orgStaffProcedure
+    autoPopulate: hsStaffProcedure
       .input(z.object({ organizationId: z.number(), year: z.string() }))
       .query(async ({ input }) => {
         return computePirSuggestions(input.organizationId, input.year);
       }),
-    applyAutoPopulate: orgAdminProcedure
+    applyAutoPopulate: hsAdminProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -1891,7 +2259,7 @@ export const appRouter = router({
         return { applied: input.items.length };
       }),
     // PIR is federal reporting data — edits are administrative.
-    setPirValue: orgAdminProcedure
+    setPirValue: hsAdminProcedure
       .input(
         z.object({
           organizationId: z.number(),

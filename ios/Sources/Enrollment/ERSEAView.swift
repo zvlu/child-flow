@@ -847,11 +847,23 @@ final class ERSEAViewModel: ObservableObject {
 
     private func loadRecords() async -> [EligibilityRecord] {
         do { return try await APIClient.shared.getEligibilityRecords() }
-        catch { return MockData.eligibilityRecords() }
+        catch {
+            #if DEBUG
+            return MockData.eligibilityRecords()
+            #else
+            return []
+            #endif
+        }
     }
 
     private func loadSuspensions() async -> [SuspensionExpulsionLog] {
         do { return try await APIClient.shared.getSuspensionLogs() }
-        catch { return MockData.suspensionLogs() }
+        catch {
+            #if DEBUG
+            return MockData.suspensionLogs()
+            #else
+            return []
+            #endif
+        }
     }
 }

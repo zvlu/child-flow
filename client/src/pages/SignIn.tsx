@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Baby, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 type Mode = "signin" | "signup";
 
 export default function SignIn() {
+  const { user, loading: authLoading } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
   const [programName, setProgramName] = useState("");
   const [name, setName] = useState("");
@@ -16,6 +18,21 @@ export default function SignIn() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Redirect already-authenticated users away from the sign-in page.
+  useEffect(() => {
+    if (!authLoading && user) {
+      window.location.href = "/dashboard";
+    }
+  }, [authLoading, user]);
+
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FBF6EE]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const submit = async () => {
     setError(null);
@@ -46,7 +63,7 @@ export default function SignIn() {
     <div className="min-h-screen bg-[#FBF6EE] flex flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         <div className="flex items-center gap-2 mb-6 justify-center">
-          <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center"><Baby className="h-5 w-5 text-primary" /></div>
+          <img src="/brand/logo-mark-64.png" alt="Sprout" className="w-8 h-8 rounded-lg" />
           <span className="font-bold text-lg tracking-tight text-foreground">Sprout</span>
         </div>
         <Card>
@@ -59,7 +76,7 @@ export default function SignIn() {
           <CardContent className="space-y-4">
             {mode === "signup" && (
               <>
-                <div className="space-y-2"><Label>Program name</Label><Input value={programName} onChange={(e) => setProgramName(e.target.value)} placeholder="Sunshine Head Start" /></div>
+                <div className="space-y-2"><Label>Program name</Label><Input value={programName} onChange={(e) => setProgramName(e.target.value)} placeholder="Sunshine Preschool" /></div>
                 <div className="space-y-2"><Label>Your name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" /></div>
               </>
             )}

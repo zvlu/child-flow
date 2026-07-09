@@ -71,9 +71,13 @@ struct SettingsView: View {
 }
 
 struct ChangePasswordView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var current = ""
     @State private var newPassword = ""
     @State private var confirm = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+    @State private var showSuccess = false
 
     var body: some View {
         List {
@@ -81,13 +85,47 @@ struct ChangePasswordView: View {
                 SecureField("Current Password", text: $current)
                 SecureField("New Password", text: $newPassword)
                 SecureField("Confirm New Password", text: $confirm)
+            } footer: {
+                Text("Password must be at least 8 characters.")
             }
             Section {
-                Button("Update Password") {}
-                    .disabled(newPassword.isEmpty || newPassword != confirm)
+                Button {
+                    update()
+                } label: {
+                    if isSaving {
+                        HStack { Spacer(); ProgressView(); Spacer() }
+                    } else {
+                        Text("Update Password")
+                    }
+                }
+                .disabled(newPassword.count < 8 || newPassword != confirm || isSaving)
             }
         }
         .navigationTitle("Change Password")
+        .alert("Couldn't Update Password", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") { errorMessage = nil }
+        } message: { Text(errorMessage ?? "") }
+        .alert("Password Updated", isPresented: $showSuccess) {
+            Button("OK") { dismiss() }
+        } message: { Text("Your password has been changed.") }
+    }
+
+    private func update() {
+        isSaving = true
+        Task {
+            do {
+                try await APIClient.shared.changePassword(
+                    currentPassword: current.isEmpty ? nil : current,
+                    newPassword: newPassword
+                )
+                showSuccess = true
+            } catch {
+                // This button used to be a no-op `{}` — tapping it did nothing
+                // at all, with no way to tell whether a password was ever set.
+                errorMessage = "Check that your current password is correct, then try again."
+            }
+            isSaving = false
+        }
     }
 }
 
@@ -125,6 +163,11 @@ class SettingsViewModel: ObservableObject {
             programName = settings.programName
             region = settings.region
             fiscalYear = settings.fiscalYear
-        } catch {}
+        } catch {
+            // Read-only info display — worth noting the failure without an
+            // intrusive alert, since there's nothing actionable for the user
+            // to retry beyond pulling to refresh.
+            print("SettingsViewModel.load failed: \(error)")
+        }
     }
 }

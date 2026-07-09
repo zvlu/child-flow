@@ -25,6 +25,8 @@ import {
   enrollmentApplications, InsertEnrollmentApplication,
   inKindContributions, InsertInKindContribution,
   programRequests, InsertProgramRequest, organizations, InsertOrganization,
+  disabilityServices,
+  familyGoals, familyReferrals, familyHomeVisits, cfcrRecords, familyCaseNotes, attendancePlans,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -163,6 +165,13 @@ const ORG_RECORD_TABLES = {
   report: customReports,
   aiInsight: aiInsights,
   staff: staff,
+  disabilityService: disabilityServices,
+  familyGoal: familyGoals,
+  familyReferral: familyReferrals,
+  familyHomeVisit: familyHomeVisits,
+  cfcrRecord: cfcrRecords,
+  familyCaseNote: familyCaseNotes,
+  attendancePlan: attendancePlans,
 } as const;
 export type OrgRecordKind = keyof typeof ORG_RECORD_TABLES;
 
@@ -478,10 +487,32 @@ export async function getDocuments(organizationId: number, childId?: number) {
   return db.select().from(documents).where(where).orderBy(desc(documents.uploadedAt));
 }
 
+/** Same list with the assigned child's name joined in — backs the iOS REST mirror. */
+export async function getDocumentsWithChildNames(organizationId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ doc: documents, childFirst: children.firstName, childLast: children.lastName })
+    .from(documents)
+    .leftJoin(children, eq(documents.childId, children.id))
+    .where(eq(documents.organizationId, organizationId))
+    .orderBy(desc(documents.uploadedAt));
+  return rows.map(r => ({
+    ...r.doc,
+    childName: r.childFirst != null ? `${r.childFirst} ${r.childLast}` : null,
+  }));
+}
+
 export async function createDocument(data: InsertDocument) {
   const db = await requireDb();
   const [result] = await db.insert(documents).values(data);
   return { id: result.insertId };
+}
+
+/** File an unassigned (or re-file an assigned) document to a child. */
+export async function assignDocumentToChild(id: number, organizationId: number, childId: number) {
+  const db = await requireDb();
+  await db.update(documents).set({ childId }).where(and(eq(documents.id, id), eq(documents.organizationId, organizationId)));
+  return { success: true };
 }
 
 export async function deleteDocument(id: number) {
@@ -495,6 +526,24 @@ export async function deleteDocument(id: number) {
 export async function getDigitalDocuments(organizationId: number) {
   const db = await requireDb();
   return db.select().from(digitalDocuments).where(eq(digitalDocuments.organizationId, organizationId)).orderBy(desc(digitalDocuments.createdAt));
+}
+
+/** Same list with the family's display name joined in — backs the iOS REST mirror. */
+export async function getDigitalDocumentsWithFamily(organizationId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ doc: digitalDocuments, familyName: families.primaryContactName })
+    .from(digitalDocuments)
+    .innerJoin(families, eq(digitalDocuments.familyId, families.id))
+    .where(eq(digitalDocuments.organizationId, organizationId))
+    .orderBy(desc(digitalDocuments.createdAt));
+  return rows.map(r => ({ ...r.doc, familyName: r.familyName }));
+}
+
+export async function getDigitalDocument(id: number) {
+  const db = await requireDb();
+  const [row] = await db.select().from(digitalDocuments).where(eq(digitalDocuments.id, id)).limit(1);
+  return row;
 }
 
 export async function createDigitalDocument(data: InsertDigitalDocument) {
@@ -793,6 +842,17 @@ export async function getTimeClockEntryOrgId(entryId: number): Promise<number | 
   return row?.organizationId ?? null;
 }
 
+const CERT_EXPIRING_SOON_DAYS = 60;
+
+/** Live status from expiryDate — never trust the stored `status` column, which is only set at creation and drifts stale as the date approaches. */
+export function certificationStatus(expiryDate: Date | string, now: Date = new Date()): "expired" | "expiring_soon" | "active" {
+  const expiry = new Date(expiryDate);
+  const days = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (days < 0) return "expired";
+  if (days <= CERT_EXPIRING_SOON_DAYS) return "expiring_soon";
+  return "active";
+}
+
 export async function getCertifications(organizationId: number) {
   const db = await requireDb();
   const rows = await db
@@ -801,7 +861,18 @@ export async function getCertifications(organizationId: number) {
     .innerJoin(staff, eq(certifications.staffId, staff.id))
     .where(eq(staff.organizationId, organizationId))
     .orderBy(certifications.expiryDate);
-  return rows.map(r => ({ ...r.cert, staffName: `${r.firstName} ${r.lastName}` }));
+  return rows.map(r => ({ ...r.cert, status: certificationStatus(r.cert.expiryDate), staffName: `${r.firstName} ${r.lastName}` }));
+}
+
+/** Counts behind the credential-expiry summary card / Action Queue. */
+export async function getCertificationExpirySummary(organizationId: number) {
+  const certs = await getCertifications(organizationId);
+  return {
+    expired: certs.filter(c => c.status === "expired").length,
+    expiringSoon: certs.filter(c => c.status === "expiring_soon").length,
+    active: certs.filter(c => c.status === "active").length,
+    total: certs.length,
+  };
 }
 
 export async function createCertification(data: InsertCertification) {

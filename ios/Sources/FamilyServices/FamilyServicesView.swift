@@ -257,6 +257,7 @@ struct LogContactSheet: View {
     @State private var followUpNeeded = false
     @State private var followUpDate = Date().addingTimeInterval(7 * 24 * 3600)
     @State private var isSaving = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -300,6 +301,9 @@ struct LogContactSheet: View {
                         .disabled(isSaving)
                 }
             }
+            .alert("Couldn't Save Contact", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 
@@ -322,21 +326,11 @@ struct LogContactSheet: View {
                     dismiss()
                 }
             } catch {
-                // Optimistic local mock
-                let mock = MonthlyContact(
-                    id: UUID().uuidString,
-                    familyId: familyId,
-                    familyName: "",
-                    date: contactDate,
-                    contactType: contactType,
-                    contactedBy: "Current User",
-                    notes: notes,
-                    followUpNeeded: followUpNeeded,
-                    followUpDate: followUpNeeded ? followUpDate : nil
-                )
+                // Do NOT fabricate a fake success — a network/server failure here
+                // must not look like a saved contact. Surface the error and let
+                // the user retry or cancel without losing what they typed.
                 await MainActor.run {
-                    onSave(mock)
-                    dismiss()
+                    errorMessage = "This contact wasn't saved. Check your connection and try again."
                 }
             }
             isSaving = false
@@ -574,6 +568,7 @@ struct AddGoalSheet: View {
     @State private var hasTargetDate = false
     @State private var steps: [String] = [""]
     @State private var isSaving = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -622,6 +617,9 @@ struct AddGoalSheet: View {
                         .disabled(title.isEmpty || isSaving)
                 }
             }
+            .alert("Couldn't Save Goal", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 
@@ -641,21 +639,10 @@ struct AddGoalSheet: View {
                 let saved = try await APIClient.shared.createGoal(request: request)
                 await MainActor.run { onSave(saved); dismiss() }
             } catch {
-                let mock = FamilyGoal(
-                    id: UUID().uuidString,
-                    familyId: familyId,
-                    title: title,
-                    description: description,
-                    category: category,
-                    status: .notStarted,
-                    targetDate: hasTargetDate ? targetDate : nil,
-                    completedDate: nil,
-                    steps: steps.filter { !$0.isEmpty }.enumerated().map { i, s in
-                        GoalStep(id: UUID().uuidString, title: s, isCompleted: false, dueDate: nil, notes: nil)
-                    },
-                    createdDate: Date()
-                )
-                await MainActor.run { onSave(mock); dismiss() }
+                // Do NOT fabricate a fake success — see LogContactSheet.save().
+                await MainActor.run {
+                    errorMessage = "This goal wasn't saved. Check your connection and try again."
+                }
             }
             isSaving = false
         }
@@ -785,6 +772,7 @@ struct FNAFormSheet: View {
     @State private var ratings: [FNADomainRating]
     @State private var notes = ""
     @State private var isSaving = false
+    @State private var errorMessage: String?
 
     init(familyId: String, familyName: String, existing: FamilyNeedsAssessment?, onSave: @escaping (FamilyNeedsAssessment) -> Void) {
         self.familyId = familyId
@@ -844,6 +832,9 @@ struct FNAFormSheet: View {
                         .disabled(isSaving)
                 }
             }
+            .alert("Couldn't Save Assessment", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 
@@ -854,18 +845,12 @@ struct FNAFormSheet: View {
                 let saved = try await APIClient.shared.saveFNA(familyId: familyId, ratings: ratings, notes: notes)
                 await MainActor.run { onSave(saved); dismiss() }
             } catch {
-                let mock = FamilyNeedsAssessment(
-                    id: existing?.id ?? UUID().uuidString,
-                    familyId: familyId,
-                    familyName: familyName,
-                    conductedBy: "Current User",
-                    conductedDate: Date(),
-                    reviewDate: Calendar.current.date(byAdding: .month, value: 6, to: Date()),
-                    ratings: ratings,
-                    notes: notes,
-                    isComplete: true
-                )
-                await MainActor.run { onSave(mock); dismiss() }
+                // Do NOT fabricate a fake success — see LogContactSheet.save().
+                // An FNA is confidential case documentation; losing it silently
+                // is worse than making the user retry.
+                await MainActor.run {
+                    errorMessage = "This assessment wasn't saved. Check your connection and try again."
+                }
             }
             isSaving = false
         }
@@ -1044,8 +1029,12 @@ struct NewCFCRSheet: View {
     let onSave: (CFCRRecord) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @State private var childId = ""
-    @State private var childName = ""
+    // Picked from this family's real children — a free-typed name has no real
+    // childId to attach the review to, which used to make every CFCR silently
+    // fail server-side (see save()).
+    @State private var familyChildren: [Child] = []
+    @State private var selectedChildId: String?
+    @State private var isLoadingChildren = true
     @State private var classroom = ""
     @State private var meetingDate = Date()
     @State private var attendanceNotes = ""
@@ -1060,12 +1049,29 @@ struct NewCFCRSheet: View {
         ("", "Health Specialist", false)
     ]
     @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private var selectedChild: Child? {
+        familyChildren.first { $0.id == selectedChildId }
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Child & Meeting") {
-                    TextField("Child Name", text: $childName)
+                    if isLoadingChildren {
+                        ProgressView()
+                    } else if familyChildren.isEmpty {
+                        Text("No children found for this family.")
+                            .foregroundColor(.secondary)
+                    } else {
+                        Picker("Child", selection: $selectedChildId) {
+                            Text("Select a child").tag(String?.none)
+                            ForEach(familyChildren) { child in
+                                Text("\(child.firstName) \(child.lastName)").tag(Optional(child.id))
+                            }
+                        }
+                    }
                     TextField("Classroom", text: $classroom)
                     DatePicker("Meeting Date", selection: $meetingDate, displayedComponents: .date)
                 }
@@ -1105,17 +1111,33 @@ struct NewCFCRSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(childName.isEmpty || isSaving)
+                        .disabled(selectedChildId == nil || isSaving)
                 }
+            }
+            .alert("Couldn't Save CFCR", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
+            .task {
+                do {
+                    let all = try await APIClient.shared.getChildren()
+                    familyChildren = all.filter { $0.familyId == familyId }
+                    if familyChildren.count == 1 { selectedChildId = familyChildren.first?.id }
+                } catch {
+                    #if DEBUG
+                    familyChildren = MockData.children.filter { $0.familyId == familyId }
+                    #endif
+                }
+                isLoadingChildren = false
             }
         }
     }
 
     private func save() {
+        guard let child = selectedChild else { return }
         isSaving = true
         let iso = ISO8601DateFormatter()
         let request = NewCFCRRequest(
-            childId: childId.isEmpty ? UUID().uuidString : childId,
+            childId: child.id,
             meetingDate: iso.string(from: meetingDate),
             attendanceNotes: attendanceNotes,
             healthNotes: healthNotes,
@@ -1128,24 +1150,10 @@ struct NewCFCRSheet: View {
                 let saved = try await APIClient.shared.createCFCR(request: request)
                 await MainActor.run { onSave(saved); dismiss() }
             } catch {
-                let mock = CFCRRecord(
-                    id: UUID().uuidString,
-                    childId: request.childId,
-                    childName: childName,
-                    classroom: classroom,
-                    meetingDate: meetingDate,
-                    participants: participants.map { p in
-                        CFCRParticipant(id: UUID().uuidString, name: p.name, role: p.role, attended: p.attended)
-                    },
-                    attendanceNotes: attendanceNotes,
-                    healthNotes: healthNotes,
-                    behaviorNotes: behaviorNotes,
-                    developmentalNotes: developmentalNotes,
-                    familyGoalNotes: familyGoalNotes,
-                    actionItems: [],
-                    conductedBy: "Current User"
-                )
-                await MainActor.run { onSave(mock); dismiss() }
+                // Do NOT fabricate a fake success — see LogContactSheet.save().
+                await MainActor.run {
+                    errorMessage = "This review wasn't saved. Check your connection and try again."
+                }
             }
             isSaving = false
         }
@@ -1770,12 +1778,11 @@ private struct TemplatePickerSheet: View {
     let onSelect: (CaseNoteTemplate) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    var recentVisit: HomeVisitLog? {
-        MockData.visitLogs(for: familyId)
-            .filter { $0.visitType == .homeVisit }
-            .sorted { $0.visitDate > $1.visitDate }
-            .first
-    }
+    // Was: computed straight from MockData with no network call at all, and
+    // labeled "Live Data" in the UI even though it could never be anything
+    // but the fixture. Now loaded for real, and the section just doesn't
+    // appear if there's no actual recent visit to import from.
+    @State private var recentVisit: HomeVisitLog?
 
     var body: some View {
         NavigationStack {
@@ -1831,6 +1838,22 @@ private struct TemplatePickerSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                }
+            }
+            .task {
+                do {
+                    let visits = try await APIClient.shared.getVisitLogs(familyId: familyId)
+                    recentVisit = visits
+                        .filter { $0.visitType == .homeVisit }
+                        .sorted { $0.visitDate > $1.visitDate }
+                        .first
+                } catch {
+                    #if DEBUG
+                    recentVisit = MockData.visitLogs(for: familyId)
+                        .filter { $0.visitType == .homeVisit }
+                        .sorted { $0.visitDate > $1.visitDate }
+                        .first
+                    #endif
                 }
             }
         }
@@ -1897,6 +1920,7 @@ struct NewCaseNoteSheet: View {
     @State private var isSaving = false
     @State private var showTemplatePicker = true    // open template picker immediately
     @State private var appliedTemplate: String? = nil
+    @State private var errorMessage: String?
     @FocusState private var editorFocused: Bool
 
     var body: some View {
@@ -2018,6 +2042,9 @@ struct NewCaseNoteSheet: View {
                     appliedTemplate = template.title
                 }
             }
+            .alert("Couldn't Save Note", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 
@@ -2036,17 +2063,15 @@ struct NewCaseNoteSheet: View {
                 let saved = try await APIClient.shared.createCaseNote(request: request)
                 await MainActor.run { onSave(saved); dismiss() }
             } catch {
-                let local = CaseNote(
-                    id: UUID().uuidString, familyId: familyId,
-                    authorId: "staff-local", authorName: "You",
-                    type: noteType, confidentiality: confidentiality,
-                    body: noteBody, createdAt: Date(),
-                    followUpRequired: followUpRequired,
-                    followUpDue: followUpRequired ? followUpDue : nil,
-                    followUpCompleted: false
-                )
-                await MainActor.run { onSave(local); dismiss() }
+                // A case note is confidential case documentation — fabricating a
+                // fake local success used to make a failed save look identical to
+                // a real one, silently losing the record. Surface the error and
+                // keep the user's text so they can retry instead.
+                await MainActor.run {
+                    errorMessage = "This note wasn't saved. Check your connection and try again."
+                }
             }
+            isSaving = false
         }
     }
 }

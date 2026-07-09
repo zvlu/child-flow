@@ -11,6 +11,8 @@ const DOC_TYPES = [
   { value: "consent_form", label: "Consent Form" },
   { value: "medical_record", label: "Medical Record" },
   { value: "assessment", label: "Assessment" },
+  { value: "iep", label: "IEP / IFSP" },
+  { value: "enrollment", label: "Enrollment Docs" },
   { value: "other", label: "Other" },
 ] as const;
 const DOC_LABEL: Record<string, string> = Object.fromEntries(DOC_TYPES.map((t) => [t.value, t.label]));
@@ -39,6 +41,10 @@ export function DocumentManagement() {
     () => new Map(children.map((c) => [c.id, `${c.firstName} ${c.lastName}`])),
     [children],
   );
+  // childId is nullable — a document can be uploaded (from the iOS app) before
+  // it's filed to a child's profile.
+  const childNameFor = (childId: number | null): string | undefined =>
+    childId != null ? nameById.get(childId) : undefined;
 
   const create = trpc.documents.create.useMutation({
     onSuccess: () => {
@@ -56,7 +62,7 @@ export function DocumentManagement() {
   });
 
   const filtered = documents.filter((doc) => {
-    const childName = nameById.get(doc.childId) ?? "";
+    const childName = childNameFor(doc.childId) ?? "";
     const matchesSearch =
       childName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doc.fileName.toLowerCase().includes(searchTerm.toLowerCase());
@@ -89,7 +95,7 @@ export function DocumentManagement() {
   const onDelete = async (doc: (typeof documents)[number]) => {
     if (await confirm({
       title: "Remove this document?",
-      description: `"${doc.fileName}" for ${nameById.get(doc.childId) ?? "this child"} will be permanently removed.`,
+      description: `"${doc.fileName}" for ${childNameFor(doc.childId) ?? "this child"} will be permanently removed.`,
       confirmLabel: "Remove",
       destructive: true,
     })) del.mutate(doc.id);
@@ -154,7 +160,7 @@ export function DocumentManagement() {
                     <FileText className="w-6 h-6 text-[#4F7C5D]" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-foreground truncate">{nameById.get(doc.childId) ?? `Child #${doc.childId}`}</h3>
+                    <h3 className="font-semibold text-foreground truncate">{childNameFor(doc.childId) ?? (doc.childId != null ? `Child #${doc.childId}` : "Unassigned")}</h3>
                     <p className="text-sm text-muted-foreground">{DOC_LABEL[doc.documentType] ?? doc.documentType}</p>
                   </div>
                 </div>

@@ -1,4 +1,5 @@
 import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
+import type { ModuleId } from '@shared/modules';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { User } from "../../drizzle/schema";
@@ -6,6 +7,7 @@ import type { TrpcContext } from "./context";
 import { clientIpFromReq } from "./audit";
 import { insertAuditLog } from "../db";
 import { isPlatformOwner } from "./env";
+import { MODULE_DISABLED_ERR_MSG, orgHasModule } from "./modules";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -112,6 +114,42 @@ export const orgStaffProcedure = t.procedure.use(requireRole(["admin", "staff"])
 
 /** Admin, additionally tenant-scoped. */
 export const orgAdminProcedure = t.procedure.use(requireRole(["admin"])).use(enforceOrgScope);
+
+// ---- Optional-module gating -------------------------------------------------
+
+/**
+ * Feature-module gate: the caller's org must have the module enabled. The
+ * platform owner is exempt (manages every org). Denied attempts are
+ * audit-logged like the role gate. Compose AFTER a role/org-scope middleware.
+ */
+const requireModule = (id: ModuleId) =>
+  t.middleware(async ({ ctx, next, path }) => {
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    }
+    if (!isPlatformOwner(ctx.user.openId)) {
+      const orgId = ctx.user.organizationId;
+      if (orgId == null || !(await orgHasModule(orgId, id))) {
+        await insertAuditLog({
+          userId: ctx.user.id,
+          actorOpenId: ctx.user.openId,
+          action: "access_denied",
+          resourceType: "module_gate",
+          resourceId: path,
+          ipAddress: clientIpFromReq(ctx.req),
+          detail: `module=${id} org=${orgId ?? "none"}`,
+        });
+        throw new TRPCError({ code: "FORBIDDEN", message: MODULE_DISABLED_ERR_MSG });
+      }
+    }
+    return next({ ctx: { ...ctx, user: ctx.user } });
+  });
+
+/** Staff/admin + tenant-scoped + Head Start module enabled. */
+export const hsStaffProcedure = orgStaffProcedure.use(requireModule("head_start"));
+
+/** Admin + tenant-scoped + Head Start module enabled. */
+export const hsAdminProcedure = orgAdminProcedure.use(requireModule("head_start"));
 
 /**
  * Platform owner (super-admin) gate for cross-organization management. Denied

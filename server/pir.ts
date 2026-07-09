@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { organizations, pirQuestions, type User } from "../drizzle/schema";
 import { sdk } from "./_core/sdk";
 import { clientIpFromReq } from "./_core/audit";
+import { userHasModule } from "./_core/modules";
 import { getDb, insertAuditLog } from "./db";
 import {
   getPirQuestions,
@@ -29,7 +30,9 @@ import {
 async function requireStaff(req: Request): Promise<User | null> {
   try {
     const user = await sdk.authenticateRequest(req);
-    return user.role === "admin" || user.role === "staff" ? user : null;
+    if (user.role !== "admin" && user.role !== "staff") return null;
+    // PIR is part of the Head Start module — the caller's org must have it on.
+    return (await userHasModule(user, "head_start")) ? user : null;
   } catch {
     return null;
   }
@@ -38,7 +41,8 @@ async function requireStaff(req: Request): Promise<User | null> {
 async function requireAdmin(req: Request): Promise<User | null> {
   try {
     const user = await sdk.authenticateRequest(req);
-    return user.role === "admin" ? user : null;
+    if (user.role !== "admin") return null;
+    return (await userHasModule(user, "head_start")) ? user : null;
   } catch {
     return null;
   }

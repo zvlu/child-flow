@@ -1,18 +1,29 @@
-import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, lte, or } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
 import {
   absenceReports,
   attendance,
+  attendancePlans,
+  calendarEvents,
   chatMessages,
   children,
+  classrooms,
+  childClassroomAssignments,
   communicationLogs,
   conversations,
   digitalDocuments,
+  documents,
+  families,
+  familyCaseNotes,
+  familyNeedsAssessments,
   organizations,
+  staff,
   type User,
 } from "../drizzle/schema";
 import { sdk } from "./_core/sdk";
 import { getDb, getHealthFollowUpAlerts } from "./db";
+import { resolveStaffId } from "./moduleDb";
+import { userHasModule } from "./_core/modules";
 
 /**
  * REST dashboard endpoint for the staff iOS app (GET /api/dashboard/stats).
@@ -34,20 +45,82 @@ async function requireStaff(req: Request): Promise<User | null> {
 
 export type DashboardAlert = { id: string; title: string; description: string; type: string; filter?: string };
 
+export type DashboardCaseloadChild = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  attendanceStatus: "present" | "absent" | "unknown";
+};
+
+/**
+ * `type` + the fields needed to reconstruct the matching iOS
+ * `DashboardTask.TaskDestination` case client-side (see DashboardView.swift):
+ *   "documentSign" -> .documentSign(familyName:, documentType:)
+ *   "healthRecord" -> .healthRecord(childName:, category:)
+ *   "family"       -> .family(name:, tab:)
+ *   "attendance"   -> .attendance
+ */
+export type DashboardTaskItem = {
+  id: string;
+  title: string;
+  dueLabel: string;
+  urgency: "overdue" | "today" | "upcoming";
+  type: "documentSign" | "healthRecord" | "family" | "attendance";
+  familyName?: string;
+  documentType?: string;
+  childName?: string;
+  category?: string;
+  tab?: string;
+};
+
+/** `type` mirrors DashboardTaskItem's convention: "messages" | "familyServices". */
+export type DashboardAgendaItem = {
+  id: string;
+  timeLabel: string;
+  title: string;
+  subtitle?: string | null;
+  colorType: string;
+  type: "messages" | "familyServices";
+};
+
+const HEALTH_CATEGORY_MAP: Record<string, string> = {
+  immunization: "immunizations",
+  physical: "physical",
+  dental: "dental",
+  vision: "vision",
+  hearing: "hearing",
+};
+
+/** "Overdue" / "Due today" / "Due Jul 14" relative to today, local time. */
+function dueLabelFor(date: Date, now: Date): { label: string; urgency: "overdue" | "today" | "upcoming" } {
+  const startToday = new Date(now);
+  startToday.setHours(0, 0, 0, 0);
+  const diffDays = Math.floor((date.getTime() - startToday.getTime()) / (24 * 60 * 60 * 1000));
+  if (diffDays < 0) return { label: "Overdue", urgency: "overdue" };
+  if (diffDays === 0) return { label: "Due today", urgency: "today" };
+  return { label: `Due ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`, urgency: "upcoming" };
+}
+
 /**
  * Shared dashboard computation — stats + actionable alerts from live data.
  * Used by both the REST /api/dashboard/stats endpoint (iOS) and the
  * dashboard.alerts tRPC query (web notification bell). Returns null if the DB
  * is unavailable.
  */
-export async function computeDashboard(organizationId: number | null) {
+export async function computeDashboard(user: User) {
     const db = await getDb();
     if (!db) return null;
 
     // Scope to the caller's organization; no first-org fallback.
-    const org = organizationId != null ? { id: organizationId } : null;
+    const org = user.organizationId != null ? { id: user.organizationId } : null;
     if (!org) {
-      return { stats: { totalEnrolled: 0, attendanceRate: 0, healthDue: 0, complianceScore: 0 }, alerts: [] as DashboardAlert[] };
+      return {
+        stats: { totalEnrolled: 0, attendanceRate: 0, healthDue: 0, complianceScore: 0 },
+        alerts: [] as DashboardAlert[],
+        caseload: [] as DashboardCaseloadChild[],
+        tasks: [] as DashboardTaskItem[],
+        agenda: [] as DashboardAgendaItem[],
+      };
     }
 
     const kids = await db
@@ -98,13 +171,15 @@ export async function computeDashboard(organizationId: number | null) {
 
     // --- Unread parent messages (in-app conversations) ---
     let unreadFromParents = 0;
+    let lastUnreadPreview: { familyName: string; body: string; sentAt: Date } | null = null;
     const threads = await db
-      .select()
+      .select({ id: conversations.id, familyId: conversations.familyId, staffLastReadAt: conversations.staffLastReadAt, familyName: families.primaryContactName })
       .from(conversations)
+      .innerJoin(families, eq(conversations.familyId, families.id))
       .where(and(eq(conversations.organizationId, org.id), eq(conversations.isActive, 1)));
     for (const t of threads) {
       const [latestFromFamily] = await db
-        .select({ sentAt: chatMessages.sentAt })
+        .select({ sentAt: chatMessages.sentAt, body: chatMessages.body })
         .from(chatMessages)
         .where(and(eq(chatMessages.conversationId, t.id), eq(chatMessages.senderRole, "family")))
         .orderBy(desc(chatMessages.sentAt), desc(chatMessages.id))
@@ -114,6 +189,9 @@ export async function computeDashboard(organizationId: number | null) {
         (t.staffLastReadAt == null || latestFromFamily.sentAt > t.staffLastReadAt)
       ) {
         unreadFromParents++;
+        if (!lastUnreadPreview || latestFromFamily.sentAt > lastUnreadPreview.sentAt) {
+          lastUnreadPreview = { familyName: t.familyName, body: latestFromFamily.body, sentAt: latestFromFamily.sentAt };
+        }
       }
     }
 
@@ -217,6 +295,149 @@ export async function computeDashboard(organizationId: number | null) {
       });
     }
 
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    // --- My Caseload: children in classrooms this staff member teaches/assists ---
+    const staffId = await resolveStaffId(org.id, user.id);
+    let myKids = kids;
+    if (staffId != null) {
+      const myRooms = await db
+        .select({ id: classrooms.id })
+        .from(classrooms)
+        .where(and(eq(classrooms.organizationId, org.id), or(eq(classrooms.teacherId, staffId), eq(classrooms.assistantId, staffId))));
+      if (myRooms.length > 0) {
+        const roomIds = myRooms.map(r => r.id);
+        const assigned = await db
+          .select({ childId: childClassroomAssignments.childId })
+          .from(childClassroomAssignments)
+          .where(and(inArray(childClassroomAssignments.classroomId, roomIds), eq(childClassroomAssignments.isActive, 1)));
+        const idSet = new Set(assigned.map(a => a.childId));
+        myKids = kids.filter(k => idSet.has(k.id));
+      }
+    }
+    // No classroom assignment (admin, family advocate, etc.) — fall back to the
+    // org roster rather than showing an empty "my caseload" widget.
+    if (myKids.length === 0) myKids = kids;
+    myKids = [...myKids].sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
+
+    const todayAttendance = await db
+      .select({ childId: attendance.childId, status: attendance.status })
+      .from(attendance)
+      .where(and(eq(attendance.organizationId, org.id), gte(attendance.date, startOfToday), lte(attendance.date, endOfToday)));
+    const statusByChild = new Map(todayAttendance.map(r => [r.childId, r.status]));
+    const caseload: DashboardCaseloadChild[] = myKids.slice(0, 8).map(c => {
+      const raw = statusByChild.get(c.id);
+      const attendanceStatus: DashboardCaseloadChild["attendanceStatus"] =
+        raw === "present" || raw === "half_day" ? "present" : raw === "absent" || raw === "excused" ? "absent" : "unknown";
+      return { id: String(c.id), firstName: c.firstName, lastName: c.lastName, attendanceStatus };
+    });
+
+    // --- Pending Tasks: real due/overdue work, not a fixed demo list ---
+    const tasks: DashboardTaskItem[] = [];
+
+    const docTaskRows = await db
+      .select({
+        id: digitalDocuments.id,
+        documentType: digitalDocuments.documentType,
+        expiresAt: digitalDocuments.expiresAt,
+        familyName: families.primaryContactName,
+      })
+      .from(digitalDocuments)
+      .innerJoin(families, eq(digitalDocuments.familyId, families.id))
+      .where(and(eq(digitalDocuments.organizationId, org.id), eq(digitalDocuments.status, "pending")));
+    for (const d of docTaskRows) {
+      const due = d.expiresAt ? dueLabelFor(new Date(d.expiresAt), now) : { label: "Needs signature", urgency: "upcoming" as const };
+      tasks.push({
+        id: `doc-${d.id}`,
+        title: `Sign ${d.familyName}'s ${d.documentType.replace(/_/g, " ")} form`,
+        dueLabel: due.label,
+        urgency: due.urgency,
+        type: "documentSign",
+        familyName: d.familyName,
+        documentType: d.documentType,
+      });
+    }
+
+    for (const a of healthAlerts.slice(0, 5)) {
+      const due = dueLabelFor(new Date(a.expiryDate), now);
+      tasks.push({
+        id: `health-${a.recordId}`,
+        title: `${a.type === "immunization" ? "Update" : "Schedule"} ${a.childName}'s ${a.type} ${a.type === "immunization" ? "record" : "screening"}`,
+        dueLabel: due.label,
+        urgency: a.severity === "overdue" ? "overdue" : due.urgency,
+        type: "healthRecord",
+        childName: a.childName,
+        category: HEALTH_CATEGORY_MAP[a.type] ?? a.type,
+      });
+    }
+
+    // Head Start-only task sources — skipped entirely for orgs without the module.
+    if (await userHasModule(user, "head_start")) {
+      const fnaRows = await db
+        .select({ id: familyNeedsAssessments.id, familyName: families.primaryContactName })
+        .from(familyNeedsAssessments)
+        .innerJoin(families, eq(familyNeedsAssessments.familyId, families.id))
+        .where(and(eq(familyNeedsAssessments.organizationId, org.id), lt(familyNeedsAssessments.reviewDate, now)));
+      for (const f of fnaRows) {
+        tasks.push({ id: `fna-${f.id}`, title: `Review ${f.familyName}'s Family Needs Assessment`, dueLabel: "Overdue", urgency: "overdue", type: "family", familyName: f.familyName, tab: "fna" });
+      }
+
+      const noteRows = await db
+        .select({ id: familyCaseNotes.id, familyName: families.primaryContactName })
+        .from(familyCaseNotes)
+        .innerJoin(families, eq(familyCaseNotes.familyId, families.id))
+        .where(and(
+          eq(familyCaseNotes.organizationId, org.id),
+          eq(familyCaseNotes.followUpRequired, 1),
+          eq(familyCaseNotes.followUpCompleted, 0),
+          lt(familyCaseNotes.followUpDue, now),
+        ));
+      for (const n of noteRows) {
+        tasks.push({ id: `note-${n.id}`, title: `Follow up with ${n.familyName} (case note)`, dueLabel: "Overdue", urgency: "overdue", type: "family", familyName: n.familyName, tab: "notes" });
+      }
+
+      const planRows = await db
+        .select({ id: attendancePlans.id, childId: attendancePlans.childId })
+        .from(attendancePlans)
+        .where(and(eq(attendancePlans.organizationId, org.id), eq(attendancePlans.status, "active"), lt(attendancePlans.reviewDate, now)));
+      if (planRows.length > 0) {
+        const nameById = new Map(kids.map(k => [k.id, `${k.firstName} ${k.lastName}`]));
+        for (const p of planRows) {
+          tasks.push({ id: `plan-${p.id}`, title: `Review ${nameById.get(p.childId) ?? "a child"}'s attendance plan`, dueLabel: "Overdue", urgency: "overdue", type: "attendance" });
+        }
+      }
+    }
+
+    const urgencyOrder = { overdue: 0, today: 1, upcoming: 2 } as const;
+    tasks.sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency]);
+    const cappedTasks = tasks.slice(0, 8);
+
+    // --- Today's Agenda: real calendar events, not invented meetings ---
+    const todaysEvents = await db
+      .select()
+      .from(calendarEvents)
+      .where(and(eq(calendarEvents.organizationId, org.id), gte(calendarEvents.startDate, startOfToday), lte(calendarEvents.startDate, endOfToday)))
+      .orderBy(calendarEvents.startDate);
+    const agenda: DashboardAgendaItem[] = todaysEvents.slice(0, 6).map(e => ({
+      id: `event-${e.id}`,
+      timeLabel: e.allDay ? "All day" : new Date(e.startDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+      title: e.title,
+      subtitle: e.location || null,
+      colorType: e.eventType ?? "other",
+      // Calendar events aren't tied to a specific screen, so route by type: staff/
+      // parent-facing events land on Messages, everything else on Family Services.
+      type: e.eventType === "parent_event" || e.eventType === "staff_training" ? "messages" : "familyServices",
+    }));
+
+    const totalDocuments = await db
+      .select({ id: documents.id })
+      .from(documents)
+      .where(eq(documents.organizationId, org.id));
+
     return {
       stats: {
         totalEnrolled: kids.length,
@@ -225,6 +446,17 @@ export async function computeDashboard(organizationId: number | null) {
         complianceScore,
       },
       alerts,
+      caseload,
+      tasks: cappedTasks,
+      agenda,
+      inbox: {
+        unreadMessageCount: unreadFromParents,
+        lastMessagePreview: lastUnreadPreview ? `${lastUnreadPreview.familyName}: ${lastUnreadPreview.body}` : "",
+      },
+      documents: {
+        totalDocumentCount: totalDocuments.length,
+        pendingDocumentCount: pendingDocs.length,
+      },
     };
 }
 
@@ -235,7 +467,7 @@ export function registerDashboardRoutes(app: Express) {
       res.status(401).json({ error: "Please sign in again" });
       return;
     }
-    const data = await computeDashboard(user.organizationId);
+    const data = await computeDashboard(user);
     if (!data) {
       res.status(500).json({ error: "Database not available" });
       return;

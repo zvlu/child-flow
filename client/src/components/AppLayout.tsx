@@ -30,7 +30,6 @@ import {
   Moon,
   LogOut,
   UserCircle,
-  Baby,
   BookOpen,
   Printer,
   Briefcase,
@@ -59,6 +58,7 @@ import {
   applyTopNav,
   applySideNav,
 } from "@/config/nav";
+import { useOrgModules } from "@/hooks/useOrgModules";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -76,8 +76,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const navPrefs = (user as any)?.settings?.navigation ?? null;
   const navRole = ((user as any)?.role ?? "staff") as "admin" | "staff" | "parent";
   const isOwner = Boolean((user as any)?.isOwner);
-  const effectiveTopNav = applyTopNav(navPrefs, navRole);
-  const effectiveSideSections = applySideNav(navPrefs, navRole);
+  const orgModules = useOrgModules();
+  const effectiveTopNav = applyTopNav(navPrefs, navRole, orgModules);
+  const effectiveSideSections = applySideNav(navPrefs, navRole, orgModules);
   const topNavPrimaryItems = effectiveTopNav.slice(0, TOP_NAV_PRIMARY_COUNT);
   const topNavOverflowItems = effectiveTopNav.slice(TOP_NAV_PRIMARY_COUNT);
 
@@ -130,6 +131,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
     );
   }
 
+  if (!user) {
+    navigate("/signin");
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   const initials = user?.name
     ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
     : "S";
@@ -148,9 +158,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <Menu className="h-4 w-4" />
         </Button>
         <div className="flex items-center gap-2 mr-4">
-          <div className="w-7 h-7 rounded-lg bg-card/20 flex items-center justify-center">
-            <Baby className="h-4 w-4 text-white" />
-          </div>
+          <img src="/brand/logo-mark-64.png" alt="Sprout" className="w-7 h-7 rounded-lg" />
           <span className="font-bold text-base tracking-tight">Sprout</span>
         </div>
         

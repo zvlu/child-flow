@@ -37,6 +37,13 @@ class AppState: ObservableObject {
     /// timesheet approval. The server enforces every permission regardless.
     var isAdmin: Bool { currentUser?.role == "admin" }
 
+    /// Whether the signed-in user's org has a feature module enabled (e.g.
+    /// Head Start compliance). Presentation only — the server enforces access
+    /// independently on every gated route.
+    func hasModule(_ module: FeatureModule) -> Bool {
+        currentUser?.enabledModules.contains(module.rawValue) ?? false
+    }
+
     /// Restore the session if a token is present in the Keychain, then load
     /// the user's profile (name + role) so the UI can gate admin functions.
     func checkAuth() async {

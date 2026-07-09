@@ -92,8 +92,8 @@ export default function OrgAdmin() {
             <DialogHeader><DialogTitle>Create Organization</DialogTitle></DialogHeader>
             <div className="space-y-4 py-2">
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Program Name</Label><Input placeholder="Sunshine Head Start" value={form.name} onChange={(e) => set("name")(e.target.value)} /></div>
-                <div className="space-y-2"><Label>Agency ID</Label><Input placeholder="HS-CA-00000" value={form.agencyId} onChange={(e) => set("agencyId")(e.target.value)} /></div>
+                <div className="space-y-2"><Label>Program Name</Label><Input placeholder="Sunshine Preschool" value={form.name} onChange={(e) => set("name")(e.target.value)} /></div>
+                <div className="space-y-2"><Label>Agency ID</Label><Input placeholder="Grantee or internal ID" value={form.agencyId} onChange={(e) => set("agencyId")(e.target.value)} /></div>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">

@@ -42,6 +42,9 @@ struct ReportsView: View {
         .sheet(item: $viewModel.activeReport) { report in
             ReportPreviewSheet(report: report)
         }
+        .alert("Couldn't Generate Report", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") { viewModel.errorMessage = nil }
+        } message: { Text(viewModel.errorMessage ?? "") }
         .overlay {
             if viewModel.isGenerating {
                 ZStack {
@@ -378,24 +381,33 @@ class ReportsViewModel: ObservableObject {
     @Published var activeReport: GeneratedReport? = nil
     @Published var isGenerating = false
     @Published var generatingType: ReportType? = nil
+    @Published var errorMessage: String?
 
     func generate(_ type: ReportType) {
         guard !isGenerating else { return }
         isGenerating = true
         generatingType = type
         Task {
-            // Simulate generation delay
-            try? await Task.sleep(nanoseconds: 800_000_000)
             do {
                 activeReport = try await APIClient.shared.generateReport(type: type.rawValue)
             } catch {
-                // Offline mock
+                // This used to silently swap in a fabricated "offline mock"
+                // report whose own template text claimed it was "generated
+                // from program records" — completely fake data presented as
+                // real, with no visual difference from an actual report.
+                // NOTE: there is currently no backend route for
+                // /api/reports/generate at all, so this always fails; report
+                // generation needs a real server-side implementation per type.
+                #if DEBUG
                 activeReport = GeneratedReport(
                     id: UUID().uuidString,
                     title: type.displayName,
                     content: type.mockContent(date: Date()),
                     generatedAt: Date()
                 )
+                #else
+                errorMessage = "Report generation isn't available yet. Check back soon."
+                #endif
             }
             isGenerating = false
             generatingType = nil

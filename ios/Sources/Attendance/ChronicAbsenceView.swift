@@ -638,7 +638,13 @@ final class ChronicAbsenceViewModel: ObservableObject {
 
     private func loadAlerts() async -> [ChronicAbsenceAlert] {
         do { return try await APIClient.shared.getChronicAbsenceAlerts() }
-        catch { return MockData.chronicAbsenceAlerts() }
+        catch {
+            #if DEBUG
+            return MockData.chronicAbsenceAlerts()
+            #else
+            return []
+            #endif
+        }
     }
 
     private func loadPlans() async -> [AttendanceSuccessPlan] {

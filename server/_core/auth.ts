@@ -1,4 +1,5 @@
 import { MOBILE_SESSION_TTL_MS, COOKIE_NAME, WEB_SESSION_IDLE_TTL_MS } from "@shared/const";
+import { hasModule, MODULE_IDS } from "@shared/modules";
 import type { Express, Request, Response } from "express";
 import { randomUUID } from "crypto";
 import * as db from "../db";
@@ -26,6 +27,8 @@ function throttled(req: Request, res: Response, action: string, max: number, win
 async function setWebSession(req: Request, res: Response, openId: string, name: string) {
   const token = await sdk.createSessionToken(openId, { name, expiresInMs: WEB_SESSION_IDLE_TTL_MS });
   res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(req), maxAge: WEB_SESSION_IDLE_TTL_MS });
+  // Clear the dev-bypass opt-out flag so bypass can kick in again after next logout.
+  res.clearCookie("__sprout_no_bypass", { httpOnly: true, sameSite: "strict" });
 }
 
 /**
@@ -62,11 +65,20 @@ export function registerAuthRoutes(app: Express) {
   app.get("/api/auth/me", async (req: Request, res: Response) => {
     try {
       const user = await sdk.authenticateRequest(req);
+      // Modules the caller's org has enabled (e.g. "head_start"), so the iOS
+      // app can hide module-gated screens for core-only orgs. The server
+      // enforces every permission independently — this is presentation only.
+      let enabledModules: string[] = [];
+      if (user.organizationId != null) {
+        const org = await db.getOrganizationById(user.organizationId);
+        enabledModules = MODULE_IDS.filter((m) => hasModule(org, m));
+      }
       res.json({
         id: String(user.id),
         fullName: user.name ?? "",
         email: user.email ?? "",
         role: user.role,
+        enabledModules,
       });
     } catch {
       res.status(401).json({ error: "Please sign in again" });

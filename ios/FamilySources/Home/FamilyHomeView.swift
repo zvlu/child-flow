@@ -124,6 +124,9 @@ struct FamilyHomeView: View {
                     await viewModel.load()
                 }
             }
+            .alert("Couldn't Update Check-In", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK") { viewModel.errorMessage = nil }
+            } message: { Text(viewModel.errorMessage ?? "") }
         }
     }
 }
@@ -602,6 +605,7 @@ class FamilyHomeViewModel: ObservableObject {
     @Published var attendanceToday: [String: FamilyAttendanceToday] = [:]
     @Published var busyChildId: String? = nil
     @Published var isLoading = false
+    @Published var errorMessage: String?
 
     /// Children for the report-absence sheet when the profile isn't cached.
     var profileChildren: [FamilyChild] { children }
@@ -634,7 +638,11 @@ class FamilyHomeViewModel: ObservableObject {
         do {
             try await APIClient.shared.checkInChild(childId: childId)
             await loadAttendance()
-        } catch {}
+        } catch {
+            // Used to be `catch {}` — a failed check-in looked identical to a
+            // successful one, since the button just did nothing either way.
+            errorMessage = "Check-in didn't go through. Check your connection and try again."
+        }
     }
 
     func checkOut(_ childId: String) async {
@@ -643,6 +651,8 @@ class FamilyHomeViewModel: ObservableObject {
         do {
             try await APIClient.shared.checkOutChild(childId: childId)
             await loadAttendance()
-        } catch {}
+        } catch {
+            errorMessage = "Check-out didn't go through. Check your connection and try again."
+        }
     }
 }

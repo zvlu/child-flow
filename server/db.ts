@@ -226,7 +226,7 @@ export async function getOrganizationById(id: number) {
 export async function updateOrganization(
   id: number,
   data: Partial<Pick<typeof organizations.$inferInsert,
-    "name" | "director" | "directorEmail" | "phone" | "address" | "maxChildren" | "classroomCount" | "maxStaff" | "subscriptionTier">>
+    "name" | "director" | "directorEmail" | "phone" | "address" | "maxChildren" | "classroomCount" | "maxStaff" | "subscriptionTier" | "enabledModules">>
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

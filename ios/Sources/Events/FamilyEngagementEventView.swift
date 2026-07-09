@@ -139,6 +139,7 @@ struct EventDetailView: View {
     @State var event: FamilyEngagementEvent
     let onUpdate: () -> Void
     @State private var selectedPhase = 0
+    @State private var errorMessage: String?
     private let phases = ["Pre-Event", "Day Of", "Post-Event"]
 
     var currentChecklist: Binding<[EventChecklistItem]> {
@@ -221,6 +222,9 @@ struct EventDetailView: View {
         }
         .navigationTitle(event.title)
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Couldn't Save Change", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") { errorMessage = nil }
+        } message: { Text(errorMessage ?? "") }
     }
 
     private func saveUpdate() {
@@ -228,7 +232,11 @@ struct EventDetailView: View {
             do {
                 _ = try await APIClient.shared.updateEvent(event: event)
                 onUpdate()
-            } catch {}
+            } catch {
+                // Previously silent — the checkbox toggled locally even when the
+                // change never reached the server, so it looked saved either way.
+                errorMessage = "This checklist change wasn't saved. Check your connection and try again."
+            }
         }
     }
 }

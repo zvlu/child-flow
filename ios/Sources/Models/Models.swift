@@ -6,10 +6,39 @@ struct User: Codable, Identifiable {
     let fullName: String
     let email: String
     let role: String
+    /// Optional feature modules enabled for this user's org, e.g. ["head_start"].
+    /// Absent in older/mocked payloads, so default to empty rather than fail decoding.
+    var enabledModules: [String] = []
 
     var initials: String {
         fullName.split(separator: " ").compactMap { $0.first }.map(String.init).joined()
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, fullName, email, role, enabledModules
+    }
+
+    init(id: String, fullName: String, email: String, role: String, enabledModules: [String] = []) {
+        self.id = id
+        self.fullName = fullName
+        self.email = email
+        self.role = role
+        self.enabledModules = enabledModules
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        fullName = try c.decode(String.self, forKey: .fullName)
+        email = try c.decode(String.self, forKey: .email)
+        role = try c.decode(String.self, forKey: .role)
+        enabledModules = try c.decodeIfPresent([String].self, forKey: .enabledModules) ?? []
+    }
+}
+
+/// Head Start compliance and other optional feature modules — mirrors shared/modules.ts on the server.
+enum FeatureModule: String {
+    case headStart = "head_start"
 }
 
 // MARK: - Child
@@ -408,9 +437,99 @@ struct ProgramAlert: Codable, Identifiable {
     }
 }
 
+/// Wire format for one "My Caseload" child. `attendanceStatus` is a raw string
+/// ("present" | "absent" | "unknown") mapped to `CaseloadChild.AttendanceStatus`
+/// by the dashboard view model.
+struct DashboardCaseloadItem: Codable, Identifiable {
+    let id: String
+    let firstName: String
+    let lastName: String
+    let attendanceStatus: String
+}
+
+/// Wire format for one pending task. `type` + the optional fields map to a
+/// `DashboardTask.TaskDestination` case client-side:
+///   "documentSign" -> familyName, documentType
+///   "healthRecord" -> childName, category
+///   "family"       -> familyName, tab
+///   "attendance"   -> (no extra fields)
+struct DashboardTaskItemDTO: Codable, Identifiable {
+    let id: String
+    let title: String
+    let dueLabel: String
+    let urgency: String
+    let type: String
+    var familyName: String? = nil
+    var documentType: String? = nil
+    var childName: String? = nil
+    var category: String? = nil
+    var tab: String? = nil
+}
+
+/// Wire format for one today's-agenda item. `type` is "messages" or
+/// "familyServices", matching the destination convention above.
+struct DashboardAgendaItemDTO: Codable, Identifiable {
+    let id: String
+    let timeLabel: String
+    let title: String
+    var subtitle: String? = nil
+    let colorType: String
+    let type: String
+}
+
+struct DashboardInbox: Codable {
+    var unreadMessageCount: Int = 0
+    var lastMessagePreview: String = ""
+}
+
+struct DashboardDocumentsSummary: Codable {
+    var totalDocumentCount: Int = 0
+    var pendingDocumentCount: Int = 0
+}
+
 struct DashboardData: Codable {
     let stats: ProgramStats
     let alerts: [ProgramAlert]
+    var caseload: [DashboardCaseloadItem] = []
+    var tasks: [DashboardTaskItemDTO] = []
+    var agenda: [DashboardAgendaItemDTO] = []
+    var inbox: DashboardInbox? = nil
+    var documents: DashboardDocumentsSummary? = nil
+
+    // Custom init so older/partial payloads (or a server that hasn't deployed
+    // the newer fields yet) decode safely instead of crashing the whole
+    // dashboard load — same convention as User.enabledModules.
+    enum CodingKeys: String, CodingKey {
+        case stats, alerts, caseload, tasks, agenda, inbox, documents
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        stats = try c.decode(ProgramStats.self, forKey: .stats)
+        alerts = try c.decode([ProgramAlert].self, forKey: .alerts)
+        caseload = try c.decodeIfPresent([DashboardCaseloadItem].self, forKey: .caseload) ?? []
+        tasks = try c.decodeIfPresent([DashboardTaskItemDTO].self, forKey: .tasks) ?? []
+        agenda = try c.decodeIfPresent([DashboardAgendaItemDTO].self, forKey: .agenda) ?? []
+        inbox = try c.decodeIfPresent(DashboardInbox.self, forKey: .inbox)
+        documents = try c.decodeIfPresent(DashboardDocumentsSummary.self, forKey: .documents)
+    }
+}
+
+// MARK: - Documents (staff file library)
+/// Wire format for GET/POST /api/documents. `documentType` is the raw server
+/// enum value (e.g. "birth_certificate") — see StaffDocument.DocumentType in
+/// DocumentsView.swift for the display-facing mapping.
+struct StaffDocumentDTO: Codable, Identifiable {
+    let id: String
+    let name: String
+    let documentType: String
+    let fileUrl: String
+    var mimeType: String? = nil
+    var fileSize: Int? = nil
+    var assignedChildId: String? = nil
+    var assignedChildName: String? = nil
+    var expiryDate: String? = nil
+    let uploadedAt: Date
 }
 
 // MARK: - Compliance
@@ -1902,5 +2021,79 @@ func contactTypeLabel(_ key: String) -> String {
     case "coordinated_services": return "Coordinated Services"
     case "monthly_contact": return "Monthly Contact"
     default: return "Other"
+    }
+}
+
+// MARK: - Digital Documents (E-Sign)
+
+struct DigitalDocumentItem: Codable, Identifiable {
+    let id: String
+    let familyId: String
+    let familyName: String
+    let documentType: String
+    let documentUrl: String
+    var status: String
+    var signedBy: String?
+    var signedAt: String?
+    let expiresAt: String?
+    let createdAt: String
+}
+
+func digitalDocumentTypeLabel(_ type: String) -> String {
+    switch type {
+    case "enrollment":  return "Enrollment Packet"
+    case "consent":     return "Consent Form"
+    case "waiver":      return "Waiver"
+    case "health_form": return "Health Form"
+    case "iep":         return "IEP"
+    default:            return "Document"
+    }
+}
+
+// MARK: - Disability Services (IEP/IFSP, §1302.60-63)
+
+struct DisabilityServiceSummary: Codable {
+    let activeEnrollment: Int
+    let childrenWithPlans: Int
+    let pctOfEnrollment: Int
+    let meetsTenPercent: Bool
+    let expiringSoon: Int
+    let parentRightsPending: Int
+    var records: [DisabilityRecord]
+}
+
+struct DisabilityRecord: Codable, Identifiable {
+    let id: String
+    let childId: String
+    let childName: String
+    let planType: String
+    var status: String
+    var primaryDisability: String?
+    var effectiveDate: String?
+    var expirationDate: String?
+    var leaAgency: String?
+    var leaContact: String?
+    var parentRightsNotifiedAt: String?
+    var parentRightsLanguage: String?
+    var transitionChecklist: [String]
+    var notes: String?
+}
+
+func disabilityPlanTypeLabel(_ type: String) -> String {
+    switch type {
+    case "iep":         return "IEP"
+    case "ifsp":        return "IFSP"
+    case "section_504": return "Section 504"
+    default:            return type
+    }
+}
+
+func disabilityStatusLabel(_ status: String) -> String {
+    switch status {
+    case "pending_evaluation": return "Pending Evaluation"
+    case "active":              return "Active"
+    case "expired":             return "Expired"
+    case "exited":               return "Exited"
+    default:                    return status
     }
 }

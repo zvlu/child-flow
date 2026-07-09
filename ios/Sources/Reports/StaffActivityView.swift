@@ -47,9 +47,9 @@ struct StaffActivityView: View {
             if let r = vm.report {
                 Section {
                     HStack(spacing: 10) {
-                        StatPill(value: "\(r.totals.total)", label: "Contacts", color: .cfPrimary)
-                        StatPill(value: "\(r.staff.filter { $0.total > 0 }.count)/\(r.staff.count)", label: "Active", color: .cfGoals)
-                        StatPill(value: "\(r.totals.byType["monthly_contact"] ?? 0)", label: "Monthly", color: .cfAttendance)
+                        ActivityStatPill(value: "\(r.totals.total)", label: "Contacts", color: .cfPrimary)
+                        ActivityStatPill(value: "\(r.staff.filter { $0.total > 0 }.count)/\(r.staff.count)", label: "Active", color: .cfGoals)
+                        ActivityStatPill(value: "\(r.totals.byType["monthly_contact"] ?? 0)", label: "Monthly", color: .cfAttendance)
                     }
                     .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                 }
@@ -85,7 +85,7 @@ struct StaffActivityView: View {
     }
 }
 
-private struct StatPill: View {
+private struct ActivityStatPill: View {
     let value: String
     let label: String
     let color: Color

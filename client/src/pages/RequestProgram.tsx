@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Baby, CheckCircle2, Loader2, ArrowLeft } from "lucide-react";
+import { CheckCircle2, Loader2, ArrowLeft } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -40,9 +40,7 @@ export default function RequestProgram() {
     <div className="min-h-screen bg-[#FBF6EE] flex flex-col items-center px-4 py-10">
       <div className="w-full max-w-xl">
         <div className="flex items-center gap-2 mb-6">
-          <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
-            <Baby className="h-5 w-5 text-primary" />
-          </div>
+          <img src="/brand/logo-mark-64.png" alt="Sprout" className="w-8 h-8 rounded-lg" />
           <span className="font-bold text-lg tracking-tight text-foreground">Sprout</span>
         </div>
 
@@ -61,12 +59,12 @@ export default function RequestProgram() {
           <Card>
             <CardHeader>
               <CardTitle className="text-xl">Request a program</CardTitle>
-              <CardDescription>Tell us about your Head Start / Early Head Start program and we’ll get you set up on Sprout.</CardDescription>
+              <CardDescription>Tell us about your school, center, or program — Head Start, Early Head Start, preschool, or child care — and we'll get you set up on Sprout.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Program name *</Label><Input placeholder="Sunshine Head Start" value={form.organizationName} onChange={set("organizationName")} /></div>
-                <div className="space-y-2"><Label>Agency ID (optional)</Label><Input placeholder="HS-CA-00000" value={form.agencyId} onChange={set("agencyId")} /></div>
+                <div className="space-y-2"><Label>Program name *</Label><Input placeholder="Sunshine Preschool" value={form.organizationName} onChange={set("organizationName")} /></div>
+                <div className="space-y-2"><Label>Agency ID (optional)</Label><Input placeholder="Head Start grantee ID or your internal ID" value={form.agencyId} onChange={set("agencyId")} /></div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2"><Label>Your name *</Label><Input placeholder="Full name" value={form.contactName} onChange={set("contactName")} /></div>

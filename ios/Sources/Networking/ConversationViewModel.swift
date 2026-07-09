@@ -7,6 +7,7 @@ class ConversationViewModel: ObservableObject {
     @Published var messages: [Message] = []
     @Published var draft = ""
     @Published var isSending = false
+    @Published var errorMessage: String?
 
     init(conversationId: String) {
         self.conversationId = conversationId
@@ -16,7 +17,9 @@ class ConversationViewModel: ObservableObject {
         do {
             messages = try await APIClient.shared.getMessages(conversationId: conversationId)
         } catch {
-            // Leave whatever is already loaded; the view shows an empty state.
+            // A failed load used to render identically to a genuinely empty
+            // thread — surface it instead of leaving the person guessing.
+            errorMessage = "Couldn't load this conversation. Check your connection and try again."
         }
     }
 
@@ -29,7 +32,13 @@ class ConversationViewModel: ObservableObject {
             do {
                 let sent = try await APIClient.shared.sendMessage(conversationId: conversationId, body: body)
                 messages.append(sent)
-            } catch {}
+            } catch {
+                // Restore what was typed — this used to clear the compose field
+                // unconditionally and silently drop the message on failure, so a
+                // failed send looked exactly like a sent one.
+                draft = body
+                errorMessage = "This message wasn't sent. Check your connection and try again."
+            }
             isSending = false
         }
     }

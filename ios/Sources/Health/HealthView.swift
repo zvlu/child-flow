@@ -762,6 +762,7 @@ class HealthViewModel: ObservableObject {
                 HealthRecord(id: "h2",  childId: "c1", childName: "Sofia Martinez",    category: "dental",        status: "Due Soon", dueDate: soon, completedDate: nil),
                 HealthRecord(id: "h3",  childId: "c2", childName: "Marcus Williams",   category: "dental",        status: "Overdue",  dueDate: overdue, completedDate: nil),
                 HealthRecord(id: "h9",  childId: "c6", childName: "Aaliyah Thompson",  category: "dental",        status: "Current",  dueDate: Calendar.current.date(byAdding: .month, value: 3, to: now), completedDate: past),
+                HealthRecord(id: "h15", childId: "c5", childName: "Jason Chen",        category: "dental",        status: "Overdue",  dueDate: overdue, completedDate: nil),
                 // Vision
                 HealthRecord(id: "h4",  childId: "c2", childName: "Marcus Williams",   category: "vision",        status: "Current",  dueDate: Calendar.current.date(byAdding: .month, value: 5, to: now), completedDate: past),
                 HealthRecord(id: "h10", childId: "c4", childName: "Diego Rodriguez",   category: "vision",        status: "Due Soon", dueDate: soon, completedDate: nil),

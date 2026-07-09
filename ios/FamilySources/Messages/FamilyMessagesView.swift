@@ -34,6 +34,9 @@ struct FamilyMessagesView: View {
             .navigationTitle(L(.tabMessages))
             .task { await viewModel.load() }
             .refreshable { await viewModel.load() }
+            .alert("Couldn't Load Messages", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK") { viewModel.errorMessage = nil }
+            } message: { Text(viewModel.errorMessage ?? "") }
         }
     }
 }
@@ -132,7 +135,7 @@ struct FamilyChatView: View {
                                 ? .secondary : .accentColor
                         )
                 }
-                .disabled(viewModel.draft.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(viewModel.draft.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isSending)
             }
             .padding(.horizontal)
             .padding(.vertical, 10)
@@ -140,6 +143,9 @@ struct FamilyChatView: View {
         .navigationTitle(conversation.participantNames.first ?? L(.tabMessages))
         .navigationBarTitleDisplayMode(.inline)
         .task { await viewModel.load() }
+        .alert("Message Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") { viewModel.errorMessage = nil }
+        } message: { Text(viewModel.errorMessage ?? "") }
     }
 }
 
@@ -196,10 +202,18 @@ struct FamilyMessageBubble: View {
 class FamilyMessagesViewModel: ObservableObject {
     @Published var conversations: [Conversation] = []
     @Published var isLoading = false
+    @Published var errorMessage: String?
 
     func load() async {
         isLoading = true
-        do { conversations = try await APIClient.shared.getConversations() } catch {}
+        do {
+            conversations = try await APIClient.shared.getConversations()
+        } catch {
+            // Used to be `catch {}` — a failed load rendered the exact same
+            // "No Messages Yet" empty state as a genuinely empty inbox, so a
+            // parent with real unread messages had no way to tell the load failed.
+            errorMessage = "Couldn't load your messages. Check your connection and try again."
+        }
         isLoading = false
     }
 }

@@ -71,6 +71,8 @@ async function main() {
     subscriptionTier: "professional",
     maxChildren: 150,
     maxStaff: 30,
+    // Demo org is a Head Start program — module on so the full demo works.
+    enabledModules: ["head_start"],
   });
   const ORG = 1;
   // Bind the seeded staff accounts to the org so tenant scoping resolves to a

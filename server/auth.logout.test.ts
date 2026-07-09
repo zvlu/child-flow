@@ -35,7 +35,9 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
       clearCookie: (name: string, options: Record<string, unknown>) => {
         clearedCookies.push({ name, options });
       },
-    } as TrpcContext["res"],
+      // Logout also sets the dev-auth bypass opt-out cookie; a no-op is fine here.
+      cookie: () => {},
+    } as unknown as TrpcContext["res"],
   };
 
   return { ctx, clearedCookies };

@@ -3,8 +3,10 @@ import {
   ShieldCheck, Settings, Baby, BookOpen, FileText, CalendarDays, DollarSign,
   UtensilsCrossed, Clock, FileSignature, Layers, School, AlertTriangle, Zap,
   MessageSquare, HandHeart, ClipboardList, Sparkles, NotebookPen, FolderHeart, Landmark, BookText,
-  TrendingDown, Handshake, CalendarClock, Accessibility, PiggyBank, type LucideIcon,
+  TrendingDown, Handshake, CalendarClock, Accessibility, PiggyBank, Upload, type LucideIcon,
 } from "lucide-react";
+
+import type { ModuleId } from "@shared/modules";
 
 export type NavRole = "admin" | "staff" | "parent";
 /**
@@ -12,9 +14,15 @@ export type NavRole = "admin" | "staff" | "parent";
  *   - omitted        → admin + staff (the default for program-work items)
  *   - ["admin"]      → admin only (financials, compliance, bulk ops)
  *   - includes "parent" → also visible to family/parent accounts
+ * `module` additionally hides the item unless the org has that feature module
+ * enabled (e.g. Head Start compliance).
  */
-export type NavItem = { path: string; label: string; icon: LucideIcon; roles?: NavRole[] };
+export type NavItem = { path: string; label: string; icon: LucideIcon; roles?: NavRole[]; module?: ModuleId };
 export type NavSection = { title: string; items: NavItem[] };
+
+/** Modules the org has enabled, as consumed by the nav filters. */
+export type EnabledModules = { has: (id: ModuleId) => boolean };
+export const ALL_MODULES: EnabledModules = { has: () => true };
 
 const PARENT_OK: NavRole[] = ["admin", "staff", "parent"];
 const ADMIN_ONLY: NavRole[] = ["admin"];
@@ -48,11 +56,11 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
       { path: "/children", label: "Children", icon: Baby },
       { path: "/daily-reports", label: "Daily Reports", icon: Sparkles },
       { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
-      { path: "/chronic-absence", label: "Chronic Absence", icon: TrendingDown },
+      { path: "/chronic-absence", label: "Chronic Absence", icon: TrendingDown, module: "head_start" },
       { path: "/staff", label: "Staff", icon: UserCog },
-      { path: "/family-services", label: "Family Services", icon: Home },
-      { path: "/family-partnership", label: "Partnership Agreements", icon: Handshake },
-      { path: "/policy-council", label: "Policy Council", icon: Landmark },
+      { path: "/family-services", label: "Family Services", icon: Home, module: "head_start" },
+      { path: "/family-partnership", label: "Partnership Agreements", icon: Handshake, module: "head_start" },
+      { path: "/policy-council", label: "Policy Council", icon: Landmark, module: "head_start" },
       { path: "/classrooms", label: "Classrooms", icon: School },
     ],
   },
@@ -60,11 +68,12 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
     title: "Operations",
     items: [
       { path: "/enrollment", label: "Enrollment", icon: BookOpen },
+      { path: "/data-import", label: "Data Import", icon: Upload, roles: ADMIN_ONLY },
       { path: "/health", label: "Health Records", icon: Heart },
-      { path: "/health-deadlines", label: "Health Deadlines", icon: CalendarClock },
-      { path: "/disability-services", label: "Disability Services", icon: Accessibility },
+      { path: "/health-deadlines", label: "Health Deadlines", icon: CalendarClock, module: "head_start" },
+      { path: "/disability-services", label: "Disability Services", icon: Accessibility, module: "head_start" },
       { path: "/assessments", label: "Assessments", icon: ClipboardList },
-      { path: "/classroom-quality", label: "Classroom Quality", icon: BarChart3 },
+      { path: "/classroom-quality", label: "Classroom Quality", icon: BarChart3, module: "head_start" },
       { path: "/lesson-planning", label: "Lesson Planning", icon: NotebookPen },
       { path: "/portfolios", label: "Portfolios", icon: FolderHeart },
       { path: "/calendar", label: "Calendar", icon: CalendarDays, roles: PARENT_OK },
@@ -72,7 +81,7 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
       { path: "/digital-documents", label: "E-Signatures", icon: FileSignature },
       { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
       { path: "/bulk-actions", label: "Bulk Actions", icon: Layers, roles: ADMIN_ONLY },
-      { path: "/compliance", label: "Compliance", icon: ShieldCheck, roles: ADMIN_ONLY },
+      { path: "/compliance", label: "Compliance", icon: ShieldCheck, roles: ADMIN_ONLY, module: "head_start" },
     ],
   },
   {
@@ -80,8 +89,8 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
     items: [
       { path: "/billing", label: "Billing", icon: DollarSign, roles: ADMIN_ONLY },
       { path: "/subsidies", label: "Subsidies", icon: Landmark },
-      { path: "/grant-budget", label: "Grant & Budget", icon: PiggyBank, roles: ADMIN_ONLY },
-      { path: "/in-kind", label: "In-Kind", icon: HandHeart },
+      { path: "/grant-budget", label: "Grant & Budget", icon: PiggyBank, roles: ADMIN_ONLY, module: "head_start" },
+      { path: "/in-kind", label: "In-Kind", icon: HandHeart, module: "head_start" },
       { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
       { path: "/staff-operations", label: "Staff Operations", icon: Clock },
       { path: "/parent-portal", label: "Parent Portal", icon: Users, roles: PARENT_OK },
@@ -109,6 +118,11 @@ export function visibleToRole(item: NavItem, role: NavRole): boolean {
   return item.roles ? item.roles.includes(role) : role !== "parent";
 }
 
+/** Whether the org's enabled modules allow an item. No `module` → always. */
+export function visibleToModules(item: NavItem, modules: EnabledModules): boolean {
+  return item.module ? modules.has(item.module) : true;
+}
+
 /**
  * Stable sort by the user's saved order. Items missing from `order` keep their
  * canonical relative position (they sort after ordered items, in original order).
@@ -126,36 +140,37 @@ export function sortByOrder<T extends { path: string }>(items: T[], order: strin
 }
 
 /** Canonical top-nav items visible to a role (ignores prefs) — for the settings UI. */
-export function topNavForRole(role: NavRole): NavItem[] {
-  return TOP_NAV_ITEMS.filter((i) => visibleToRole(i, role));
+export function topNavForRole(role: NavRole, modules: EnabledModules = ALL_MODULES): NavItem[] {
+  return TOP_NAV_ITEMS.filter((i) => visibleToRole(i, role) && visibleToModules(i, modules));
 }
 
 /** Canonical side-nav sections visible to a role (ignores prefs) — for the settings UI. */
-export function sideNavForRole(role: NavRole): NavSection[] {
+export function sideNavForRole(role: NavRole, modules: EnabledModules = ALL_MODULES): NavSection[] {
   return SIDE_NAV_SECTIONS
-    .map((section) => ({ ...section, items: section.items.filter((i) => visibleToRole(i, role)) }))
+    .map((section) => ({ ...section, items: section.items.filter((i) => visibleToRole(i, role) && visibleToModules(i, modules)) }))
     .filter((section) => section.items.length > 0);
 }
 
-/** Effective top-nav items after applying role visibility, then hide + order. */
-export function applyTopNav(prefs: NavPreferences | null | undefined, role: NavRole): NavItem[] {
+/** Effective top-nav items after applying role + module visibility, then hide + order. */
+export function applyTopNav(prefs: NavPreferences | null | undefined, role: NavRole, modules: EnabledModules = ALL_MODULES): NavItem[] {
   const hidden = new Set(prefs?.topNav?.hidden ?? []);
-  const base = TOP_NAV_ITEMS.filter((i) => visibleToRole(i, role) && !hidden.has(i.path));
+  const base = TOP_NAV_ITEMS.filter((i) => visibleToRole(i, role) && visibleToModules(i, modules) && !hidden.has(i.path));
   return sortByOrder(base, prefs?.topNav?.order);
 }
 
 /**
- * Effective side-nav sections after applying role visibility, then hide + order.
- * Sorting is global (a single order array) but each section only contains its own
- * items, so items stay within their section while honoring the user's order.
+ * Effective side-nav sections after applying role + module visibility, then
+ * hide + order. Sorting is global (a single order array) but each section only
+ * contains its own items, so items stay within their section while honoring
+ * the user's order.
  */
-export function applySideNav(prefs: NavPreferences | null | undefined, role: NavRole): NavSection[] {
+export function applySideNav(prefs: NavPreferences | null | undefined, role: NavRole, modules: EnabledModules = ALL_MODULES): NavSection[] {
   const hidden = new Set(prefs?.sideNav?.hidden ?? []);
   const order = prefs?.sideNav?.order;
   return SIDE_NAV_SECTIONS
     .map((section) => ({
       ...section,
-      items: sortByOrder(section.items.filter((i) => visibleToRole(i, role) && !hidden.has(i.path)), order),
+      items: sortByOrder(section.items.filter((i) => visibleToRole(i, role) && visibleToModules(i, modules) && !hidden.has(i.path)), order),
     }))
     .filter((section) => section.items.length > 0);
 }

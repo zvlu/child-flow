@@ -18,8 +18,10 @@ import { toast } from "sonner";
 import { useConfirm } from "@/components/ConfirmDialog";
 import {
   TOP_NAV_PRIMARY_COUNT, sortByOrder, topNavForRole, sideNavForRole,
-  type NavItem, type NavSection, type NavRole,
+  type EnabledModules, type NavItem, type NavSection, type NavRole,
 } from "@/config/nav";
+import { useOrgModules } from "@/hooks/useOrgModules";
+import { MODULE_DESCRIPTIONS, MODULE_IDS, MODULE_LABELS, hasModule, type ModuleId } from "@shared/modules";
 
 const roleLabel: Record<string, string> = { admin: "Administrator", staff: "Staff", parent: "Parent" };
 
@@ -55,6 +57,7 @@ const roleColorClasses: Record<RoleColor, string> = {
 export default function Settings() {
   const { user, loading, refresh } = useAuth();
   const isAdmin = useIsAdmin();
+  const orgModules = useOrgModules();
 
   const initials = user?.name
     ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -110,6 +113,7 @@ export default function Settings() {
         {isAdmin && (
         <TabsContent value="program" className="mt-4 space-y-4">
           <ProgramSettings />
+          <ModulesCard />
           <PlanUsageCard />
         </TabsContent>
         )}
@@ -127,7 +131,15 @@ export default function Settings() {
           {loading ? (
             <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : (
-            <NavigationSettings key={(user as any)?.id ?? "anon"} settings={user?.settings} role={((user as any)?.role ?? "staff") as NavRole} onSaved={refresh} disabled={!user} />
+            <NavigationSettings
+              // Re-key on module availability so the working copy re-derives once the org loads or a module is toggled.
+              key={`${(user as any)?.id ?? "anon"}-${MODULE_IDS.filter((m) => orgModules.has(m)).join(",")}`}
+              settings={user?.settings}
+              role={((user as any)?.role ?? "staff") as NavRole}
+              modules={orgModules}
+              onSaved={refresh}
+              disabled={!user}
+            />
           )}
         </TabsContent>
 
@@ -719,6 +731,65 @@ function ProgramSettings() {
   );
 }
 
+/* ------------------------------- Modules -------------------------------- */
+
+/**
+ * Optional feature modules (admin only). Toggling writes
+ * organizations.enabledModules and invalidates the org query so nav, routes,
+ * and gated pages update immediately.
+ */
+function ModulesCard() {
+  const utils = trpc.useUtils();
+  const orgQuery = trpc.organizations.get.useQuery(ORGANIZATION_ID);
+  const org = orgQuery.data;
+
+  const update = trpc.organizations.update.useMutation({
+    onSuccess: async () => {
+      await utils.organizations.get.invalidate(ORGANIZATION_ID);
+      toast.success("Modules updated");
+    },
+    onError: (e) => toast.error(e.message || "Could not update modules"),
+  });
+
+  if (orgQuery.isLoading) {
+    return <Card><CardContent className="py-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></CardContent></Card>;
+  }
+  if (!org) return null;
+
+  const enabled = new Set<ModuleId>(MODULE_IDS.filter((m) => hasModule(org, m)));
+
+  const toggleModule = (id: ModuleId, on: boolean) => {
+    const next = new Set(enabled);
+    on ? next.add(id) : next.delete(id);
+    update.mutate({ id: ORGANIZATION_ID, enabledModules: MODULE_IDS.filter((m) => next.has(m)) });
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2"><LayoutGrid className="h-4 w-4 text-primary" />Modules</CardTitle>
+        <CardDescription>Optional feature sets for your program type. Turning a module off hides its pages and data entry — nothing is deleted.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {MODULE_IDS.map((id) => (
+          <div key={id} className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+            <div>
+              <p className="text-sm font-medium">{MODULE_LABELS[id]}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{MODULE_DESCRIPTIONS[id]}</p>
+            </div>
+            <Switch
+              checked={enabled.has(id)}
+              disabled={update.isPending}
+              onCheckedChange={(on) => toggleModule(id, on)}
+              aria-label={`Toggle ${MODULE_LABELS[id]}`}
+            />
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 /* ----------------------------- Plan & Usage ----------------------------- */
 
 const TIERS: Record<string, { label: string; perChild: number; base: number }> = {
@@ -820,11 +891,11 @@ function reorder<T>(arr: T[], idx: number, dir: -1 | 1): T[] {
   return copy;
 }
 
-function NavigationSettings({ settings, role, onSaved, disabled }: { settings: any; role: NavRole; onSaved: () => Promise<void>; disabled: boolean }) {
+function NavigationSettings({ settings, role, modules, onSaved, disabled }: { settings: any; role: NavRole; modules: EnabledModules; onSaved: () => Promise<void>; disabled: boolean }) {
   const nav = settings?.navigation;
-  // Only the items this role can actually see are customizable.
-  const roleTop = topNavForRole(role);
-  const roleSections = sideNavForRole(role);
+  // Only the items this role (and the org's enabled modules) can actually see are customizable.
+  const roleTop = topNavForRole(role, modules);
+  const roleSections = sideNavForRole(role, modules);
 
   // Local working copy: full item lists in the saved order (hidden items kept so
   // they can be re-enabled), plus the hidden sets.
@@ -868,9 +939,9 @@ function NavigationSettings({ settings, role, onSaved, disabled }: { settings: a
   };
 
   const reset = () => {
-    setTopItems(topNavForRole(role));
+    setTopItems(topNavForRole(role, modules));
     setTopHidden(new Set());
-    setSideSections(sideNavForRole(role).map(s => ({ ...s })));
+    setSideSections(sideNavForRole(role, modules).map(s => ({ ...s })));
     setSideHidden(new Set());
     // Persist the cleared state (server drops the navigation key -> defaults).
     save.mutate({ navigation: {} });

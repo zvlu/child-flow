@@ -75,9 +75,12 @@ struct AttendanceView: View {
                                 .foregroundColor(.orange)
                         }
                         Button(justSaved ? "Saved ✓" : "Save") {
-                            viewModel.saveAll()
-                            justSaved = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { justSaved = false }
+                            Task {
+                                let succeeded = await viewModel.saveAll()
+                                guard succeeded else { return }
+                                justSaved = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { justSaved = false }
+                            }
                         }
                         .fontWeight(.semibold)
                         .disabled(viewModel.records.isEmpty)
@@ -91,6 +94,9 @@ struct AttendanceView: View {
                 }
             }
             .task { await viewModel.load() }
+            .alert("Couldn't Save", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK") { viewModel.errorMessage = nil }
+            } message: { Text(viewModel.errorMessage ?? "") }
             .overlay {
                 if viewModel.isLoading { ProgressView() }
             }
@@ -200,6 +206,7 @@ class AttendanceViewModel: ObservableObject {
     @Published var notedChildIds: Set<String> = []
     @Published var hasChanges = false
     @Published var isLoading = false
+    @Published var errorMessage: String?
 
     var presentCount: Int { records.filter { $0.status == .present || $0.status == .halfDay }.count }
     var totalCount: Int { records.count }
@@ -240,12 +247,18 @@ class AttendanceViewModel: ObservableObject {
         Task { await load() }
     }
 
-    func saveAll() {
-        Task {
-            do {
-                try await APIClient.shared.saveAttendance(records: records)
-                hasChanges = false
-            } catch {}
+    /// Returns whether the save actually succeeded — the caller used to show
+    /// "Saved ✓" on a fixed timer regardless of the outcome, so a failed save
+    /// looked identical to a successful one.
+    @discardableResult
+    func saveAll() async -> Bool {
+        do {
+            try await APIClient.shared.saveAttendance(records: records)
+            hasChanges = false
+            return true
+        } catch {
+            errorMessage = "Attendance wasn't saved. Check your connection and try again."
+            return false
         }
     }
 
@@ -255,7 +268,9 @@ class AttendanceViewModel: ObservableObject {
             do {
                 try await APIClient.shared.addQuickNote(childId: childId, content: content)
                 notedChildIds.insert(childId)
-            } catch {}
+            } catch {
+                errorMessage = "This note wasn't saved. Check your connection and try again."
+            }
         }
     }
 }

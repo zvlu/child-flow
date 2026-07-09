@@ -605,6 +605,13 @@ struct DashboardTask: Identifiable {
         case health
         case healthCompliance
         case healthCategory(HealthCategory)
+        /// Deep link to one child's record within a health category — lands on
+        /// the record detail itself (worst status first if the child has
+        /// several), falling back to the category list if none match.
+        case healthRecord(childName: String, category: HealthCategory)
+        /// Deep link to a family's pending e-sign document — lands on the sign
+        /// screen itself, falling back to the E-Signatures list if none match.
+        case documentSign(familyName: String, documentType: String? = nil)
         case documents
         case attendance
         case chronicAbsence
@@ -692,6 +699,10 @@ struct TaskDestinationView: View {
         case .health:                        HealthView()
         case .healthCompliance:              HealthComplianceView()
         case .healthCategory(let category):  HealthCategoryLaunchView(category: category)
+        case .healthRecord(let child, let category):
+                                             HealthRecordLaunchView(childName: child, category: category)
+        case .documentSign(let family, let type):
+                                             DocumentSignLaunchView(familyName: family, documentType: type)
         case .documents:                     DocumentsView()
         case .attendance:                    AttendanceView()
         case .chronicAbsence:               ChronicAbsenceView()
@@ -710,6 +721,44 @@ struct HealthCategoryLaunchView: View {
     var body: some View {
         HealthCategoryDetailView(category: category, viewModel: viewModel)
             .task { await viewModel.load() }
+    }
+}
+
+// MARK: - Health Record Launch View
+// Resolves one child's record in a category and lands directly on its detail,
+// so "Schedule Jason Chen dental screening" opens Jason's dental record — not
+// the whole dental list. If the child has several records in the category, the
+// most urgent wins; if none match, falls back to the category list.
+
+struct HealthRecordLaunchView: View {
+    let childName: String
+    let category: HealthCategory
+
+    @StateObject private var viewModel = HealthViewModel()
+    @State private var isLoading = true
+
+    private var match: HealthRecord? {
+        let statusRank: [String: Int] = ["Overdue": 0, "Due Soon": 1, "Current": 2]
+        return viewModel.records(for: category)
+            .filter { $0.childName.localizedCaseInsensitiveContains(childName) }
+            .min { (statusRank[$0.status] ?? 3) < (statusRank[$1.status] ?? 3) }
+    }
+
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let record = match {
+                HealthRecordDetailView(record: record, viewModel: viewModel)
+            } else {
+                HealthCategoryDetailView(category: category, viewModel: viewModel)
+            }
+        }
+        .task {
+            await viewModel.load()
+            isLoading = false
+        }
     }
 }
 
@@ -737,11 +786,13 @@ struct FamilyLaunchView: View {
             }
         }
         .task {
-            var families: [Family]
+            var families: [Family] = []
             do {
                 families = try await APIClient.shared.getFamilies()
             } catch {
+                #if DEBUG
                 families = MockData.families
+                #endif
             }
             family = families.first {
                 $0.name.localizedCaseInsensitiveContains(familyName)
@@ -779,35 +830,95 @@ class DashboardViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        // In production these would come from separate API calls.
-        // For now load mock data in all builds.
-        loadMockData()
-
         do {
             let data = try await APIClient.shared.getDashboardStats()
             alerts = data.alerts
+            myCaseload = data.caseload.map { item in
+                CaseloadChild(id: item.id, firstName: item.firstName, lastName: item.lastName,
+                               attendanceStatus: Self.attendanceStatus(from: item.attendanceStatus))
+            }
+            pendingTasks = data.tasks.map(Self.dashboardTask(from:))
+            todayAgenda = data.agenda.map(Self.agendaEvent(from:))
+            if let inbox = data.inbox {
+                unreadMessageCount = inbox.unreadMessageCount
+                lastMessagePreview = inbox.lastMessagePreview
+            }
+            if let documents = data.documents {
+                totalDocumentCount = documents.totalDocumentCount
+                pendingDocumentCount = documents.pendingDocumentCount
+            }
         } catch {
+            // Server unreachable / decode failure — demo mode only, never in a
+            // real build, so a real user never sees fabricated names on a real
+            // account.
             #if DEBUG
-            alerts = [
-                ProgramAlert(id: "a1",
-                             title: "2 Children Chronically Absent",
-                             description: "Jason Chen (51%) and Marcus Williams (72%) are below the 85% threshold.",
-                             type: "attendance"),
-                ProgramAlert(id: "a2",
-                             title: "3 Children Have Compliance Deadlines",
-                             description: "1 overdue health screening, 2 dental deadlines within 10 days.",
-                             type: "health"),
-                ProgramAlert(id: "a3",
-                             title: "3 Family Messages Not Delivered",
-                             description: "1 failed to send and needs to be resent.",
-                             type: "message"),
-                ProgramAlert(id: "a4",
-                             title: "4 Documents Need Attention",
-                             description: "3 awaiting signature, 1 expired and needs renewal.",
-                             type: "document")
-            ]
+            loadMockData()
             #endif
         }
+    }
+
+    private static func attendanceStatus(from raw: String) -> CaseloadChild.AttendanceStatus {
+        switch raw {
+        case "present": return .present
+        case "absent":  return .absent
+        default:        return .unknown
+        }
+    }
+
+    private static func familyTab(from raw: String?) -> FamilyDetailTab {
+        switch raw {
+        case "contacts": return .contacts
+        case "goals":    return .goals
+        case "fna":      return .fna
+        case "cfcr":     return .cfcr
+        case "notes":    return .notes
+        case "moments":  return .moments
+        default:         return .overview
+        }
+    }
+
+    private static func urgency(from raw: String) -> DashboardTask.Urgency {
+        switch raw {
+        case "overdue": return .overdue
+        case "today":   return .today
+        default:        return .upcoming
+        }
+    }
+
+    private static func dashboardTask(from dto: DashboardTaskItemDTO) -> DashboardTask {
+        let destination: DashboardTask.TaskDestination
+        switch dto.type {
+        case "documentSign":
+            destination = .documentSign(familyName: dto.familyName ?? "", documentType: dto.documentType)
+        case "healthRecord":
+            if let category = dto.category.flatMap(HealthCategory.init(rawValue:)) {
+                destination = .healthRecord(childName: dto.childName ?? "", category: category)
+            } else {
+                destination = .health
+            }
+        case "family":
+            destination = .family(name: dto.familyName ?? "", tab: familyTab(from: dto.tab))
+        case "attendance":
+            destination = .attendance
+        default:
+            destination = .familyServices
+        }
+        return DashboardTask(id: dto.id, title: dto.title, dueLabel: dto.dueLabel,
+                              urgency: urgency(from: dto.urgency), destination: destination)
+    }
+
+    private static func agendaEvent(from dto: DashboardAgendaItemDTO) -> AgendaEvent {
+        let color: Color
+        switch dto.colorType {
+        case "parent_event":   color = .cfGoals
+        case "staff_training": color = .cfChildren
+        case "deadline":       color = .cfHealth
+        case "holiday":        color = .cfAttendance
+        default:                color = .cfPrimary
+        }
+        let destination: DashboardTask.TaskDestination = dto.type == "messages" ? .messages : .familyServices
+        return AgendaEvent(id: dto.id, timeLabel: dto.timeLabel, title: dto.title,
+                            subtitle: dto.subtitle, color: color, destination: destination)
     }
 
     private func loadMockData() {
@@ -829,11 +940,11 @@ class DashboardViewModel: ObservableObject {
         // Each task deep-links to the screen where it gets done. Names match
         // MockData families/children so the links resolve in demo mode too.
         pendingTasks = [
-            DashboardTask(id: "t1", title: "Sign Sofia Johnson's IEP",             dueLabel: "Due today",  urgency: .today,    destination: .family(name: "Johnson", tab: .overview)),
-            DashboardTask(id: "t2", title: "Complete FNA — Rodriguez family",       dueLabel: "Due Jun 12", urgency: .upcoming, destination: .family(name: "Rodriguez", tab: .fna)),
-            DashboardTask(id: "t3", title: "Liam Rivera — health screening overdue", dueLabel: "Overdue",    urgency: .overdue,  destination: .healthCompliance),
-            DashboardTask(id: "t4", title: "Upload Aaliyah's immunization record",  dueLabel: "Due Jun 15", urgency: .upcoming, destination: .healthCategory(.immunizations)),
-            DashboardTask(id: "t5", title: "Review Marcus Williams CFCR",           dueLabel: "Due Jun 18", urgency: .upcoming, destination: .family(name: "Williams", tab: .cfcr)),
+            DashboardTask(id: "t1", title: "Sign Sofia Johnson's IEP",              dueLabel: "Due today",  urgency: .today,    destination: .documentSign(familyName: "Johnson", documentType: "iep")),
+            DashboardTask(id: "t2", title: "Complete FNA — Rodriguez family",        dueLabel: "Due Jun 12", urgency: .upcoming, destination: .family(name: "Rodriguez", tab: .fna)),
+            DashboardTask(id: "t3", title: "Schedule Jason Chen dental screening",   dueLabel: "Overdue",    urgency: .overdue,  destination: .healthRecord(childName: "Jason Chen", category: .dental)),
+            DashboardTask(id: "t4", title: "Upload Aaliyah's immunization record",   dueLabel: "Due Jun 15", urgency: .upcoming, destination: .healthRecord(childName: "Aaliyah", category: .immunizations)),
+            DashboardTask(id: "t5", title: "Review Marcus Williams CFCR",            dueLabel: "Due Jun 18", urgency: .upcoming, destination: .family(name: "Williams", tab: .cfcr)),
         ]
 
         todayAgenda = [
