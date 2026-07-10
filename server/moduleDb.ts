@@ -3,7 +3,7 @@
  * classrooms, calendar, billing, meals, documents, staff ops, parent portal,
  * AI insights, bulk actions, notes, custom reports, and dashboard stats.
  */
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import {
   families, children, staff, classrooms, childClassroomAssignments, childFlags,
   attendance, healthRecords, studentNotes, calendarEvents, documents, familyServices,
@@ -29,6 +29,7 @@ import {
   familyGoals, familyReferrals, familyHomeVisits, cfcrRecords, familyCaseNotes, attendancePlans,
 } from "../drizzle/schema";
 import { getDb } from "./db";
+import { isEmptyPatch } from "./_core/patch";
 
 async function requireDb() {
   const db = await getDb();
@@ -51,6 +52,7 @@ export async function createFamily(data: InsertFamily) {
 
 /** Update a family record. Caller must verify the family is in the user's org. */
 export async function updateFamily(id: number, data: Partial<typeof families.$inferInsert>) {
+  if (isEmptyPatch(data)) return { id };
   const db = await requireDb();
   await db.update(families).set(data).where(eq(families.id, id));
   return { id };
@@ -64,6 +66,7 @@ export async function getFamilyContacts(familyId: number) {
 // ==================== CHILDREN ====================
 
 export async function updateChild(id: number, data: Partial<typeof children.$inferInsert>) {
+  if (isEmptyPatch(data)) return { success: true };
   const db = await requireDb();
   await db.update(children).set(data).where(eq(children.id, id));
   return { success: true };
@@ -261,6 +264,7 @@ export async function createStaff(data: InsertStaff) {
 }
 
 export async function updateStaff(id: number, data: Partial<InsertStaff>) {
+  if (isEmptyPatch(data)) return { success: true };
   const db = await requireDb();
   await db.update(staff).set(data).where(eq(staff.id, id));
   return { success: true };
@@ -314,6 +318,7 @@ export async function updateEnrollmentApplication(
   organizationId: number,
   data: Partial<Pick<InsertEnrollmentApplication, "status" | "priority" | "notes">>
 ) {
+  if (isEmptyPatch(data)) return { success: true };
   const db = await requireDb();
   await db
     .update(enrollmentApplications)
@@ -466,6 +471,7 @@ export async function createCalendarEvent(data: InsertCalendarEvent) {
 }
 
 export async function updateCalendarEvent(id: number, data: Partial<InsertCalendarEvent>) {
+  if (isEmptyPatch(data)) return { success: true };
   const db = await requireDb();
   await db.update(calendarEvents).set(data).where(eq(calendarEvents.id, id));
   return { success: true };
@@ -658,6 +664,7 @@ export async function createLessonPlan(data: InsertLessonPlan) {
 }
 
 export async function updateLessonPlan(id: number, data: Partial<typeof lessonPlans.$inferInsert>) {
+  if (isEmptyPatch(data)) return { id };
   const db = await requireDb();
   await db.update(lessonPlans).set(data).where(eq(lessonPlans.id, id));
   return { id };
@@ -732,6 +739,7 @@ export async function createSubsidy(data: InsertSubsidy) {
 }
 
 export async function updateSubsidy(id: number, data: Partial<typeof subsidies.$inferInsert>) {
+  if (isEmptyPatch(data)) return { id };
   const db = await requireDb();
   await db.update(subsidies).set(data).where(eq(subsidies.id, id));
   return { id };
@@ -1402,4 +1410,15 @@ export async function getDashboardStats(organizationId: number) {
     openActionItems: openInsights.filter(i => !i.dismissedAt && i.actionRequired === 1).length,
     upcomingEvents: events.slice(0, 5),
   };
+}
+
+/** All device tokens for an org's staff/admin users (chronic-absence alerts etc.). */
+export async function getDeviceTokensForOrgStaff(organizationId: number): Promise<string[]> {
+  const db = await requireDb();
+  const rows = await db
+    .select({ token: deviceTokens.token })
+    .from(deviceTokens)
+    .innerJoin(users, eq(deviceTokens.userId, users.id))
+    .where(and(eq(users.organizationId, organizationId), inArray(users.role, ["admin", "staff"])));
+  return rows.map(r => r.token);
 }

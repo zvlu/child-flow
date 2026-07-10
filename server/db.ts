@@ -1,4 +1,5 @@
 import { eq, and, gte, lte } from "drizzle-orm";
+import { isEmptyPatch } from "./_core/patch";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users, organizations, children, staff, families, attendance,
@@ -140,6 +141,7 @@ export async function assignUserOrganization(openId: string, organizationId: num
 
 /** Update a user's own editable profile fields (currently just display name). */
 export async function updateUserProfile(openId: string, data: { name?: string; avatarUrl?: string | null }) {
+  if (isEmptyPatch(data)) return;
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(users).set(data).where(eq(users.openId, openId));
@@ -228,6 +230,7 @@ export async function updateOrganization(
   data: Partial<Pick<typeof organizations.$inferInsert,
     "name" | "director" | "directorEmail" | "phone" | "address" | "maxChildren" | "classroomCount" | "maxStaff" | "subscriptionTier" | "enabledModules">>
 ) {
+  if (isEmptyPatch(data)) return;
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(organizations).set(data).where(eq(organizations.id, id));

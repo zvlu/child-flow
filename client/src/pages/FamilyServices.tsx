@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Home, Phone, Mail, MapPin, Calendar, CheckCircle2, Clock, Users, Heart, BookOpen, Loader2, Pencil } from "lucide-react";
+import { Search, Plus, Home, Phone, Mail, MapPin, Calendar, CheckCircle2, Clock, Users, Heart, BookOpen, Loader2, Pencil, Sparkles, Target } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
@@ -79,6 +79,18 @@ export default function FamilyServices() {
     },
     onError: (error) => toast.error(`Failed to log contact: ${error.message}`),
   });
+
+  // AI case summary (LLM digest of case notes with goal links)
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summaryFamilyName, setSummaryFamilyName] = useState("");
+  const summarize = trpc.familyCaseNotes.summarize.useMutation({
+    onSuccess: () => setSummaryOpen(true),
+    onError: (error) => toast.error(error.message || "Could not generate the summary."),
+  });
+  const requestSummary = (family: { id: number; primaryContactName: string }) => {
+    setSummaryFamilyName(family.primaryContactName);
+    summarize.mutate({ familyId: family.id });
+  };
 
   const updateFamily = trpc.families.update.useMutation({
     onSuccess: () => {
@@ -317,6 +329,20 @@ export default function FamilyServices() {
                           <Home className="h-3.5 w-3.5" />Log Visit
                         </Button>
                         <Button variant="outline" size="sm" className="flex-1 text-xs gap-1" onClick={() => openEditDialog(family)}><Pencil className="h-3.5 w-3.5" />Edit</Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-xs gap-1"
+                          disabled={summarize.isPending}
+                          onClick={() => requestSummary(family)}
+                        >
+                          {summarize.isPending && summaryFamilyName === family.primaryContactName ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3.5 w-3.5" />
+                          )}
+                          AI Summary
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -562,6 +588,61 @@ export default function FamilyServices() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI case summary */}
+      <Dialog open={summaryOpen} onOpenChange={setSummaryOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" /> Case summary — {summaryFamilyName}
+            </DialogTitle>
+            <DialogDescription>
+              AI digest of {summarize.data?.noteCount ?? 0} case notes. Verify details against the record before
+              acting on them.
+            </DialogDescription>
+          </DialogHeader>
+          {summarize.data && (
+            <div className="space-y-4">
+              <p className="text-sm leading-relaxed text-foreground">{summarize.data.summary}</p>
+              {summarize.data.themes.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {summarize.data.themes.map((t) => (
+                    <span key={t} className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {summarize.data.goalSuggestions.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Goal connections</p>
+                  {summarize.data.goalSuggestions.map((g, i) => (
+                    <div key={i} className="flex gap-2 rounded-lg border border-border p-3">
+                      <Target className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {g.title}{" "}
+                          {g.goalId == null && (
+                            <Badge variant="outline" className="ml-1 text-[10px]">
+                              Suggested new goal
+                            </Badge>
+                          )}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{g.rationale}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSummaryOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -6,7 +6,8 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router, staffProcedure, adminProcedure, superAdminProcedure, orgStaffProcedure, orgAdminProcedure, hsStaffProcedure, hsAdminProcedure, parentProcedure } from "./_core/trpc";
 import { isPlatformOwner } from "./_core/env";
-import { invalidateModuleCache } from "./_core/modules";
+import { invalidateModuleCache, orgHasModule } from "./_core/modules";
+import { checkChronicAbsenceAlerts } from "./absenceAlerts";
 import { auditAccess } from "./_core/audit";
 import { hashPassword, verifyPassword } from "./_core/password";
 import { persistMediaDataUrl } from "./storage";
@@ -851,7 +852,20 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
-        return mod.saveAttendanceForDate(input.organizationId, input.date, input.records);
+        const result = await mod.saveAttendanceForDate(input.organizationId, input.date, input.records);
+        // Fire-and-forget: flag children who just crossed the chronic-absence
+        // threshold (insight + staff push). Head Start orgs only — the 85%
+        // benchmark is a §1302.16 concept.
+        void (async () => {
+          try {
+            if (await orgHasModule(input.organizationId, "head_start")) {
+              await checkChronicAbsenceAlerts(input.organizationId);
+            }
+          } catch (e) {
+            console.warn("[Attendance] chronic-absence check failed:", e);
+          }
+        })();
+        return result;
       }),
   }),
 
@@ -2062,6 +2076,18 @@ export const appRouter = router({
         const row = await fcm.setCaseNoteFollowUpCompleted(input.id, ctx.user.organizationId!, input.completed);
         await auditAccess(ctx, { action: "update", resourceType: "family_case_note", resourceId: input.id, detail: "followup" });
         return row;
+      }),
+    // LLM digest of the family's case history with goal links (staff prep tool).
+    summarize: hsStaffProcedure
+      .input(z.object({ familyId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await assertRecordInOrg(ctx.user, "family", input.familyId);
+        const result = await fcm.summarizeFamilyCaseNotes(input.familyId);
+        if (!result) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "No case notes to summarize for this family yet." });
+        }
+        await auditAccess(ctx, { action: "read", resourceType: "family_case_note", detail: `ai_summary:family:${input.familyId}` });
+        return result;
       }),
   }),
 

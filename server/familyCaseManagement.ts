@@ -237,3 +237,113 @@ export async function childBelongsToOrg(childId: number, organizationId: number)
   const [row] = await db.select({ id: children.id }).from(children).where(and(eq(children.id, childId), eq(children.organizationId, organizationId))).limit(1);
   return !!row;
 }
+
+// ==================== AI Case Summary ====================
+
+export type CaseSummaryResult = {
+  summary: string;
+  themes: string[];
+  goalSuggestions: {
+    /** Matches an existing goal id when the model links to one; null = proposed new goal. */
+    goalId: number | null;
+    title: string;
+    rationale: string;
+  }[];
+  noteCount: number;
+  generatedAt: string;
+};
+
+/**
+ * True LLM case-note summarization (replaces the template-based assistant):
+ * digest a family's case-note history, surface recurring themes, and link the
+ * work to existing family goals — or propose a new one when a theme has no
+ * goal behind it. Sensitive notes are included (staff-only surface) but the
+ * model is instructed to keep the summary professional and non-graphic.
+ */
+export async function summarizeFamilyCaseNotes(familyId: number): Promise<CaseSummaryResult | null> {
+  const [notes, goals] = await Promise.all([getFamilyCaseNotes(familyId), getFamilyGoals(familyId)]);
+  if (notes.length === 0) return null;
+
+  // Newest 30 notes keeps the prompt bounded for long case histories.
+  const recent = notes.slice(0, 30);
+  const noteLines = recent
+    .map((n) => {
+      const date = new Date(n.createdAt).toISOString().slice(0, 10);
+      const followUp = n.followUpRequired && !n.followUpCompleted ? " [follow-up open]" : "";
+      return `- ${date} (${n.type}, by ${n.authorName})${followUp}: ${n.body}`;
+    })
+    .join("\n");
+  const goalLines =
+    goals.length === 0
+      ? "None yet."
+      : goals
+          .map((g) => `- id=${g.id} "${g.title}" (${g.status}, ${g.progress}% complete)`)
+          .join("\n");
+
+  const { invokeLLM } = await import("./_core/llm");
+  const result = await invokeLLM({
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a Head Start family-services assistant. Summarize case notes for a staff member preparing " +
+          "for their next family contact. Be concise, professional, and strengths-based. Never invent facts. " +
+          "Link themes to the existing goals when they clearly relate (use the given goal id); when an important " +
+          "theme has no matching goal, propose a new one with goalId null.",
+      },
+      {
+        role: "user",
+        content: `EXISTING FAMILY GOALS:\n${goalLines}\n\nCASE NOTES (newest first):\n${noteLines}`,
+      },
+    ],
+    outputSchema: {
+      name: "case_summary",
+      schema: {
+        type: "object",
+        properties: {
+          summary: { type: "string", description: "3-5 sentence narrative summary of the case history" },
+          themes: { type: "array", items: { type: "string" }, description: "2-5 short recurring themes" },
+          goalSuggestions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                goalId: { type: ["integer", "null"] },
+                title: { type: "string" },
+                rationale: { type: "string" },
+              },
+              required: ["goalId", "title", "rationale"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["summary", "themes", "goalSuggestions"],
+        additionalProperties: false,
+      },
+      strict: true,
+    },
+  });
+
+  const raw = result.choices?.[0]?.message?.content;
+  const text =
+    typeof raw === "string"
+      ? raw
+      : Array.isArray(raw)
+        ? raw.map((part) => ("text" in part ? part.text : "")).join("")
+        : "";
+  try {
+    const parsed = JSON.parse(text) as Omit<CaseSummaryResult, "noteCount" | "generatedAt">;
+    return {
+      summary: parsed.summary,
+      themes: Array.isArray(parsed.themes) ? parsed.themes : [],
+      goalSuggestions: Array.isArray(parsed.goalSuggestions) ? parsed.goalSuggestions : [],
+      noteCount: notes.length,
+      generatedAt: new Date().toISOString(),
+    };
+  } catch {
+    // Model returned non-JSON despite the schema — degrade to plain summary.
+    return text.trim()
+      ? { summary: text.trim(), themes: [], goalSuggestions: [], noteCount: notes.length, generatedAt: new Date().toISOString() }
+      : null;
+  }
+}
