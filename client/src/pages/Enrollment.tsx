@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { dateInputToLocal } from "@/lib/date";
 import { Glossary } from "@/components/Glossary";
 import { useOrgModules } from "@/hooks/useOrgModules";
+import { VerificationChecklist } from "@/components/VerificationChecklist";
 
 const INCOME_LABEL: Record<string, string> = {
   below_100: "Below 100% FPL",
@@ -317,10 +318,18 @@ export default function Enrollment() {
       <Tabs defaultValue="waitlist">
         <TabsList>
           <TabsTrigger value="waitlist">Waitlist & Applications</TabsTrigger>
+          {hasHeadStart && <TabsTrigger value="verification">Verification</TabsTrigger>}
           <TabsTrigger value="enrolled">Currently Enrolled</TabsTrigger>
           <TabsTrigger value="capacity">Capacity Planning</TabsTrigger>
           {hasHeadStart && <TabsTrigger value="incidents">§1302.17 Log</TabsTrigger>}
         </TabsList>
+
+        {hasHeadStart && (
+          <TabsContent value="verification" className="mt-4">
+            {/* ERSEA document checklist — shares data with the iOS screen */}
+            <VerificationChecklist />
+          </TabsContent>
+        )}
 
         <TabsContent value="waitlist" className="mt-4 space-y-4">
           <div className="relative max-w-xs">
