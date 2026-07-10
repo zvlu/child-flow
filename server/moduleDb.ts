@@ -1422,3 +1422,58 @@ export async function getDeviceTokensForOrgStaff(organizationId: number): Promis
     .where(and(eq(users.organizationId, organizationId), inArray(users.role, ["admin", "staff"])));
   return rows.map(r => r.token);
 }
+
+/**
+ * Kiosk check-in/out: upsert ONE child's attendance for today without
+ * touching anyone else's records (saveAttendanceForDate replaces the whole
+ * day, which would be catastrophic from a door tablet).
+ */
+export async function markAttendance(
+  organizationId: number,
+  childId: number,
+  action: "check_in" | "check_out" | "absent",
+  recordedBy?: number | null,
+) {
+  const db = await requireDb();
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+  const now = new Date();
+
+  const [existing] = await db
+    .select()
+    .from(attendance)
+    .where(and(
+      eq(attendance.organizationId, organizationId),
+      eq(attendance.childId, childId),
+      gte(attendance.date, startOfDay),
+      lte(attendance.date, endOfDay),
+    ))
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(attendance)
+      .set(
+        action === "check_in"
+          ? { status: "present", checkInTime: existing.checkInTime ?? now, checkOutTime: null }
+          : action === "check_out"
+            ? { status: "present", checkInTime: existing.checkInTime ?? now, checkOutTime: now }
+            : { status: "absent", checkInTime: null, checkOutTime: null },
+      )
+      .where(eq(attendance.id, existing.id));
+    return { id: existing.id, updated: true };
+  }
+
+  const [ins] = await db.insert(attendance).values({
+    organizationId,
+    childId,
+    date: startOfDay,
+    status: action === "absent" ? "absent" : "present",
+    checkInTime: action === "absent" ? null : now,
+    checkOutTime: action === "check_out" ? now : null,
+    recordedBy: recordedBy ?? null,
+  });
+  return { id: ins.insertId, updated: false };
+}

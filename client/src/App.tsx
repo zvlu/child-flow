@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Children from "./pages/Children";
 import DataImport from "./pages/DataImport";
+import Kiosk from "./pages/Kiosk";
 import ChildDetail from "./pages/ChildDetail";
 import DailyReports from "./pages/DailyReports";
 import LessonPlanning from "./pages/LessonPlanning";
@@ -58,6 +59,8 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/request-program" component={RequestProgram} />
       <Route path="/signin" component={SignIn} />
+      {/* Kiosk runs chromeless — it's the tablet at the classroom door. */}
+      <Route path="/kiosk" component={Kiosk} />
       <Route path="/dashboard">
         {() => (
           <AppLayout>

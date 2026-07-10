@@ -839,6 +839,19 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return mod.getAttendanceRange(input.organizationId, input.start, input.end);
       }),
+    // Kiosk: one-tap check-in/out for a single child (upsert, today only).
+    mark: orgStaffProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          childId: z.number(),
+          action: z.enum(["check_in", "check_out", "absent"]),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await assertChildInOrg(ctx.user, input.childId);
+        return mod.markAttendance(input.organizationId, input.childId, input.action, ctx.user.id);
+      }),
     save: orgStaffProcedure
       .input(
         z.object({

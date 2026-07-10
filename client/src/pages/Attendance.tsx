@@ -5,7 +5,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
-import { CheckCircle2, XCircle, Clock, AlertCircle, Save, Download, CalendarDays, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, AlertCircle, Save, Download, CalendarDays, Loader2, MonitorSmartphone } from "lucide-react";
+import { Link } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -179,6 +180,11 @@ export default function Attendance() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/kiosk">
+            <Button variant="outline" size="sm" className="gap-2">
+              <MonitorSmartphone className="h-4 w-4" />Kiosk Mode
+            </Button>
+          </Link>
           <Button variant="outline" size="sm" className="gap-2" onClick={exportAttendance}><Download className="h-4 w-4" />Export</Button>
           <Button size="sm" className="gap-2" onClick={handleSave} disabled={saveMutation.isPending || isRosterLoading}>
             {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
