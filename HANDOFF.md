@@ -2,6 +2,31 @@
 
 State of the world after the big build session. Read this first in a new session.
 
+## July 10 session (10 commits on feature/ios-app)
+
+All web unless noted; tsc-clean, 46/46 vitest, vite build passing at every commit.
+
+| Feature | Where | Notes |
+|---------|-------|-------|
+| Data Import (one-upload roster migration) | `/data-import`, `server/dataImport.ts` | Children + deduped families (siblings auto-link) + health records from one CSV; template download, alias column matching, per-row validation. Unit tested. |
+| Onboarding checklist | Dashboard, `components/OnboardingChecklist.tsx` | 5 live-detected setup steps; dismissible (localStorage). |
+| Unified action feed | `hooks/useActionItems.ts` | Health + AI insights + documents + credentials + chronic absence; shared by Action Queue and the dashboard "Needs Attention Today" card. |
+| Web family chat | Communication → Family Chat tab, `components/FamilyChat.tsx` | Same REST endpoints as iOS; translation w/ show-original, unread badges, read receipts, 5s polling. |
+| AI case summaries (true LLM) | Family Services → AI Summary; `familyCaseNotes.summarize` | Structured output: summary, themes, goal links. Supersedes the "template engine" note in deferred items. |
+| Chronic-absence alerts + staff push | `server/absenceAlerts.ts`, hooked into `attendance.save` | Compliance-flag insight (dedupes via undismissed flag) + one batched APNs push to org staff. |
+| Empty-patch guards | `server/_core/patch.ts` | Applied to all nine all-optional update helpers; closes the drizzle "No values to set" item below. |
+| Global record search | Cmd+K palette | Live children/families results; `/family-services?family=<id>` deep link. |
+| Chat language setting | Settings → Notifications | `users.settings.preferredLanguage` settable on web (was iOS-only). |
+| ERSEA verification checklist | Enrollment → Verification tab | Web parity with iOS Application Verification; same REST + JSON shapes, syncs mid-checklist. |
+| Audit Readiness Score | Compliance (full) + Dashboard (compact); `server/auditReadiness.ts` | Weighted live score across §1302.42/.16/.52/.12–.14/.91 + PIR. Unit tested. |
+| Review Binder export | Compliance → Export Review Binder | Print-ready evidence package: readiness, roster, ADA, health deadlines, FPAs, credentials. |
+| Kiosk check-in | `/kiosk` (chromeless route); button on Attendance | New `attendance.mark` single-child upsert — the old `attendance.save` REPLACES the whole day; never call it from kiosks. |
+| Recurring tuition + AR aging | Billing page; `server/billingPlans.ts` | **NEW TABLE `billing_plans` — run `pnpm db:push`.** Idempotent invoice generation with catch-up; aging buckets. Unit tested. |
+| Seed data | `scripts/seed.ts` | Now also seeds family goals, case notes (rich enough for AI summary), translated chat threads + 2 parent users. |
+
+Also: credential expiry flags and breadcrumbs listed as "not built" below turned
+out to already exist — those notes are stale, not the features.
+
 ## What's built (competitive roadmap: 13/13 complete)
 
 | # | Feature | iOS | Web | Where |
@@ -65,16 +90,20 @@ Cowork sandbox — builds must happen in Xcode on the Mac.
 
 - iOS staff app has NOT been compiled since the new files were added —
   needs `xcodegen generate` + Xcode build; expect minor fixes.
-- Case note assistant is template-based; "AI summarize + goal-link" not wired.
-- Staff credential expiry auto-flags (#10) not built.
-- Empty-patch mutations (all-optional zod updates) throw drizzle
-  "No values to set" — unreachable from UI, guard if exposing APIs.
-- Web Communication page is broadcast logs; thread chat UI is iOS-only.
+- ~~Case note assistant is template-based~~ → done July 10 (web `familyCaseNotes.summarize`); iOS still uses the template engine, could call the new route.
+- ~~Staff credential expiry auto-flags~~ → was already built (live status in Action Queue / Staff Ops); note was stale.
+- ~~Empty-patch mutations throw drizzle "No values to set"~~ → guarded July 10 (`server/_core/patch.ts`).
+- ~~Web Communication is broadcast-only~~ → Family Chat tab added July 10.
+- Online payments (Stripe/ACH) not started — needs merchant onboarding + API keys, deliberate decision.
+- Invoice auto-generation is button-triggered; no server cron yet (route `billing.generateInvoices` is idempotent and cron-safe).
+- Kiosk has no PIN lock — anyone at the tablet can check any child in/out. Fine for staff-operated drop-off; add a per-family PIN before parent-operated use.
+- `NEXT_PUBLIC_SITE_URL` (landing repo) and APNs/Gemini env vars unset in production.
 
 ## Suggested next steps
 
-1. Build both iOS targets in Xcode; fix compile fallout.
-2. Click through demo with seeded data; polish rough edges.
-3. Staff credential tracker (#10 completion) — cheap win.
-4. Push notifications for chronic-absence threshold crossings.
-5. True LLM case-note summarization (engine exists in `_core/llm.ts`).
+1. Push feature/ios-app (10 commits), `pnpm db:push` (billing_plans), re-seed, click through the demo.
+2. Build both iOS targets in Xcode; fix compile fallout.
+3. Put the demo in front of a real Head Start director; their notes > more features.
+4. Validate Audit Readiness weights/thresholds with that director (they're first-pass readings of the standards).
+5. Stripe checkout for invoices when ready to take payments.
+6. Point iOS case-note assistant at the new `familyCaseNotes.summarize` route.
