@@ -148,7 +148,10 @@ export default function Settings() {
           {loading ? (
             <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : (
-            <NotificationPreferences settings={user?.settings} onSaved={refresh} disabled={!user} />
+            <>
+              <NotificationPreferences settings={user?.settings} onSaved={refresh} disabled={!user} />
+              <ChatLanguageCard settings={user?.settings} onSaved={refresh} disabled={!user} />
+            </>
           )}
         </TabsContent>
 
@@ -378,6 +381,64 @@ function NotificationPreferences({ settings, onSaved, disabled }: { settings: an
         >
           {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Save Preferences
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ------------------------- Chat language ------------------------- */
+
+const CHAT_LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Español (Spanish)" },
+  { code: "ht", label: "Kreyòl Ayisyen (Haitian Creole)" },
+  { code: "zh-Hans", label: "简体中文 (Simplified Chinese)" },
+  { code: "vi", label: "Tiếng Việt (Vietnamese)" },
+  { code: "ar", label: "العربية (Arabic)" },
+] as const;
+
+/** Family-chat translation preference: messages from families render in this language. */
+function ChatLanguageCard({ settings, onSaved, disabled }: { settings: any; onSaved: () => Promise<void>; disabled: boolean }) {
+  const stored: string = settings?.preferredLanguage ?? "en";
+  const [lang, setLang] = useState(stored);
+  useEffect(() => { setLang(stored); }, [stored]);
+
+  const save = trpc.auth.updateSettings.useMutation({
+    onSuccess: async () => { await onSaved(); toast.success("Chat language saved"); },
+    onError: (e) => toast.error(e.message || "Could not save language"),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Bell className="h-4 w-4 text-primary" />
+          Family Chat Language
+        </CardTitle>
+        <CardDescription>
+          Messages from families are automatically translated into this language for you. Your replies are
+          translated into each family's language.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <Select value={lang} onValueChange={setLang} disabled={disabled}>
+          <SelectTrigger className="sm:w-72">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CHAT_LANGUAGES.map((l) => (
+              <SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          className="gap-2"
+          disabled={disabled || lang === stored || save.isPending}
+          onClick={() => save.mutate({ preferredLanguage: lang as any })}
+        >
+          {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Save
         </Button>
       </CardContent>
     </Card>

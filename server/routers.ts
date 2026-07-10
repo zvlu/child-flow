@@ -8,6 +8,7 @@ import { publicProcedure, protectedProcedure, router, staffProcedure, adminProce
 import { isPlatformOwner } from "./_core/env";
 import { invalidateModuleCache, orgHasModule } from "./_core/modules";
 import { checkChronicAbsenceAlerts } from "./absenceAlerts";
+import { SUPPORTED_LANGUAGES } from "./translation";
 import { auditAccess } from "./_core/audit";
 import { hashPassword, verifyPassword } from "./_core/password";
 import { persistMediaDataUrl } from "./storage";
@@ -162,6 +163,8 @@ export const appRouter = router({
         z.object({
           twoFactorEnabled: z.boolean().optional(),
           notifications: z.record(z.string(), z.boolean()).optional(),
+          // Chat translation: messages from families render in this language.
+          preferredLanguage: z.enum(SUPPORTED_LANGUAGES).optional(),
           navigation: z
             .object({
               topNav: z.object({ order: z.array(z.string()).optional(), hidden: z.array(z.string()).optional() }).optional(),
