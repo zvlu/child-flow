@@ -175,6 +175,25 @@ export default function ChildDetail({ id }: ChildDetailProps) {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editStatus, setEditStatus] = useState<"active" | "inactive" | "graduated" | "withdrawn">("active");
   const [editNotes, setEditNotes] = useState("");
+
+  // Stat cards jump to their tab, so Tabs must be controlled.
+  const [activeTab, setActiveTab] = useState("profile");
+
+  // Sibling linking: pick another child and merge them into this family.
+  const [showSiblingDialog, setShowSiblingDialog] = useState(false);
+  const [siblingPickId, setSiblingPickId] = useState("");
+  const { data: allChildren } = trpc.children.list.useQuery(ORGANIZATION_ID);
+  const linkSibling = trpc.children.update.useMutation({
+    onSuccess: () => {
+      utils.children.siblings.invalidate();
+      utils.children.getById.invalidate(childId);
+      utils.children.list.invalidate(ORGANIZATION_ID);
+      toast.success("Sibling linked — they now share family data");
+      setShowSiblingDialog(false);
+      setSiblingPickId("");
+    },
+    onError: (err) => toast.error(err.message || "Could not link sibling"),
+  });
   const updateChild = trpc.children.update.useMutation({
     onSuccess: () => {
       utils.children.getById.invalidate(childId);
@@ -516,26 +535,84 @@ export default function ChildDetail({ id }: ChildDetailProps) {
         </DialogContent>
       </Dialog>
 
+      {/* Link Sibling Dialog */}
+      <Dialog open={showSiblingDialog} onOpenChange={setShowSiblingDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link a sibling</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {child.familyId
+              ? `The child you pick joins ${child.firstName}'s family and shares its contacts, agreements, and messages.`
+              : `${child.firstName} has no family on record yet — picking a child who has one will add ${child.firstName} to that family.`}
+          </p>
+          <Select value={siblingPickId} onValueChange={setSiblingPickId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Choose a child" />
+            </SelectTrigger>
+            <SelectContent>
+              {(allChildren ?? [])
+                .filter((c: any) => c.id !== childId && (child.familyId == null || c.familyId !== child.familyId))
+                .sort((a: any, b: any) => a.firstName.localeCompare(b.firstName))
+                .map((c: any) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.firstName} {c.lastName}
+                    {c.familyId != null ? " (already in a family)" : ""}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowSiblingDialog(false)}>Cancel</Button>
+            <Button
+              disabled={!siblingPickId || linkSibling.isPending}
+              onClick={() => {
+                const pick = (allChildren ?? []).find((c: any) => c.id === Number(siblingPickId));
+                if (!pick) return;
+                if (child.familyId != null) {
+                  linkSibling.mutate({ id: pick.id, familyId: child.familyId });
+                } else if (pick.familyId != null) {
+                  linkSibling.mutate({ id: childId, familyId: pick.familyId });
+                } else {
+                  toast.error("Neither child has a family yet — add family details on the Family tab first.");
+                }
+              }}
+            >
+              {linkSibling.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+              Link Sibling
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Main Content Area */}
         <div className="lg:col-span-3 space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: "Attendance Rate", value: attendance.rate !== null ? `${attendance.rate}%` : "—", color: "text-green-600" },
-              { label: "Days Present", value: attendance.present, color: "text-foreground" },
-              { label: "Health Status", value: overallHealthStatus.label, color: overallHealthStatus.color },
-              { label: "Enrolled Since", value: formatDate(child.enrollmentDate), color: "text-foreground" },
+              { label: "Attendance Rate", value: attendance.rate !== null ? `${attendance.rate}%` : "—", color: "text-green-600", tab: "attendance" },
+              { label: "Days Present", value: attendance.present, color: "text-foreground", tab: "attendance" },
+              { label: "Health Status", value: overallHealthStatus.label, color: overallHealthStatus.color, tab: "health" },
+              { label: "Enrolled Since", value: formatDate(child.enrollmentDate), color: "text-foreground", tab: "profile" },
             ].map(stat => (
-              <Card key={stat.label} className="rounded-xl border-border shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">{stat.label}</p>
-                  <p className={`text-xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
-                </CardContent>
-              </Card>
+              <button
+                key={stat.label}
+                type="button"
+                onClick={() => setActiveTab(stat.tab)}
+                aria-label={`View ${stat.tab} details`}
+                className="text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <Card className="rounded-xl border-border shadow-sm h-full cursor-pointer transition-all hover:shadow-md hover:border-primary/40">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">{stat.label}</p>
+                    <p className={`text-xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+                  </CardContent>
+                </Card>
+              </button>
             ))}
           </div>
 
-          <Tabs defaultValue="profile" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="bg-card border border-border p-1 rounded-xl w-fit shadow-sm mb-6">
               <TabsTrigger value="profile" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Profile</TabsTrigger>
               <TabsTrigger value="health" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Health</TabsTrigger>
@@ -893,7 +970,13 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                 <CardTitle className="text-lg font-bold flex items-center gap-2 text-primary">
                   <Users className="h-5 w-5" /> Sibling Group
                 </CardTitle>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/20">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-primary hover:bg-primary/20"
+                  aria-label="Link a sibling"
+                  onClick={() => setShowSiblingDialog(true)}
+                >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -928,7 +1011,12 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                   </div>
                   <p className="text-sm text-muted-foreground font-bold">No siblings linked</p>
                   <p className="text-[11px] text-muted-foreground font-bold mt-1">Add a sibling to share family data</p>
-                  <Button variant="outline" size="sm" className="mt-4 font-bold text-xs border-border hover:bg-primary hover:text-white hover:border-primary transition-all">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 font-bold text-xs border-border hover:bg-primary hover:text-white hover:border-primary transition-all"
+                    onClick={() => setShowSiblingDialog(true)}
+                  >
                     Link Sibling
                   </Button>
                 </div>

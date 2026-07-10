@@ -384,11 +384,16 @@ export const appRouter = router({
           gender: z.enum(["male", "female", "other", "prefer_not_to_say"]).optional(),
           status: z.enum(["active", "inactive", "graduated", "withdrawn"]).optional(),
           notes: z.string().optional(),
+          // Sibling linking: move the child into a family (null = unlink).
+          familyId: z.number().nullable().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
         await assertChildInOrg(ctx.user, id);
+        if (data.familyId != null) {
+          await assertRecordInOrg(ctx.user, "family", data.familyId);
+        }
         await auditAccess(ctx, { action: "update", resourceType: "child", resourceId: id });
         return mod.updateChild(id, data);
       }),
