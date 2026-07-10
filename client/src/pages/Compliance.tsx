@@ -10,6 +10,7 @@ import PirReportEditor from "@/components/PirReportEditor";
 import PirReportView from "@/components/PirReportView";
 import { Glossary } from "@/components/Glossary";
 import { AuditReadiness } from "@/components/AuditReadiness";
+import { ReviewBinderButton } from "@/components/ReviewBinder";
 
 const monitoringItems = [
   { area: "Child-to-Staff Ratio", status: "compliant", lastReview: "Nov 1, 2024", notes: "All classrooms within required ratios" },
@@ -99,6 +100,7 @@ export default function Compliance() {
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-1.5">Compliance & PIR <Glossary term="PIR" /></h1>
           <p className="text-muted-foreground text-sm mt-0.5">Program Information Report and federal compliance tracking</p>
         </div>
+        <ReviewBinderButton />
       </div>
 
       {/* Live per-standard readiness score */}
