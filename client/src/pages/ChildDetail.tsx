@@ -224,7 +224,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
 
   if (isChildLoading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[50vh] bg-[#FBF6EE]">
+      <div className="p-6 flex items-center justify-center min-h-[50vh] bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -232,7 +232,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
 
   if (!child) {
     return (
-      <div className="p-6 bg-[#FBF6EE] min-h-full">
+      <div className="p-6 bg-background min-h-full">
         <div className="text-center py-20">
           <Baby className="h-14 w-14 mx-auto mb-4 text-muted-foreground" />
           <h2 className="text-xl font-bold text-foreground">Child not found</h2>
@@ -258,7 +258,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
   });
 
   return (
-    <div className="p-6 space-y-6 bg-[#FBF6EE] min-h-full">
+    <div className="p-6 space-y-6 bg-background min-h-full">
       <div className="flex items-center gap-4">
         <Link href="/children">
           <Button variant="ghost" size="sm" className="gap-2 font-bold">

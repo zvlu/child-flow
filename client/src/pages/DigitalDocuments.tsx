@@ -85,16 +85,16 @@ export function DigitalDocuments() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted p-6">
+    <div className="p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <FileText className="w-8 h-8 text-[#4F7C5D]" />
-              <h1 className="text-4xl font-bold text-foreground">Digital Documents</h1>
+              <FileText className="w-8 h-8 text-primary" />
+              <h1 className="text-2xl font-bold text-foreground">Digital Documents</h1>
             </div>
-            <button onClick={() => setShowUploadModal(true)} className="bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
+            <button onClick={() => setShowUploadModal(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
               <Upload className="w-5 h-5" />Add Document
             </button>
           </div>
@@ -118,7 +118,7 @@ export function DigitalDocuments() {
 
         {/* Filter */}
         <div className="bg-card rounded-xl shadow-sm border border-border p-4 mb-6">
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] bg-background text-foreground">
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground">
             <option value="all">All Documents</option>
             <option value="signed">Signed</option>
             <option value="pending">Pending</option>
@@ -174,7 +174,7 @@ export function DigitalDocuments() {
                         <div className="flex items-center gap-2">
                           <button onClick={() => onOpen(doc)} className="p-2 hover:bg-muted rounded-lg transition-colors" aria-label="Open document"><Eye className="w-4 h-4 text-muted-foreground" /></button>
                           {doc.status !== "signed" && (
-                            <button onClick={() => onSign(doc)} disabled={sign.isPending} className="p-2 hover:bg-muted rounded-lg transition-colors" aria-label="Mark as signed"><PenLine className="w-4 h-4 text-[#4F7C5D]" /></button>
+                            <button onClick={() => onSign(doc)} disabled={sign.isPending} className="p-2 hover:bg-muted rounded-lg transition-colors" aria-label="Mark as signed"><PenLine className="w-4 h-4 text-primary" /></button>
                           )}
                         </div>
                       </td>
@@ -194,29 +194,29 @@ export function DigitalDocuments() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">Document Type</label>
-                  <select value={form.documentType} onChange={(e) => setForm((f) => ({ ...f, documentType: e.target.value }))} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] bg-background text-foreground">
+                  <select value={form.documentType} onChange={(e) => setForm((f) => ({ ...f, documentType: e.target.value }))} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground">
                     {DOC_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">Family</label>
-                  <select value={form.familyId} onChange={(e) => setForm((f) => ({ ...f, familyId: e.target.value }))} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] bg-background text-foreground">
+                  <select value={form.familyId} onChange={(e) => setForm((f) => ({ ...f, familyId: e.target.value }))} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground">
                     <option value="">Select family...</option>
                     {families.map((f) => <option key={f.id} value={String(f.id)}>{f.primaryContactName}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">Link (optional)</label>
-                  <input type="url" placeholder="https://… (where the form lives)" value={form.documentUrl} onChange={(e) => setForm((f) => ({ ...f, documentUrl: e.target.value }))} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] bg-background text-foreground" />
+                  <input type="url" placeholder="https://… (where the form lives)" value={form.documentUrl} onChange={(e) => setForm((f) => ({ ...f, documentUrl: e.target.value }))} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground" />
                   <p className="text-xs text-muted-foreground mt-1">File uploads aren't connected yet — paste a link, or just record the document for signature tracking.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">Expires (Optional)</label>
-                  <input type="date" value={form.expiresAt} onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] bg-background text-foreground" />
+                  <input type="date" value={form.expiresAt} onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground" />
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button onClick={() => setShowUploadModal(false)} className="flex-1 bg-muted hover:bg-muted/80 text-muted-foreground px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
-                  <button onClick={submit} disabled={create.isPending} className="flex-1 bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl transition-colors font-medium inline-flex items-center justify-center gap-2 disabled:opacity-60">
+                  <button onClick={submit} disabled={create.isPending} className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-xl transition-colors font-medium inline-flex items-center justify-center gap-2 disabled:opacity-60">
                     {create.isPending && <Loader2 className="w-4 h-4 animate-spin" />}Add
                   </button>
                 </div>

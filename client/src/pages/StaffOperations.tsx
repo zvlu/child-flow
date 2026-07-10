@@ -118,13 +118,13 @@ export function StaffOperations() {
   const isLoadingClock = staffLoading || entriesLoading;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted p-6">
+    <div className="p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
-            <Clock className="w-8 h-8 text-[#4F7C5D]" />
-            <h1 className="text-4xl font-bold text-foreground">Staff Operations</h1>
+            <Clock className="w-6 h-6 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">Staff Operations</h1>
           </div>
         </div>
 
@@ -223,7 +223,7 @@ export function StaffOperations() {
             {isAdmin && (
               <button
                 onClick={() => setShowCertModal(true)}
-                className="bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl transition-colors font-medium flex items-center gap-2"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-xl transition-colors font-medium flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 Add Certification
@@ -312,7 +312,7 @@ export function StaffOperations() {
                   <select
                     value={certForm.staffId}
                     onChange={(e) => setCertForm((f) => ({ ...f, staffId: e.target.value }))}
-                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Choose a staff member...</option>
                     {(staff ?? []).map((member) => (
@@ -330,7 +330,7 @@ export function StaffOperations() {
                     placeholder="e.g. CPR/First Aid, CDA"
                     value={certForm.certificationType}
                     onChange={(e) => setCertForm((f) => ({ ...f, certificationType: e.target.value }))}
-                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
 
@@ -341,7 +341,7 @@ export function StaffOperations() {
                       type="date"
                       value={certForm.issueDate}
                       onChange={(e) => setCertForm((f) => ({ ...f, issueDate: e.target.value }))}
-                      className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                      className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                   <div>
@@ -350,7 +350,7 @@ export function StaffOperations() {
                       type="date"
                       value={certForm.expiryDate}
                       onChange={(e) => setCertForm((f) => ({ ...f, expiryDate: e.target.value }))}
-                      className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                      className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                 </div>
@@ -361,7 +361,7 @@ export function StaffOperations() {
                     type="text"
                     value={certForm.certificationNumber}
                     onChange={(e) => setCertForm((f) => ({ ...f, certificationNumber: e.target.value }))}
-                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
 
@@ -375,7 +375,7 @@ export function StaffOperations() {
                   <button
                     onClick={submitCertification}
                     disabled={createCertification.isPending}
-                    className="flex-1 bg-[#4F7C5D] hover:bg-[#3C5E47] disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium flex items-center justify-center gap-2"
+                    className="flex-1 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium flex items-center justify-center gap-2"
                   >
                     {createCertification.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                     Save Certification

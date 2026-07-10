@@ -69,13 +69,13 @@ export function AIInsights() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted p-6">
+    <div className="p-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <Sparkles className="w-8 h-8 text-[#4F7C5D]" />
-            <h1 className="text-4xl font-bold text-foreground">AI Insights</h1>
+            <Sparkles className="w-6 h-6 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">AI Insights</h1>
           </div>
           <p className="text-muted-foreground">
             AI-powered recommendations and alerts for your program
@@ -92,7 +92,7 @@ export function AIInsights() {
                   {filteredInsights.length}
                 </p>
               </div>
-              <Sparkles className="w-10 h-10 text-[#E7F0E9]" />
+              <Sparkles className="w-10 h-10 text-primary-foreground" />
             </div>
           </div>
 
@@ -131,7 +131,7 @@ export function AIInsights() {
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value)}
-                className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="all">All Priorities</option>
                 <option value="critical">Critical</option>
@@ -148,7 +148,7 @@ export function AIInsights() {
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="all">All Types</option>
                 {insightTypes.map((type) => (
@@ -237,7 +237,7 @@ export function AIInsights() {
         {/* Info Box */}
         <div className="mt-8 bg-[#F1F6F2] border border-[#CFE0D3] rounded-xl p-6">
           <div className="flex gap-4">
-            <Sparkles className="w-6 h-6 text-[#4F7C5D] flex-shrink-0 mt-1" />
+            <Sparkles className="w-6 h-6 text-primary flex-shrink-0 mt-1" />
             <div>
               <h3 className="font-semibold text-[#24382B] mb-1">
                 How AI Insights Work

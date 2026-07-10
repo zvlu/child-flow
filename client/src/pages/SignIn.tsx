@@ -28,7 +28,7 @@ export default function SignIn() {
 
   if (authLoading || user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FBF6EE]">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -60,7 +60,7 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FBF6EE] flex flex-col items-center justify-center px-4 py-10">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         <div className="flex items-center gap-2 mb-6 justify-center">
           <img src="/brand/logo-mark-64.png" alt="Sprout" className="w-8 h-8 rounded-lg" />

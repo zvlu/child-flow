@@ -131,16 +131,16 @@ export function MealPlanning() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted p-6">
+    <div className="p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <Apple className="w-8 h-8 text-[#4F7C5D]" />
-              <h1 className="text-4xl font-bold text-foreground flex items-center gap-2">CACFP Meal Planning <Glossary term="CACFP" /></h1>
+              <Apple className="w-8 h-8 text-primary" />
+              <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">CACFP Meal Planning <Glossary term="CACFP" /></h1>
             </div>
-            <button onClick={() => setShowModal(true)} className="bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
+            <button onClick={() => setShowModal(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
               <Plus className="w-5 h-5" />
               New Meal Plan
             </button>
@@ -320,7 +320,7 @@ export function MealPlanning() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-2">Classroom</label>
-                    <select value={newClassroomId} onChange={(e) => setNewClassroomId(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
+                    <select value={newClassroomId} onChange={(e) => setNewClassroomId(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring">
                       <option value="">Select classroom...</option>
                       {(classrooms ?? []).map((c) => (
                         <option key={c.id} value={c.id}>{c.name}</option>
@@ -329,18 +329,18 @@ export function MealPlanning() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-2">Week Starting</label>
-                    <input type="date" value={newWeekStart} onChange={(e) => setNewWeekStart(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]" />
+                    <input type="date" value={newWeekStart} onChange={(e) => setNewWeekStart(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring" />
                   </div>
                 </div>
                 {selectedPlan && planItems.length > 0 && (
                   <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <input type="checkbox" checked={copyFromSelected} onChange={(e) => setCopyFromSelected(e.target.checked)} className="rounded border-border text-[#4F7C5D] focus:ring-[#5E8C6A]" />
+                    <input type="checkbox" checked={copyFromSelected} onChange={(e) => setCopyFromSelected(e.target.checked)} className="rounded border-border text-primary focus:ring-ring" />
                     Copy menu items from selected plan ({formatWeek(selectedPlan.weekStartDate)}, {selectedPlan.classroomName})
                   </label>
                 )}
                 <div className="flex gap-3 pt-4">
                   <button onClick={() => setShowModal(false)} className="flex-1 bg-muted hover:bg-muted text-muted-foreground px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
-                  <button onClick={handleCreatePlan} disabled={createPlan.isPending} className="flex-1 bg-[#4F7C5D] hover:bg-[#3C5E47] disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium">
+                  <button onClick={handleCreatePlan} disabled={createPlan.isPending} className="flex-1 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium">
                     {createPlan.isPending ? "Creating..." : "Create Plan"}
                   </button>
                 </div>

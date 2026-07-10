@@ -105,11 +105,11 @@ export function BulkActionCenter() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted p-6">
+    <div className="p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Bulk Action Center</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Bulk Action Center</h1>
           <p className="text-muted-foreground">
             Save time by performing actions on entire classrooms at once
           </p>
@@ -123,7 +123,7 @@ export function BulkActionCenter() {
                 <p className="text-muted-foreground text-sm font-medium">Total Actions</p>
                 <p className="text-3xl font-bold text-foreground mt-1">{logs.length}</p>
               </div>
-              <BarChart3 className="w-12 h-12 text-[#E7F0E9]" />
+              <BarChart3 className="w-12 h-12 text-primary-foreground" />
             </div>
           </div>
           <div className="bg-card rounded-xl shadow-sm border border-border p-6">
@@ -227,7 +227,7 @@ export function BulkActionCenter() {
                   <select
                     value={selectedClassroom}
                     onChange={(e) => setSelectedClassroom(e.target.value)}
-                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] bg-background text-foreground"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
                   >
                     <option value="">Choose a classroom...</option>
                     {classrooms.map((c) => (
@@ -245,7 +245,7 @@ export function BulkActionCenter() {
                         onClick={() => setAttendanceStatus(s.value)}
                         className={`p-3 border rounded-xl transition-colors text-sm font-medium ${
                           attendanceStatus === s.value
-                            ? "border-[#5E8C6A] bg-[#F1F6F2] text-[#3C5E47]"
+                            ? "border-[#5E8C6A] bg-[#F1F6F2] text-accent-foreground"
                             : "border-border hover:border-[#5E8C6A] hover:bg-[#F1F6F2]"
                         }`}
                       >
@@ -271,7 +271,7 @@ export function BulkActionCenter() {
                   <button
                     onClick={applyAttendance}
                     disabled={bulkAttendance.isPending}
-                    className="flex-1 bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl transition-colors font-medium disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                    className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-xl transition-colors font-medium disabled:opacity-60 inline-flex items-center justify-center gap-2"
                   >
                     {bulkAttendance.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                     Apply to Classroom

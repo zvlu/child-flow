@@ -102,10 +102,10 @@ export function DocumentManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted p-6">
+    <div className="p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Document Management</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Document Management</h1>
           <p className="text-muted-foreground">Securely store and manage documents for children and families</p>
         </div>
 
@@ -120,13 +120,13 @@ export function DocumentManagement() {
                   placeholder="Search by child name or file..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] bg-background text-foreground"
+                  className="w-full pl-10 pr-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
                 />
               </div>
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                className="px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] bg-background text-foreground"
+                className="px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
               >
                 <option value="all">All Types</option>
                 {DOC_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -134,7 +134,7 @@ export function DocumentManagement() {
             </div>
             <button
               onClick={() => setShowUploadModal(true)}
-              className="bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-6 py-2 rounded-xl flex items-center gap-2 transition-colors"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-xl flex items-center gap-2 transition-colors"
             >
               <Plus className="w-5 h-5" />Add Document
             </button>
@@ -156,8 +156,8 @@ export function DocumentManagement() {
             {filtered.map((doc) => (
               <div key={doc.id} className="bg-card rounded-xl shadow-sm border border-border p-6 hover:shadow-md transition-shadow">
                 <div className="flex items-start gap-3 mb-4">
-                  <div className="bg-[#E7F0E9] p-3 rounded-xl">
-                    <FileText className="w-6 h-6 text-[#4F7C5D]" />
+                  <div className="bg-accent p-3 rounded-xl">
+                    <FileText className="w-6 h-6 text-primary" />
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-semibold text-foreground truncate">{childNameFor(doc.childId) ?? (doc.childId != null ? `Child #${doc.childId}` : "Unassigned")}</h3>
@@ -208,7 +208,7 @@ export function DocumentManagement() {
                   <select
                     value={form.childId}
                     onChange={(e) => setForm((f) => ({ ...f, childId: e.target.value }))}
-                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] bg-background text-foreground"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
                   >
                     <option value="">Choose a child...</option>
                     {children.map((c) => <option key={c.id} value={String(c.id)}>{c.firstName} {c.lastName}</option>)}
@@ -219,7 +219,7 @@ export function DocumentManagement() {
                   <select
                     value={form.documentType}
                     onChange={(e) => setForm((f) => ({ ...f, documentType: e.target.value }))}
-                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] bg-background text-foreground"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
                   >
                     {DOC_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
@@ -230,7 +230,7 @@ export function DocumentManagement() {
                     type="text" placeholder="e.g., emma_birth_cert.pdf"
                     value={form.fileName}
                     onChange={(e) => setForm((f) => ({ ...f, fileName: e.target.value }))}
-                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] bg-background text-foreground"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
                   />
                 </div>
                 <div>
@@ -239,7 +239,7 @@ export function DocumentManagement() {
                     type="url" placeholder="https://… (where the file lives)"
                     value={form.fileUrl}
                     onChange={(e) => setForm((f) => ({ ...f, fileUrl: e.target.value }))}
-                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] bg-background text-foreground"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
                   />
                   <p className="text-xs text-muted-foreground mt-1">File uploads aren't connected yet — paste a link, or just record the document.</p>
                 </div>
@@ -249,12 +249,12 @@ export function DocumentManagement() {
                     type="date"
                     value={form.expiryDate}
                     onChange={(e) => setForm((f) => ({ ...f, expiryDate: e.target.value }))}
-                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A] bg-background text-foreground"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground"
                   />
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button onClick={() => setShowUploadModal(false)} className="flex-1 bg-muted hover:bg-muted/80 text-muted-foreground px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
-                  <button onClick={submit} disabled={create.isPending} className="flex-1 bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl transition-colors font-medium inline-flex items-center justify-center gap-2 disabled:opacity-60">
+                  <button onClick={submit} disabled={create.isPending} className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-xl transition-colors font-medium inline-flex items-center justify-center gap-2 disabled:opacity-60">
                     {create.isPending && <Loader2 className="w-4 h-4 animate-spin" />}Save
                   </button>
                 </div>

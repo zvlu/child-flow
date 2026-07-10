@@ -126,17 +126,17 @@ export function Billing() {
     allInvoices.find((i) => i.id === id)?.invoiceNumber || `#${id}`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted p-6">
+    <div className="p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <DollarSign className="w-8 h-8 text-[#4F7C5D]" />
-              <h1 className="text-4xl font-bold text-foreground">Billing & Payments</h1>
+              <DollarSign className="w-8 h-8 text-primary" />
+              <h1 className="text-2xl font-bold text-foreground">Billing & Payments</h1>
             </div>
             {isAdmin && (
-              <button onClick={() => setShowModal(true)} className="bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
+              <button onClick={() => setShowModal(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
                 <Plus className="w-5 h-5" />
                 New Invoice
               </button>
@@ -173,7 +173,7 @@ export function Billing() {
         <div className="bg-card rounded-xl shadow-sm border border-border p-4 mb-6">
           <div className="flex items-center gap-2">
             <Filter className="w-5 h-5 text-muted-foreground" />
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring">
               <option value="all">All Invoices</option>
               <option value="draft">Draft</option>
               <option value="sent">Sent</option>
@@ -233,7 +233,7 @@ export function Billing() {
                             onClick={() => { setPaymentInvoiceId(invoice.id); setPaymentMethod("credit_card"); }}
                             className="p-2 hover:bg-muted rounded-lg transition-colors"
                           >
-                            <CreditCard className="w-4 h-4 text-[#4F7C5D]" />
+                            <CreditCard className="w-4 h-4 text-primary" />
                           </button>
                         )}
                         <button title="Download" className="p-2 hover:bg-muted rounded-lg transition-colors"><Download className="w-4 h-4 text-muted-foreground" /></button>
@@ -303,7 +303,7 @@ export function Billing() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-2">Family</label>
-                    <select value={familyId} onChange={(e) => setFamilyId(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
+                    <select value={familyId} onChange={(e) => setFamilyId(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring">
                       <option value="">Select family...</option>
                       {(families ?? []).map((f) => (
                         <option key={f.id} value={f.id}>{f.primaryContactName}</option>
@@ -312,22 +312,22 @@ export function Billing() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-2">Amount</label>
-                    <input type="number" min="0" step="0.01" placeholder="1200.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]" />
+                    <input type="number" min="0" step="0.01" placeholder="1200.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-2">Due Date</label>
-                    <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]" />
+                    <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-2">Description</label>
-                    <input type="text" placeholder="Tuition for January..." value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]" />
+                    <input type="text" placeholder="Tuition for January..." value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring" />
                   </div>
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button onClick={() => setShowModal(false)} className="flex-1 bg-muted hover:bg-muted text-muted-foreground px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
-                  <button onClick={handleCreateInvoice} disabled={createInvoice.isPending} className="flex-1 bg-[#4F7C5D] hover:bg-[#3C5E47] disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium">
+                  <button onClick={handleCreateInvoice} disabled={createInvoice.isPending} className="flex-1 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium">
                     {createInvoice.isPending ? "Creating..." : "Create Invoice"}
                   </button>
                 </div>
@@ -347,7 +347,7 @@ export function Billing() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">Payment Method</label>
-                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]">
+                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="credit_card">Credit Card</option>
                     <option value="ach">ACH</option>
                     <option value="check">Check</option>
@@ -356,7 +356,7 @@ export function Billing() {
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button onClick={() => setPaymentInvoiceId(null)} className="flex-1 bg-muted hover:bg-muted text-muted-foreground px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
-                  <button onClick={handleRecordPayment} disabled={recordPayment.isPending} className="flex-1 bg-[#4F7C5D] hover:bg-[#3C5E47] disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium">
+                  <button onClick={handleRecordPayment} disabled={recordPayment.isPending} className="flex-1 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium">
                     {recordPayment.isPending ? "Recording..." : "Record Payment"}
                   </button>
                 </div>
