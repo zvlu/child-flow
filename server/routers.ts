@@ -10,6 +10,7 @@ import { invalidateModuleCache, orgHasModule } from "./_core/modules";
 import { checkChronicAbsenceAlerts } from "./absenceAlerts";
 import { SUPPORTED_LANGUAGES } from "./translation";
 import { computeAuditReadiness } from "./auditReadiness";
+import { getBillingPlans, createBillingPlan, setBillingPlanActive, generateDueInvoices, getArAging } from "./billingPlans";
 import { auditAccess } from "./_core/audit";
 import { hashPassword, verifyPassword } from "./_core/password";
 import { persistMediaDataUrl } from "./storage";
@@ -1343,6 +1344,47 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         await auditAccess(ctx, { action: "create", resourceType: "payment", resourceId: input.invoiceId });
         return mod.recordPayment(input);
+      }),
+    // Recurring tuition plans → auto-generated invoices.
+    plans: orgStaffProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId }) => {
+        return getBillingPlans(organizationId);
+      }),
+    createPlan: orgAdminProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          familyId: z.number(),
+          childId: z.number().nullable().optional(),
+          name: z.string().min(1).max(200),
+          amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Enter a dollar amount like 850 or 850.50"),
+          frequency: z.enum(["weekly", "biweekly", "monthly"]),
+          nextInvoiceDate: z.string(),
+          notes: z.string().max(1000).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "create", resourceType: "billing_plan", detail: `family:${input.familyId}` });
+        return createBillingPlan({ ...input, childId: input.childId ?? undefined, nextInvoiceDate: new Date(input.nextInvoiceDate) });
+      }),
+    setPlanActive: orgAdminProcedure
+      .input(z.object({ id: z.number(), organizationId: z.number(), isActive: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
+        await auditAccess(ctx, { action: "update", resourceType: "billing_plan", resourceId: input.id, detail: input.isActive ? "activate" : "pause" });
+        return setBillingPlanActive(input.id, input.organizationId, input.isActive);
+      }),
+    generateInvoices: orgAdminProcedure
+      .input(z.number())
+      .mutation(async ({ input: organizationId, ctx }) => {
+        const result = await generateDueInvoices(organizationId);
+        await auditAccess(ctx, { action: "create", resourceType: "invoice", detail: `auto_generate:${result.created}` });
+        return result;
+      }),
+    aging: orgStaffProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId }) => {
+        return getArAging(organizationId);
       }),
   }),
 

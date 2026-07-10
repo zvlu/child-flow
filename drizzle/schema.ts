@@ -1026,6 +1026,31 @@ export const invoices = mysqlTable("invoices", {
 export type Invoice = typeof invoices.$inferSelect;
 export type InsertInvoice = typeof invoices.$inferInsert;
 
+/**
+ * Recurring tuition plans: the rate agreement behind auto-generated invoices.
+ * `nextInvoiceDate` advances by one period each time an invoice is generated,
+ * so generation is idempotent — running it twice in a day creates nothing new.
+ */
+export const billingPlans = mysqlTable("billing_plans", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  familyId: int("familyId").notNull().references(() => families.id),
+  /** Optional per-child rate (e.g. sibling discounts); null = family-level plan. */
+  childId: int("childId").references(() => children.id),
+  name: varchar("name", { length: 200 }).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  frequency: mysqlEnum("frequency", ["weekly", "biweekly", "monthly"]).default("monthly").notNull(),
+  /** Next date an invoice should be generated for. */
+  nextInvoiceDate: date("nextInvoiceDate").notNull(),
+  isActive: int("isActive").default(1).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type BillingPlan = typeof billingPlans.$inferSelect;
+export type InsertBillingPlan = typeof billingPlans.$inferInsert;
+
 export const payments = mysqlTable("payments", {
   id: int("id").autoincrement().primaryKey(),
   invoiceId: int("invoiceId").notNull().references(() => invoices.id),

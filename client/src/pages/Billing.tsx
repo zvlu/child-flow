@@ -3,6 +3,7 @@ import { DollarSign, Plus, Eye, Download, Filter, CreditCard, Loader2 } from "lu
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
+import { TuitionPlans, ArAgingCards } from "@/components/TuitionPlans";
 import { toast } from "sonner";
 
 const statusColors = {
@@ -160,6 +161,12 @@ export function Billing() {
             <p className="text-3xl font-bold text-foreground mt-2">{allInvoices.length}</p>
             <p className="text-xs text-muted-foreground mt-2">All time</p>
           </div>
+        </div>
+
+        {/* Recurring tuition + receivables aging */}
+        <div className="space-y-6 mb-8">
+          <TuitionPlans isAdmin={isAdmin} />
+          <ArAgingCards />
         </div>
 
         {/* Filter */}
