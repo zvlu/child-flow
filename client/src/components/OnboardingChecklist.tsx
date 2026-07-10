@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, Circle, ChevronRight, Rocket, X } from "lucide-react";
+import { CheckCircle2, ChevronRight, Rocket, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -113,34 +113,34 @@ export function OnboardingChecklist() {
         </div>
         <Progress value={(doneCount / steps.length) * 100} className="mt-2 h-1.5" />
       </CardHeader>
-      <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        {steps.map((step) => (
-          <Link key={step.key} href={step.href}>
-            <button
-              type="button"
-              className={`group flex h-full w-full flex-col rounded-lg border p-3 text-left transition-colors ${
+      <CardContent className="space-y-1.5">
+        {steps.map((step, i) => (
+          <Link key={step.key} href={step.href} asChild>
+            <a
+              className={`group flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 step.done
-                  ? "border-transparent bg-transparent opacity-70"
+                  ? "border-transparent opacity-60"
                   : "border-border bg-card hover:border-primary/40 hover:bg-primary/[0.04]"
               }`}
             >
-              <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-                {step.done ? (
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-                ) : (
-                  <Circle className="h-4 w-4 shrink-0 text-muted-foreground" />
-                )}
-                <span className={step.done ? "line-through decoration-muted-foreground/50" : undefined}>
-                  {step.label}
-                </span>
+              <span
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                  step.done ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground"
+                }`}
+              >
+                {step.done ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
               </span>
-              <span className="mt-1 flex-1 text-xs text-muted-foreground">{step.detail}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-foreground">{step.label}</span>
+                <span className="block truncate text-xs text-muted-foreground">{step.detail}</span>
+              </span>
               {!step.done && (
-                <span className="mt-2 inline-flex items-center gap-0.5 text-xs font-medium text-primary">
-                  Start <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-primary">
+                  Start
+                  <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                 </span>
               )}
-            </button>
+            </a>
           </Link>
         ))}
       </CardContent>
