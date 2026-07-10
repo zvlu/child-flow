@@ -1765,6 +1765,17 @@ export const appRouter = router({
         void notifyMomentPosted(input.childId, input.description); // fire-and-forget push to the family
         return created;
       }),
+    // Pull back a mis-logged moment (families see the feed in real time).
+    deleteActivity: orgStaffProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const result = await mod.deleteActivityLog(input.id, ctx.user.organizationId!);
+        if (!result.deleted) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Moment not found." });
+        }
+        await auditAccess(ctx, { action: "delete", resourceType: "activity_log", resourceId: input.id });
+        return result;
+      }),
     notifications: staffProcedure
       .input(z.number())
       .query(async ({ input: familyId, ctx }) => {

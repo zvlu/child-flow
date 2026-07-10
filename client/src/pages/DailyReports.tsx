@@ -1,14 +1,16 @@
 import { useMemo, useState } from "react";
+import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Apple, Moon, Droplet, Sparkles, MessageSquare, Camera, Loader2, Send, ImagePlus, X } from "lucide-react";
+import { Apple, Moon, Droplet, Sparkles, MessageSquare, Camera, Loader2, Send, ImagePlus, X, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type ActivityType = "meal" | "nap" | "diaper" | "activity" | "note" | "photo";
 
@@ -84,6 +86,15 @@ export default function DailyReports() {
   const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID);
   const { data: classroomMap } = trpc.children.classroomMap.useQuery(ORGANIZATION_ID);
   const { data: activities, isLoading } = trpc.parentPortal.activities.useQuery({ organizationId: ORGANIZATION_ID });
+
+  const confirm = useConfirm();
+  const deleteMoment = trpc.parentPortal.deleteActivity.useMutation({
+    onSuccess: () => {
+      utils.parentPortal.activities.invalidate();
+      toast.success("Moment removed from the feed");
+    },
+    onError: (e) => toast.error(e.message || "Couldn't remove that moment"),
+  });
 
   const log = trpc.parentPortal.logActivity.useMutation({
     onSuccess: () => {
@@ -264,13 +275,18 @@ export default function DailyReports() {
                     const meta = TYPE_META[a.activityType] ?? TYPE_META.activity;
                     const Icon = meta.icon;
                     return (
-                      <div key={a.id} className="flex items-start gap-3 p-4">
+                      <div key={a.id} className="group flex items-start gap-3 p-4">
                         <div className={`h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 ${meta.tint}`}>
                           <Icon className="h-4 w-4" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm text-foreground">{a.childName}</span>
+                            <Link
+                              href={`/children/${a.childId}`}
+                              className="font-semibold text-sm text-foreground hover:text-primary hover:underline underline-offset-2"
+                            >
+                              {a.childName}
+                            </Link>
                             <Badge variant="secondary" className="text-[10px] uppercase">{meta.label}</Badge>
                           </div>
                           <p className="text-sm text-foreground mt-0.5">{a.description}</p>
@@ -281,9 +297,31 @@ export default function DailyReports() {
                             {new Date(a.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · {a.staffName}
                           </p>
                         </div>
-                        <Avatar className="h-7 w-7 flex-shrink-0">
-                          <AvatarFallback className="bg-muted text-muted-foreground text-[10px] font-semibold">{initials(a.childName)}</AvatarFallback>
-                        </Avatar>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Remove this moment"
+                            className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-destructive transition-opacity"
+                            disabled={deleteMoment.isPending}
+                            onClick={async () => {
+                              if (await confirm({
+                                title: "Remove this moment?",
+                                description: `It disappears from the feed and from ${a.childName}'s family app immediately.`,
+                                destructive: true,
+                              })) {
+                                deleteMoment.mutate({ id: a.id });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Link href={`/children/${a.childId}`} aria-label={`Open ${a.childName}'s profile`}>
+                            <Avatar className="h-7 w-7 transition-transform hover:scale-105">
+                              <AvatarFallback className="bg-muted text-muted-foreground text-[10px] font-semibold">{initials(a.childName)}</AvatarFallback>
+                            </Avatar>
+                          </Link>
+                        </div>
                       </div>
                     );
                   })}

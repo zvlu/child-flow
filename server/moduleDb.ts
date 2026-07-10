@@ -1477,3 +1477,21 @@ export async function markAttendance(
   });
   return { id: ins.insertId, updated: false };
 }
+
+/**
+ * Remove a mis-logged daily-report moment. Org-scoped through the child join
+ * (activity logs don't carry organizationId directly). Families see moments
+ * in real time, so staff need a way to pull back a wrong-child entry.
+ */
+export async function deleteActivityLog(id: number, organizationId: number) {
+  const db = await requireDb();
+  const [row] = await db
+    .select({ id: activityLogs.id })
+    .from(activityLogs)
+    .innerJoin(children, eq(activityLogs.childId, children.id))
+    .where(and(eq(activityLogs.id, id), eq(children.organizationId, organizationId)))
+    .limit(1);
+  if (!row) return { deleted: false };
+  await db.delete(activityLogs).where(eq(activityLogs.id, id));
+  return { deleted: true };
+}
