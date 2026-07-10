@@ -158,7 +158,8 @@ export default function DataImport() {
       utils.children.list.invalidate(ORGANIZATION_ID);
       utils.families.list.invalidate(ORGANIZATION_ID);
       toast.success(
-        `Imported ${res.childrenCreated} children, ${res.familiesCreated} new families (${res.familiesMatched} matched), ${res.healthRecordsCreated} health records`
+        `Imported ${res.childrenCreated} children, ${res.familiesCreated} new families (${res.familiesMatched} matched), ${res.healthRecordsCreated} health records` +
+          (res.skippedDuplicates ? ` — ${res.skippedDuplicates} already on the roster, skipped` : "")
       );
       if (res.errors.length) {
         toast.warning(`${res.errors.length} row${res.errors.length === 1 ? "" : "s"} failed — see details below`);
@@ -375,6 +376,9 @@ export default function DataImport() {
                     {result.familiesCreated} families created, {result.familiesMatched} linked to existing families
                   </li>
                   <li>{result.healthRecordsCreated} health records added</li>
+                  {result.skippedDuplicates > 0 && (
+                    <li>{result.skippedDuplicates} skipped — already on the roster (same name and birth date)</li>
+                  )}
                 </ul>
                 {result.errors.length > 0 && (
                   <div className="mt-2 text-amber-700">

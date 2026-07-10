@@ -9,6 +9,7 @@ import { isPlatformOwner } from "./_core/env";
 import { invalidateModuleCache, orgHasModule } from "./_core/modules";
 import { checkChronicAbsenceAlerts } from "./absenceAlerts";
 import { SUPPORTED_LANGUAGES } from "./translation";
+import { rateLimit } from "./_core/rateLimit";
 import { computeAuditReadiness } from "./auditReadiness";
 import { getBillingPlans, createBillingPlan, setBillingPlanActive, generateDueInvoices, getArAging } from "./billingPlans";
 import { auditAccess } from "./_core/audit";
@@ -2156,6 +2157,11 @@ export const appRouter = router({
     summarize: hsStaffProcedure
       .input(z.object({ familyId: z.number() }))
       .mutation(async ({ input, ctx }) => {
+        // LLM calls cost real money — cap per user so a stuck client can't burn the budget.
+        const { ok, retryAfterSec } = rateLimit(`case-summary:${ctx.user.id}`, 10, 60_000);
+        if (!ok) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Too many summaries at once — try again in ${retryAfterSec}s.` });
+        }
         await assertRecordInOrg(ctx.user, "family", input.familyId);
         const result = await fcm.summarizeFamilyCaseNotes(input.familyId);
         if (!result) {

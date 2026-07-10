@@ -65,28 +65,35 @@ export async function generateDueInvoices(organizationId: number) {
 
   let created = 0;
   for (const plan of due) {
-    let cursor = new Date(plan.nextInvoiceDate);
-    let guard = 0;
-    while (cursor <= today && guard < 12) {
-      const dueDate = new Date(cursor);
-      dueDate.setDate(dueDate.getDate() + 7); // one week to pay
-      await db.insert(invoices).values({
-        organizationId,
-        familyId: plan.familyId,
-        invoiceNumber: `INV-${dateStr(cursor).replace(/-/g, "")}-P${plan.id}${guard ? `-${guard}` : ""}`,
-        amount: plan.amount,
-        dueDate,
-        status: "sent",
-        description: `${plan.name} — ${plan.frequency} tuition (period starting ${dateStr(cursor)})`,
-      });
-      created++;
-      guard++;
-      cursor = advance(cursor, plan.frequency);
-    }
-    await db
-      .update(billingPlans)
-      .set({ nextInvoiceDate: cursor })
-      .where(eq(billingPlans.id, plan.id));
+    // Money path: the plan's invoices and its cursor advance commit together.
+    // A crash mid-plan rolls both back, so re-running never double-bills.
+    const planCreated = await db.transaction(async (tx) => {
+      let cursor = new Date(plan.nextInvoiceDate);
+      let guard = 0;
+      let count = 0;
+      while (cursor <= today && guard < 12) {
+        const dueDate = new Date(cursor);
+        dueDate.setDate(dueDate.getDate() + 7); // one week to pay
+        await tx.insert(invoices).values({
+          organizationId,
+          familyId: plan.familyId,
+          invoiceNumber: `INV-${dateStr(cursor).replace(/-/g, "")}-P${plan.id}${guard ? `-${guard}` : ""}`,
+          amount: plan.amount,
+          dueDate,
+          status: "sent",
+          description: `${plan.name} — ${plan.frequency} tuition (period starting ${dateStr(cursor)})`,
+        });
+        count++;
+        guard++;
+        cursor = advance(cursor, plan.frequency);
+      }
+      await tx
+        .update(billingPlans)
+        .set({ nextInvoiceDate: cursor })
+        .where(eq(billingPlans.id, plan.id));
+      return count;
+    });
+    created += planCreated;
   }
 
   return { created, plansProcessed: due.length };

@@ -8,10 +8,15 @@ import { importRoster } from "./dataImport";
  */
 const inserted: { table: unknown; row: Record<string, any>; insertId: number }[] = [];
 let existingFamilies: Record<string, any>[] = [];
+let existingChildren: Record<string, any>[] = [];
 let nextId = 100;
 
 const fakeDb = {
-  select: () => ({ from: () => ({ where: () => Promise.resolve(existingFamilies) }) }),
+  select: (..._cols: unknown[]) => ({
+    from: (table: unknown) => ({
+      where: () => Promise.resolve(table === children ? existingChildren : existingFamilies),
+    }),
+  }),
   insert: (table: unknown) => ({
     values: (row: Record<string, any>) => {
       const insertId = nextId++;
@@ -19,6 +24,7 @@ const fakeDb = {
       return Promise.resolve([{ insertId }]);
     },
   }),
+  transaction: (fn: (tx: typeof fakeDb) => Promise<unknown>) => fn(fakeDb),
 };
 
 vi.mock("./db", () => ({ getDb: () => Promise.resolve(fakeDb) }));
@@ -29,6 +35,7 @@ describe("importRoster", () => {
   beforeEach(() => {
     inserted.length = 0;
     existingFamilies = [];
+    existingChildren = [];
     nextId = 100;
   });
 
@@ -109,6 +116,28 @@ describe("importRoster", () => {
     expect(result.childrenCreated).toBe(1);
     expect(result.familiesCreated).toBe(0);
     expect(insertedFor(children)[0].row.familyId).toBeUndefined();
+  });
+
+  it("skips children who already exist (same name + DOB) — re-upload is safe", async () => {
+    const dob = new Date("2021-03-12");
+    existingChildren = [{ firstName: "Sofia", lastName: "Ramirez", dateOfBirth: dob }];
+
+    const result = await importRoster(1, [
+      { firstName: "sofia", lastName: "RAMIREZ", dateOfBirth: dob }, // case-insensitive match
+      { firstName: "Mateo", lastName: "Ramirez", dateOfBirth: new Date("2022-11-02") },
+    ]);
+
+    expect(result.skippedDuplicates).toBe(1);
+    expect(result.childrenCreated).toBe(1);
+    expect(insertedFor(children)).toHaveLength(1);
+    expect(insertedFor(children)[0].row.firstName).toBe("Mateo");
+  });
+
+  it("skips duplicate rows within the same upload", async () => {
+    const row = { firstName: "Ana", lastName: "Solo", dateOfBirth: new Date("2021-01-01") };
+    const result = await importRoster(1, [row, { ...row }]);
+    expect(result.childrenCreated).toBe(1);
+    expect(result.skippedDuplicates).toBe(1);
   });
 
   it("records a per-row error without aborting the rest of the import", async () => {

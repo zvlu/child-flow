@@ -44,6 +44,8 @@ export type ImportRosterResult = {
   familiesCreated: number;
   familiesMatched: number;
   healthRecordsCreated: number;
+  /** Rows skipped because the child (name + DOB) already exists — makes re-uploading the same CSV safe. */
+  skippedDuplicates: number;
   errors: { rowIndex: number; message: string }[];
 };
 
@@ -88,6 +90,7 @@ export async function importRoster(
     familiesCreated: 0,
     familiesMatched: 0,
     healthRecordsCreated: 0,
+    skippedDuplicates: 0,
     errors: [],
   };
 
@@ -96,64 +99,98 @@ export async function importRoster(
   const familyIdByKey = new Map<string, number>();
   for (const f of existing) for (const k of keyForExisting(f)) if (!familyIdByKey.has(k)) familyIdByKey.set(k, f.id);
 
+  // Idempotency: a child with the same name + DOB already on the roster is
+  // skipped, so re-uploading the same spreadsheet never duplicates children.
+  const childKey = (first: string, last: string, dob: Date | null | undefined) =>
+    `${norm(first)}|${norm(last)}|${dob ? new Date(dob).toISOString().slice(0, 10) : ""}`;
+  const existingChildren = await db
+    .select({ firstName: children.firstName, lastName: children.lastName, dateOfBirth: children.dateOfBirth })
+    .from(children)
+    .where(eq(children.organizationId, organizationId));
+  const seenChildren = new Set(existingChildren.map((c) => childKey(c.firstName, c.lastName, c.dateOfBirth)));
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
+    const rowChildKey = childKey(row.firstName, row.lastName, row.dateOfBirth);
+    if (seenChildren.has(rowChildKey)) {
+      result.skippedDuplicates++;
+      continue;
+    }
     try {
-      // 1. Family: match or create (once per key — siblings share it).
-      let familyId: number | undefined;
-      const key = familyKey(row);
-      if (key) {
-        const matched = familyIdByKey.get(key);
-        if (matched !== undefined) {
-          familyId = matched;
-          result.familiesMatched++;
-        } else {
-          const [ins] = await db.insert(families).values({
+      // Each row commits atomically: family + child + health land together
+      // or not at all, so a mid-import failure can't leave orphaned halves.
+      const rowOutcome = await db.transaction(async (tx) => {
+        // 1. Family: match or create (once per key — siblings share it).
+        let familyId: number | undefined;
+        let familyCreated = false;
+        const key = familyKey(row);
+        if (key) {
+          const matched = familyIdByKey.get(key);
+          if (matched !== undefined) {
+            familyId = matched;
+          } else {
+            const [ins] = await tx.insert(families).values({
+              organizationId,
+              primaryContactName: row.familyContactName?.trim() || row.familyContactEmail!.trim(),
+              primaryContactPhone: row.familyContactPhone?.trim() || undefined,
+              primaryContactEmail: row.familyContactEmail?.trim() || undefined,
+              secondaryContactName: row.secondaryContactName?.trim() || undefined,
+              address: row.address?.trim() || undefined,
+              city: row.city?.trim() || undefined,
+              state: row.state?.trim().slice(0, 2).toUpperCase() || undefined,
+              zipCode: row.zipCode?.trim() || undefined,
+            });
+            familyId = ins.insertId;
+            familyCreated = true;
+          }
+        }
+
+        // 2. Child, linked to the family when present.
+        const [childIns] = await tx.insert(children).values({
+          organizationId,
+          firstName: row.firstName.trim(),
+          lastName: row.lastName.trim(),
+          dateOfBirth: row.dateOfBirth,
+          gender: row.gender,
+          status: row.status ?? "active",
+          familyId,
+          notes: row.notes?.trim() || undefined,
+        });
+        const childId = childIns.insertId;
+
+        // 3. Health records for any exam dates supplied.
+        let healthCreated = 0;
+        for (const [k, type] of Object.entries(HEALTH_TYPE_BY_KEY) as [keyof ImportHealthDates, (typeof HEALTH_TYPE_BY_KEY)[keyof ImportHealthDates]][]) {
+          const recordDate = row.health?.[k];
+          if (!recordDate) continue;
+          await tx.insert(healthRecords).values({
+            childId,
             organizationId,
-            primaryContactName: row.familyContactName?.trim() || row.familyContactEmail!.trim(),
-            primaryContactPhone: row.familyContactPhone?.trim() || undefined,
-            primaryContactEmail: row.familyContactEmail?.trim() || undefined,
-            secondaryContactName: row.secondaryContactName?.trim() || undefined,
-            address: row.address?.trim() || undefined,
-            city: row.city?.trim() || undefined,
-            state: row.state?.trim().slice(0, 2).toUpperCase() || undefined,
-            zipCode: row.zipCode?.trim() || undefined,
+            type,
+            status: "up_to_date",
+            recordDate,
+            provider: row.healthProvider?.trim() || undefined,
+            notes: "Imported from roster spreadsheet",
           });
-          familyId = ins.insertId;
-          familyIdByKey.set(key, familyId);
+          healthCreated++;
+        }
+
+        return { familyId, familyCreated, key, healthCreated };
+      });
+
+      // Only mutate shared state after the row committed — a rollback must
+      // not leave a phantom family id in the cache.
+      if (rowOutcome.key) {
+        if (rowOutcome.familyCreated) {
+          familyIdByKey.set(rowOutcome.key, rowOutcome.familyId!);
           result.familiesCreated++;
+        } else {
+          result.familiesMatched++;
         }
       }
-
-      // 2. Child, linked to the family when present.
-      const [childIns] = await db.insert(children).values({
-        organizationId,
-        firstName: row.firstName.trim(),
-        lastName: row.lastName.trim(),
-        dateOfBirth: row.dateOfBirth,
-        gender: row.gender,
-        status: row.status ?? "active",
-        familyId,
-        notes: row.notes?.trim() || undefined,
-      });
-      const childId = childIns.insertId;
+      seenChildren.add(rowChildKey);
       result.childrenCreated++;
-
-      // 3. Health records for any exam dates supplied.
-      for (const [k, type] of Object.entries(HEALTH_TYPE_BY_KEY) as [keyof ImportHealthDates, (typeof HEALTH_TYPE_BY_KEY)[keyof ImportHealthDates]][]) {
-        const recordDate = row.health?.[k];
-        if (!recordDate) continue;
-        await db.insert(healthRecords).values({
-          childId,
-          organizationId,
-          type,
-          status: "up_to_date",
-          recordDate,
-          provider: row.healthProvider?.trim() || undefined,
-          notes: "Imported from roster spreadsheet",
-        });
-        result.healthRecordsCreated++;
-      }
+      result.healthRecordsCreated += rowOutcome.healthCreated;
     } catch (err) {
       result.errors.push({
         rowIndex: i,

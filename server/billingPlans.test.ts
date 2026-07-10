@@ -28,6 +28,7 @@ const fakeDb = {
       },
     }),
   }),
+  transaction: (fn: (tx: typeof fakeDb) => Promise<unknown>) => fn(fakeDb),
 };
 
 vi.mock("./db", () => ({ getDb: () => Promise.resolve(fakeDb) }));

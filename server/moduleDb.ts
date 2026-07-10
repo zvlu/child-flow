@@ -231,19 +231,23 @@ export async function saveAttendanceForDate(
   startOfDay.setHours(0, 0, 0, 0);
   const endOfDay = new Date(date);
   endOfDay.setHours(23, 59, 59, 999);
-  await db.delete(attendance).where(and(
-    eq(attendance.organizationId, organizationId),
-    gte(attendance.date, startOfDay),
-    lte(attendance.date, endOfDay),
-  ));
-  if (records.length === 0) return { saved: 0 };
-  await db.insert(attendance).values(records.map(r => ({
-    ...r,
-    organizationId,
-    date: startOfDay,
-    recordedBy: recordedBy ?? null,
-  })));
-  return { saved: records.length };
+  // Replace-the-day must be atomic: a crash between delete and insert would
+  // otherwise erase the whole day's attendance.
+  return db.transaction(async (tx) => {
+    await tx.delete(attendance).where(and(
+      eq(attendance.organizationId, organizationId),
+      gte(attendance.date, startOfDay),
+      lte(attendance.date, endOfDay),
+    ));
+    if (records.length === 0) return { saved: 0 };
+    await tx.insert(attendance).values(records.map(r => ({
+      ...r,
+      organizationId,
+      date: startOfDay,
+      recordedBy: recordedBy ?? null,
+    })));
+    return { saved: records.length };
+  });
 }
 
 export async function getAttendanceRange(organizationId: number, start: Date, end: Date) {
