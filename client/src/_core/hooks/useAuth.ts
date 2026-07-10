@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import { syncOrganizationId } from "@/const";
 
 /**
  * Authentication state derived from the server session.
@@ -16,6 +17,13 @@ export function useAuth() {
   const logoutMutation = trpc.auth.logout.useMutation();
 
   const user = meQuery.data ?? null;
+
+  // Keep the client's active-org binding in step with the session. Idempotent
+  // and cheap, so doing it on every render (rather than an effect) guarantees
+  // it's set before any child component fires an org-scoped query.
+  if (user) {
+    syncOrganizationId((user as { organizationId?: number | null }).organizationId);
+  }
 
   return {
     user,

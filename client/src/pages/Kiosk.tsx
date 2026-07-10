@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { Loader2 } from "lucide-react";
 
 type ChildRow = { id: number; firstName: string; lastName: string; status: string | null };
 
@@ -26,6 +28,10 @@ function timeOf(d: string | Date | null | undefined) {
  * State refreshes every 30s so several door tablets stay in sync.
  */
 export default function Kiosk() {
+  // Chromeless route (no AppLayout), so gate on auth ourselves — this also
+  // guarantees the active-org binding is synced before queries fire.
+  const { loading: authLoading, user } = useAuth();
+
   const [classroomId, setClassroomId] = useState<string>("all");
   const [pending, setPending] = useState<ChildRow | null>(null);
   const [clock, setClock] = useState(new Date());
@@ -36,9 +42,10 @@ export default function Kiosk() {
     return () => clearInterval(t);
   }, []);
 
-  const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID, { refetchInterval: 60_000 });
-  const { data: classrooms } = trpc.classrooms.list.useQuery(ORGANIZATION_ID);
-  const { data: classroomMap } = trpc.children.classroomMap.useQuery(ORGANIZATION_ID);
+  const ready = !authLoading && !!user;
+  const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID, { refetchInterval: 60_000, enabled: ready });
+  const { data: classrooms } = trpc.classrooms.list.useQuery(ORGANIZATION_ID, { enabled: ready });
+  const { data: classroomMap } = trpc.children.classroomMap.useQuery(ORGANIZATION_ID, { enabled: ready });
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(12, 0, 0, 0); // noon avoids TZ edge cases in the date-range query
@@ -46,7 +53,7 @@ export default function Kiosk() {
   }, []);
   const { data: todays } = trpc.attendance.getByDate.useQuery(
     { organizationId: ORGANIZATION_ID, date: today },
-    { refetchInterval: 30_000 }
+    { refetchInterval: 30_000, enabled: ready }
   );
 
   const mark = trpc.attendance.mark.useMutation({
@@ -89,6 +96,14 @@ export default function Kiosk() {
     if (!a?.checkInTime) return "out";
     return a.checkOutTime ? "done" : "in";
   };
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
