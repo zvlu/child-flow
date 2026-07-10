@@ -6,22 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
-import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
-
-type QueueStatus = "urgent" | "pending" | "completed";
-
-type QueueItem = {
-  id: string;
-  title: string;
-  owner: string;
-  area: string;
-  due: string;
-  status: QueueStatus;
-  detail: string;
-  href?: string;
-  insightId?: number;
-};
+import { useActionItems, type QueueStatus } from "@/hooks/useActionItems";
 
 const statusMeta: Record<QueueStatus, { label: string; className: string }> = {
   urgent: { label: "Urgent", className: "bg-red-100 text-red-700 border-red-200" },
@@ -29,33 +15,13 @@ const statusMeta: Record<QueueStatus, { label: string; className: string }> = {
   completed: { label: "Completed", className: "bg-green-100 text-green-700 border-green-200" },
 };
 
-function formatTypeLabel(type: string) {
-  return type
-    .split(/[_\s]+/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
-
-function formatDate(d: Date | string | null | undefined) {
-  if (!d) return "No due date";
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
 export function ActionQueue() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<QueueStatus | "all">("all");
 
-  const { data: followUps, isLoading: followUpsLoading } = trpc.health.followUps.useQuery({
-    organizationId: ORGANIZATION_ID,
-  });
-  const { data: insights, isLoading: insightsLoading } = trpc.aiInsights.list.useQuery({
-    organizationId: ORGANIZATION_ID,
-  });
-  const { data: documents, isLoading: documentsLoading } = trpc.digitalDocuments.list.useQuery(ORGANIZATION_ID);
-  const { data: families } = trpc.families.list.useQuery(ORGANIZATION_ID);
-  const { data: certifications, isLoading: certsLoading } = trpc.staffOps.certifications.useQuery(ORGANIZATION_ID);
-
-  const isLoading = followUpsLoading || insightsLoading || documentsLoading || certsLoading;
+  // Merged feed: health follow-ups, AI insights, document signatures,
+  // credential expiries, and chronic-absence alerts (see useActionItems).
+  const { items: queueItems, isLoading } = useActionItems();
 
   const utils = trpc.useUtils();
   const dismissInsight = trpc.aiInsights.dismiss.useMutation({
@@ -67,98 +33,6 @@ export function ActionQueue() {
       toast.error(err.message || "Failed to resolve insight");
     },
   });
-
-  const queueItems = useMemo<QueueItem[]>(() => {
-    const items: QueueItem[] = [];
-
-    // Health follow-ups: overdue and due-soon screenings/immunizations.
-    for (const fu of followUps ?? []) {
-      items.push({
-        id: `health-${fu.recordId}`,
-        title: `${formatTypeLabel(fu.type)} follow-up — ${fu.childName}`,
-        owner: fu.childName,
-        area: "Health",
-        due:
-          fu.severity === "overdue"
-            ? `Overdue (was due ${formatDate(fu.expiryDate)})`
-            : `Due ${formatDate(fu.expiryDate)} (${fu.daysUntilDue} days)`,
-        status: fu.severity === "overdue" ? "urgent" : "pending",
-        detail: fu.message || `${formatTypeLabel(fu.type)} record needs attention before the compliance cutoff.`,
-        href: "/health",
-      });
-    }
-
-    // AI insights flagged as requiring action.
-    for (const ins of insights ?? []) {
-      if (ins.actionRequired !== 1) continue;
-      items.push({
-        id: `insight-${ins.id}`,
-        title: ins.title,
-        owner: ins.childName ?? "Program-wide",
-        area: "AI Insight",
-        due: `Flagged ${formatDate(ins.generatedAt)}`,
-        status: ins.priority === "critical" || ins.priority === "high" ? "urgent" : "pending",
-        detail: ins.content,
-        insightId: ins.id,
-      });
-    }
-
-    // Digital documents: pending or expired signatures; signed show as completed.
-    const familyById = new Map((families ?? []).map((f) => [f.id, f]));
-    for (const doc of documents ?? []) {
-      const familyName = familyById.get(doc.familyId)?.primaryContactName ?? `Family #${doc.familyId}`;
-      if (doc.status === "pending" || doc.status === "expired") {
-        items.push({
-          id: `doc-${doc.id}`,
-          title: `${formatTypeLabel(doc.documentType)} signature ${doc.status === "expired" ? "expired" : "needed"} — ${familyName}`,
-          owner: familyName,
-          area: "Documents",
-          due: doc.expiresAt ? `Expires ${formatDate(doc.expiresAt)}` : "No expiration",
-          status: doc.status === "expired" ? "urgent" : "pending",
-          detail:
-            doc.status === "expired"
-              ? `The ${formatTypeLabel(doc.documentType)} document expired and must be re-sent for signature.`
-              : `The ${formatTypeLabel(doc.documentType)} document is awaiting a signature from ${familyName}.`,
-          href: "/digital-documents",
-        });
-      } else if (doc.status === "signed") {
-        items.push({
-          id: `doc-${doc.id}`,
-          title: `${formatTypeLabel(doc.documentType)} signed — ${familyName}`,
-          owner: familyName,
-          area: "Documents",
-          due: doc.signedBy ? `Signed by ${doc.signedBy}` : "Signed",
-          status: "completed",
-          detail: `The ${formatTypeLabel(doc.documentType)} document has been completed.`,
-          href: "/digital-documents",
-        });
-      }
-    }
-
-    // Staff certifications: expired or expiring within 60 days need renewal.
-    for (const cert of certifications ?? []) {
-      if (cert.status === "active") continue;
-      items.push({
-        id: `cert-${cert.id}`,
-        title: `${cert.certificationType} ${cert.status === "expired" ? "expired" : "expiring soon"} — ${cert.staffName}`,
-        owner: cert.staffName,
-        area: "Staff",
-        due:
-          cert.status === "expired"
-            ? `Expired ${formatDate(cert.expiryDate)}`
-            : `Expires ${formatDate(cert.expiryDate)}`,
-        status: cert.status === "expired" ? "urgent" : "pending",
-        detail:
-          cert.status === "expired"
-            ? `${cert.staffName}'s ${cert.certificationType} certification has expired and needs renewal.`
-            : `${cert.staffName}'s ${cert.certificationType} certification expires soon — renew before it lapses.`,
-        href: "/staff-operations",
-      });
-    }
-
-    const rank: Record<QueueStatus, number> = { urgent: 0, pending: 1, completed: 2 };
-    return items.sort((a, b) => rank[a.status] - rank[b.status]);
-  }, [followUps, insights, documents, families, certifications]);
 
   const filteredItems = useMemo(() => {
     return queueItems.filter((item) => {

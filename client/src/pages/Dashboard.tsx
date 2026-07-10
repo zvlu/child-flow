@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
+import { useActionItems } from "@/hooks/useActionItems";
+import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 
 const quickActions = [
   { label: "Take Attendance", href: "/attendance", icon: ClipboardCheck, color: "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200" },
@@ -69,8 +71,9 @@ export default function Dashboard() {
 
   const reduced = useReducedMotion() ?? false;
   const { data: stats, isLoading: statsLoading } = trpc.dashboard.stats.useQuery(ORGANIZATION_ID);
-  const { data: followUps } = trpc.health.followUps.useQuery({ organizationId: ORGANIZATION_ID });
-  const { data: insights } = trpc.aiInsights.list.useQuery({ organizationId: ORGANIZATION_ID });
+  // Unified action feed (shared with the Action Queue page) — health
+  // follow-ups, AI insights, documents, credentials, chronic absence.
+  const { items: actionItems } = useActionItems();
   const { data: attendanceRows } = trpc.attendance.getRange.useQuery({
     organizationId: ORGANIZATION_ID,
     start: rangeStart,
@@ -174,35 +177,18 @@ export default function Dashboard() {
     }));
   }, [healthRecords]);
 
-  // ---- Alerts: health follow-ups + actionable AI insights ----
+  // ---- "Needs attention today": top open items from the unified feed ----
   const alerts = useMemo(() => {
-    const items: { id: string; message: string; severity: "high" | "medium" | "low"; time: string; href: string }[] = [];
-    for (const fu of followUps ?? []) {
-      items.push({
-        id: `health-${fu.recordId}`,
-        message: fu.message || `${formatTypeLabel(fu.type)} follow-up for ${fu.childName}`,
-        severity: fu.severity === "overdue" ? "high" : "medium",
-        time:
-          fu.severity === "overdue"
-            ? `Overdue by ${Math.abs(fu.daysUntilDue)} days`
-            : `Due in ${fu.daysUntilDue} days`,
-        // Land directly on Health pre-filtered to the slice that needs action.
-        href: fu.severity === "overdue" ? "/health?status=overdue" : "/health?status=due_soon",
-      });
-    }
-    for (const ins of insights ?? []) {
-      if (ins.actionRequired !== 1) continue;
-      items.push({
-        id: `insight-${ins.id}`,
-        message: ins.title,
-        severity: ins.priority === "critical" || ins.priority === "high" ? "high" : ins.priority === "medium" ? "medium" : "low",
-        time: ins.generatedAt ? new Date(ins.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "",
-        href: "/action-queue",
-      });
-    }
-    const rank = { high: 0, medium: 1, low: 2 } as const;
-    return items.sort((a, b) => rank[a.severity] - rank[b.severity]);
-  }, [followUps, insights]);
+    return actionItems
+      .filter((item) => item.status !== "completed")
+      .map((item) => ({
+        id: item.id,
+        message: item.title,
+        severity: (item.status === "urgent" ? "high" : "medium") as "high" | "medium" | "low",
+        time: item.due,
+        href: item.href ?? "/action-queue",
+      }));
+  }, [actionItems]);
 
   // ---- Upcoming events (from dashboard.stats) ----
   const upcomingEvents = stats?.upcomingEvents ?? [];
@@ -282,6 +268,9 @@ export default function Dashboard() {
           </Badge>
         </div>
       </div>
+
+      {/* First-run setup guide — renders only while setup is incomplete */}
+      <OnboardingChecklist />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -450,9 +439,16 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
-                Action Items
+                Needs Attention Today
               </CardTitle>
-              <Badge variant="secondary">{alerts.length}</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{alerts.length}</Badge>
+                <Link href="/action-queue">
+                  <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                    View all <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-2">

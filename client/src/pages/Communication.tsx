@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useOrgModules } from "@/hooks/useOrgModules";
+import { FamilyChat } from "@/components/FamilyChat";
 
 const initialMessages = [
   { id: 1, sender: "Maria Rodriguez", subject: "Absence Note - Marcus", preview: "Marcus will be out today due to a doctor's appointment...", time: "10:30 AM", unread: true, type: "Message", category: "Attendance" },
@@ -250,9 +251,12 @@ export default function Communication() {
         </div>
       </div>
 
-      <Tabs defaultValue="messages" className="w-full" onValueChange={setSelectedTab}>
+      <Tabs defaultValue="chat" className="w-full" onValueChange={setSelectedTab}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <TabsList className="bg-card border border-border p-1 rounded-xl w-fit shadow-sm">
+            <TabsTrigger value="chat" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
+              Family Chat
+            </TabsTrigger>
             <TabsTrigger value="messages" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
               Inbox <Badge className="ml-2 bg-card/20 text-white border-none h-4 px-1.5">{messages.filter(m => m.unread).length}</Badge>
             </TabsTrigger>
@@ -271,6 +275,11 @@ export default function Communication() {
             />
           </div>
         </div>
+
+        {/* Live thread chat with families — same backend as the iOS app */}
+        <TabsContent value="chat" className="mt-0">
+          <FamilyChat />
+        </TabsContent>
 
         <TabsContent value="messages" className="mt-0">
           <Card className="border-none shadow-sm rounded-xl overflow-hidden bg-card">
