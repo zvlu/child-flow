@@ -9,6 +9,7 @@ import { isPlatformOwner } from "./_core/env";
 import { invalidateModuleCache, orgHasModule } from "./_core/modules";
 import { checkChronicAbsenceAlerts } from "./absenceAlerts";
 import { SUPPORTED_LANGUAGES } from "./translation";
+import { computeAuditReadiness } from "./auditReadiness";
 import { auditAccess } from "./_core/audit";
 import { hashPassword, verifyPassword } from "./_core/password";
 import { persistMediaDataUrl } from "./storage";
@@ -2211,6 +2212,13 @@ export const appRouter = router({
   }),
 
   compliance: router({
+    // Live "if the reviewer walked in today" score across the Performance
+    // Standards. Read-only aggregation of data staff already maintain.
+    auditReadiness: hsStaffProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId }) => {
+        return computeAuditReadiness(organizationId);
+      }),
     getPir: hsStaffProcedure
       .input(z.object({ organizationId: z.number(), year: z.string() }))
       .query(async ({ input }) => {

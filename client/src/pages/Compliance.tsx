@@ -9,6 +9,7 @@ import { ORGANIZATION_ID } from "@/const";
 import PirReportEditor from "@/components/PirReportEditor";
 import PirReportView from "@/components/PirReportView";
 import { Glossary } from "@/components/Glossary";
+import { AuditReadiness } from "@/components/AuditReadiness";
 
 const monitoringItems = [
   { area: "Child-to-Staff Ratio", status: "compliant", lastReview: "Nov 1, 2024", notes: "All classrooms within required ratios" },
@@ -99,6 +100,9 @@ export default function Compliance() {
           <p className="text-muted-foreground text-sm mt-0.5">Program Information Report and federal compliance tracking</p>
         </div>
       </div>
+
+      {/* Live per-standard readiness score */}
+      <AuditReadiness />
 
       <Tabs defaultValue="pir">
         <TabsList>

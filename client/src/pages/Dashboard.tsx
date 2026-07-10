@@ -17,6 +17,7 @@ import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useActionItems } from "@/hooks/useActionItems";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
+import { AuditReadiness } from "@/components/AuditReadiness";
 
 const quickActions = [
   { label: "Take Attendance", href: "/attendance", icon: ClipboardCheck, color: "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200" },
@@ -271,6 +272,9 @@ export default function Dashboard() {
 
       {/* First-run setup guide — renders only while setup is incomplete */}
       <OnboardingChecklist />
+
+      {/* Live audit-readiness tile (Head Start orgs) */}
+      <AuditReadiness compact />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
