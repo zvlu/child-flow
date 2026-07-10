@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +43,7 @@ function serviceIcon(type: string) {
 export default function FamilyServices() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("families");
+  const searchParams = useSearch();
   const [logOpen, setLogOpen] = useState(false);
   const [logFamilyId, setLogFamilyId] = useState<string>("");
   const [logType, setLogType] = useState<string>("");
@@ -63,6 +65,17 @@ export default function FamilyServices() {
 
   const utils = trpc.useUtils();
   const { data: families, isLoading: familiesLoading } = trpc.families.list.useQuery(ORGANIZATION_ID);
+
+  // Deep link from global search (?family=<id>): pre-filter to that family.
+  useEffect(() => {
+    const id = new URLSearchParams(searchParams).get("family");
+    if (!id || !families) return;
+    const fam = families.find((f) => f.id === Number(id));
+    if (fam) {
+      setSearch(fam.primaryContactName);
+      setTab("families");
+    }
+  }, [searchParams, families]);
   const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID);
   const { data: services, isLoading: servicesLoading } = trpc.familyServices.list.useQuery({ organizationId: ORGANIZATION_ID });
 

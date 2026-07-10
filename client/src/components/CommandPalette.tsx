@@ -26,10 +26,26 @@ import {
   Baby
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { ORGANIZATION_ID } from "@/const";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 export function CommandPalette() {
   const [open, setOpen] = React.useState(false);
   const [, setLocation] = useLocation();
+
+  // Live record search: children and families load once the palette opens
+  // (staff only) and cmdk's fuzzy filter matches them alongside commands.
+  const { user } = useAuth();
+  const isStaff = user?.role === "admin" || user?.role === "staff";
+  const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID, {
+    enabled: open && isStaff,
+    staleTime: 60_000,
+  });
+  const { data: families } = trpc.families.list.useQuery(ORGANIZATION_ID, {
+    enabled: open && isStaff,
+    staleTime: 60_000,
+  });
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -60,9 +76,49 @@ export function CommandPalette() {
         </kbd>
       </button>
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Type a command or search..." />
+        <CommandInput placeholder="Search children, families, or commands..." />
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
+          {(children?.length ?? 0) > 0 && (
+            <>
+              <CommandGroup heading="Children">
+                {children!.map((c) => (
+                  <CommandItem
+                    key={`child-${c.id}`}
+                    value={`child ${c.firstName} ${c.lastName}`}
+                    onSelect={() => runCommand(`/children/${c.id}`)}
+                  >
+                    <Baby className="mr-2 h-4 w-4" />
+                    <span>
+                      {c.firstName} {c.lastName}
+                    </span>
+                    {c.status && c.status !== "active" && (
+                      <span className="ml-2 text-xs capitalize text-muted-foreground">{c.status}</span>
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+              <CommandSeparator />
+            </>
+          )}
+          {(families?.length ?? 0) > 0 && (
+            <>
+              <CommandGroup heading="Families">
+                {families!.map((f) => (
+                  <CommandItem
+                    key={`family-${f.id}`}
+                    value={`family ${f.primaryContactName}`}
+                    onSelect={() => runCommand(`/family-services?family=${f.id}`)}
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    <span>{f.primaryContactName}</span>
+                    {f.city && <span className="ml-2 text-xs text-muted-foreground">{f.city}</span>}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+              <CommandSeparator />
+            </>
+          )}
           <CommandGroup heading="Navigation">
             <CommandItem onSelect={() => runCommand("/dashboard")}>
               <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -106,6 +162,14 @@ export function CommandPalette() {
             <CommandItem onSelect={() => runCommand("/children?action=new")}>
               <Plus className="mr-2 h-4 w-4" />
               <span>Enroll New Child</span>
+            </CommandItem>
+            <CommandItem onSelect={() => runCommand("/data-import")}>
+              <FileText className="mr-2 h-4 w-4" />
+              <span>Import Roster Data</span>
+            </CommandItem>
+            <CommandItem onSelect={() => runCommand("/communication")}>
+              <MessageSquare className="mr-2 h-4 w-4" />
+              <span>Message a Family</span>
             </CommandItem>
             <CommandItem onSelect={() => runCommand("/communication?action=broadcast")}>
               <Megaphone className="mr-2 h-4 w-4" />

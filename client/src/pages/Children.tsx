@@ -274,6 +274,13 @@ export default function Children() {
                   <code className="text-xs bg-muted px-1 py-0.5 rounded">firstName, lastName, dateOfBirth, gender, status, notes</code>.
                   Each row needs at least a first and last name; dates use YYYY-MM-DD.
                 </p>
+                <p className="text-sm text-muted-foreground">
+                  Migrating a whole roster?{" "}
+                  <Link href="/data-import" className="font-medium text-primary hover:underline">
+                    Use Data Import
+                  </Link>{" "}
+                  to bring children, family contacts, and health records over in one upload.
+                </p>
                 <div className="flex items-center gap-2">
                   <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onPickCsv} />
                   <Button variant="outline" size="sm" className="gap-2" onClick={() => fileRef.current?.click()}>

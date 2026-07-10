@@ -16,9 +16,11 @@ import {
   aiInsights, invoices, payments, activityLogs, parentNotifications,
   digitalDocuments, mealPlans, mealItems, cacfpReports, timeClock,
   certifications, customReports,
+  conversations, chatMessages, familyCaseNotes, familyGoals,
 } from "../drizzle/schema";
 
 const TABLES = [
+  "chat_messages", "conversations", "family_case_notes", "family_goals",
   "reportResults", "customReports", "certifications", "timeClock",
   "cacfpReports", "mealItems", "mealPlans", "digitalDocuments",
   "parentNotifications", "activityLogs", "payments", "invoices",
@@ -59,6 +61,9 @@ async function main() {
   await db.insert(users).values([
     { openId: "dev-test-user", name: "Test Administrator", email: "admin@childflow.org", loginMethod: "email", role: "admin", passwordHash: adminHash },
     { openId: "user-maria", name: "Maria Lopez", email: "maria.lopez@childflow.org", loginMethod: "email", role: "staff", passwordHash: staffHash },
+    // Parent accounts power the family side of chat threads (users 3 & 4).
+    { openId: "parent-garcia", name: "Carmen Garcia", email: "carmen.garcia@example.com", loginMethod: "email", role: "parent", familyId: 1, passwordHash: staffHash },
+    { openId: "parent-nguyen", name: "Linh Nguyen", email: "linh.nguyen@example.com", loginMethod: "email", role: "parent", familyId: 2, passwordHash: staffHash },
   ]);
   console.log(`  Demo login → admin@childflow.org / ${demoPassword}`);
 
@@ -454,6 +459,34 @@ async function main() {
     { organizationId: ORG, createdByUserId: 1, reportName: "Monthly Attendance Summary", reportType: "attendance", filters: { range: "last_30_days" }, columns: ["child", "daysPresent", "daysAbsent", "rate"], lastRunAt: daysAgo(2) },
     { organizationId: ORG, createdByUserId: 1, reportName: "Health Compliance Status", reportType: "health", filters: { status: ["overdue", "due_soon"] }, columns: ["child", "screening", "status", "expiry"], lastRunAt: daysAgo(5) },
     { organizationId: ORG, createdByUserId: 1, reportName: "Enrollment by Classroom", reportType: "enrollment", filters: {}, columns: ["classroom", "enrolled", "capacity", "utilization"] },
+  ]);
+
+
+  console.log("Seeding family goals & case notes…");
+  await db.insert(familyGoals).values([
+    { familyId: 1, organizationId: ORG, title: "Enroll in ESL evening classes", description: "Mother wants to improve English for job applications.", category: "education", progress: 40, status: "in_progress", targetDate: daysAhead(90), steps: [{ id: "s1", title: "Collect program options", isCompleted: true, dueDate: null, notes: null }, { id: "s2", title: "Submit application", isCompleted: false, dueDate: dateStr(daysAhead(14)), notes: null }] },
+    { familyId: 2, organizationId: ORG, title: "Secure stable housing", description: "Family at risk of losing current rental; pursuing assistance.", category: "housing", progress: 25, status: "in_progress", targetDate: daysAhead(60), steps: [{ id: "s1", title: "Housing Alliance application", isCompleted: true, dueDate: null, notes: "Submitted" }, { id: "s2", title: "Follow up on waitlist", isCompleted: false, dueDate: dateStr(daysAhead(7)), notes: null }] },
+    { familyId: 5, organizationId: ORG, title: "Consistent daily attendance", description: "Address transportation barrier affecting Madison's attendance.", category: "attendance", progress: 60, status: "in_progress", targetDate: daysAhead(30), steps: [{ id: "s1", title: "Bus route enrollment", isCompleted: true, dueDate: null, notes: null }, { id: "s2", title: "Two weeks full attendance", isCompleted: false, dueDate: dateStr(daysAhead(14)), notes: null }] },
+  ]);
+
+  await db.insert(familyCaseNotes).values([
+    { organizationId: ORG, familyId: 1, authorId: 6, type: "home_visit", confidentiality: "standard", body: "Fall home visit completed. Home environment is warm and organized. Mother expressed strong interest in ESL classes — connected her with two evening programs near their apartment. Isabella shows growing vocabulary in both languages.", followUpRequired: 1, followUpDue: daysAhead(18), createdAt: daysAgo(12) },
+    { organizationId: ORG, familyId: 1, authorId: 6, type: "phone_call", confidentiality: "standard", body: "Mother called to confirm she picked up the ESL program brochures. She plans to apply to the Tuesday/Thursday program. Asked about childcare during classes — shared Head Start extended-day options.", followUpRequired: 0, createdAt: daysAgo(6) },
+    { organizationId: ORG, familyId: 5, authorId: 6, type: "phone_call", confidentiality: "standard", body: "Check-in about Madison's attendance gaps. Grandmother shared that the family car broke down two weeks ago and repairs are unaffordable this month. Shared bus route info and voucher program.", followUpRequired: 1, followUpDue: daysAhead(10), createdAt: daysAgo(3) },
+    { organizationId: ORG, familyId: 5, authorId: 2, type: "general", confidentiality: "sensitive", body: "Madison arrived visibly tired two days this week and mentioned the family is staying with relatives temporarily. Monitoring; will raise gently at next family contact. No safety concerns observed.", followUpRequired: 1, followUpDue: daysAhead(5), createdAt: daysAgo(1) },
+  ]);
+
+  console.log("Seeding chat conversations…");
+  await db.insert(conversations).values([
+    { organizationId: ORG, familyId: 1, createdBy: 1, isActive: 1, staffLastReadAt: at(daysAgo(0), 9), familyLastReadAt: at(daysAgo(0), 8) },
+    { organizationId: ORG, familyId: 2, createdBy: 2, isActive: 1, staffLastReadAt: at(daysAgo(1), 15), familyLastReadAt: at(daysAgo(1), 16) },
+  ]);
+  await db.insert(chatMessages).values([
+    { conversationId: 1, senderUserId: 1, senderRole: "staff", body: "Good morning! Just a reminder that Isabella's physical exam is due March 12. Let us know if you need help scheduling.", translations: { __source: "en" }, sentAt: at(daysAgo(2), 9, 15) },
+    { conversationId: 1, senderUserId: 3, senderRole: "family", body: "¡Gracias! Ya tenemos la cita con el doctor para el 10 de marzo.", translations: { __source: "es" }, sentAt: at(daysAgo(2), 12, 40) },
+    { conversationId: 1, senderUserId: 1, senderRole: "staff", body: "Wonderful — we'll mark it on her record. Isabella had a great day today!", translations: { __source: "en" }, sentAt: at(daysAgo(0), 8, 5) },
+    { conversationId: 2, senderUserId: 2, senderRole: "staff", body: "Hi! Sharing this month's family engagement calendar — the science night is next Thursday at 5:30.", translations: { __source: "en" }, sentAt: at(daysAgo(1), 14, 30) },
+    { conversationId: 2, senderUserId: 4, senderRole: "family", body: "Cảm ơn cô! Chúng tôi sẽ tham gia.", translations: { __source: "vi" }, sentAt: at(daysAgo(1), 15, 45) },
   ]);
 
   console.log("✅ Seed complete.");
