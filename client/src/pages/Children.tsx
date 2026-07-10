@@ -17,6 +17,7 @@ import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { FlagChips } from "@/components/FlagChips";
+import { EmptyState } from "@/components/EmptyState";
 import { objectsToCsv, downloadCsv, parseCsvToObjects } from "@/lib/csv";
 
 const GENDERS = new Set(["male", "female", "other", "prefer_not_to_say"]);
@@ -556,11 +557,29 @@ export default function Children() {
               </tbody>
             </table>
             {filtered.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                <Baby className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <p className="font-medium">No children found</p>
-                <p className="text-sm mt-1">Try adjusting your search or filters</p>
-              </div>
+              allChildren.length === 0 ? (
+                <EmptyState
+                  icon={Baby}
+                  title="No children enrolled yet"
+                  description="Bring your whole roster over from a spreadsheet in one upload, or add children one at a time."
+                  action={
+                    <div className="flex gap-2">
+                      <Link href="/data-import">
+                        <Button size="sm" className="gap-1"><Upload className="h-4 w-4" /> Import roster</Button>
+                      </Link>
+                      <Link href="/enrollment">
+                        <Button size="sm" variant="outline" className="gap-1"><Plus className="h-4 w-4" /> Add a child</Button>
+                      </Link>
+                    </div>
+                  }
+                />
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Baby className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p className="font-medium">No children found</p>
+                  <p className="text-sm mt-1">Try adjusting your search or filters</p>
+                </div>
+              )
             )}
           </div>
         </CardContent>
