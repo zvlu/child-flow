@@ -65,6 +65,17 @@ async function main() {
     // Parent accounts power the family side of chat threads (users 3 & 4).
     { openId: "parent-garcia", name: "Carmen Garcia", email: "carmen.garcia@example.com", loginMethod: "email", role: "parent", familyId: 1, passwordHash: staffHash },
     { openId: "parent-nguyen", name: "Linh Nguyen", email: "linh.nguyen@example.com", loginMethod: "email", role: "parent", familyId: 2, passwordHash: staffHash },
+    // One login per staff member (users 5-12) so every §1302.91 role can be
+    // exercised: sign in as the nurse, the nutritionist, an advocate, etc.
+    // staff.userId links these to their staff rows below.
+    { openId: "staff-diana", name: "Diana Reyes", email: "diana.reyes@childflow.org", loginMethod: "email", role: "admin", passwordHash: staffHash },
+    { openId: "staff-james", name: "James Mitchell", email: "james.mitchell@childflow.org", loginMethod: "email", role: "staff", passwordHash: staffHash },
+    { openId: "staff-aisha", name: "Aisha Johnson", email: "aisha.johnson@childflow.org", loginMethod: "email", role: "staff", passwordHash: staffHash },
+    { openId: "staff-sofia", name: "Sofia Hernandez", email: "sofia.hernandez@childflow.org", loginMethod: "email", role: "staff", passwordHash: staffHash },
+    { openId: "staff-marcus", name: "Marcus Webb", email: "marcus.webb@childflow.org", loginMethod: "email", role: "staff", passwordHash: staffHash },
+    { openId: "staff-linda", name: "Linda Tran", email: "linda.tran@childflow.org", loginMethod: "email", role: "staff", passwordHash: staffHash },
+    { openId: "staff-rachel", name: "Rachel Kim", email: "rachel.kim@childflow.org", loginMethod: "email", role: "staff", passwordHash: staffHash },
+    { openId: "staff-carlos", name: "Carlos Mendoza", email: "carlos.mendoza@childflow.org", loginMethod: "email", role: "staff", passwordHash: staffHash },
   ]);
   console.log(`  Demo login → admin@childflow.org / ${demoPassword}`);
 
@@ -88,17 +99,18 @@ async function main() {
 
   console.log("Seeding staff…");
   const staffRows = [
-    ["Diana", "Reyes", "Center Director", "admin"],
+    ["Diana", "Reyes", "Center Director", "director"],
     ["James", "Mitchell", "Lead Teacher", "teacher"],
-    ["Aisha", "Johnson", "Lead Teacher", "teacher"],
+    ["Aisha", "Johnson", "Education Coordinator", "education_coordinator"],
     ["Sofia", "Hernandez", "Teacher Assistant", "assistant"],
-    ["Marcus", "Webb", "Teacher Assistant", "assistant"],
-    ["Linda", "Tran", "Family Services Coordinator", "coordinator"],
-    ["Rachel", "Kim", "Health Coordinator", "coordinator"],
-    ["Carlos", "Mendoza", "Lead Teacher", "teacher"],
+    ["Marcus", "Webb", "Nutritionist (RD)", "nutritionist"],
+    ["Linda", "Tran", "Family Advocate", "family_advocate"],
+    ["Rachel", "Kim", "Program Nurse (RN)", "nurse"],
+    ["Carlos", "Mendoza", "Family Advocate", "family_advocate"],
   ] as const;
   await db.insert(staff).values(staffRows.map(([firstName, lastName, position, role], i) => ({
     organizationId: ORG, firstName, lastName, position, role,
+    userId: 5 + i, // staff logins seeded above, same order
     email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@childflow.org`,
     phone: `(916) 555-0${100 + i}`,
   })));

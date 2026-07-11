@@ -260,7 +260,7 @@ export default function Caseloads() {
                               </span>
                             )}
                           </span>
-                          <span>{a.visitCoverage}% visited this month</span>
+                          <span>{a.contactCoverage}% contacted this month</span>
                         </div>
                         <Progress value={Math.min(100, (a.familyCount / overview.caseloadLimit) * 100)} className="mt-1.5 h-1.5" />
                         <p className="mt-2 text-xs text-muted-foreground">
@@ -374,7 +374,7 @@ export default function Caseloads() {
                 <Card className="border-transparent shadow-sm">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Coverage by Advocate</CardTitle>
-                    <CardDescription>Monthly home-visit coverage, open goals, and follow-ups at a glance.</CardDescription>
+                    <CardDescription>Monthly contact coverage (visits, calls, coordinated services), open goals, and follow-ups.</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="overflow-x-auto">
@@ -383,7 +383,7 @@ export default function Caseloads() {
                           <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                             <th className="py-2 pr-4">Advocate</th>
                             <th className="py-2 pr-4">Families</th>
-                            <th className="py-2 pr-4">Visits this month</th>
+                            <th className="py-2 pr-4">Contacted this month</th>
                             <th className="py-2 pr-4">Follow-ups due</th>
                             <th className="py-2 pr-4">Open goals</th>
                             <th className="py-2">Health</th>
@@ -394,8 +394,8 @@ export default function Caseloads() {
                             <tr key={a.staffId} className="border-b border-border/60">
                               <td className="py-2 pr-4 font-medium text-foreground">{a.name}</td>
                               <td className="py-2 pr-4">{a.familyCount}{a.overCapacity && <AlertTriangle className="ml-1 inline h-3.5 w-3.5 text-red-500" />}</td>
-                              <td className={cn("py-2 pr-4", a.visitCoverage >= 80 ? "text-green-600" : a.visitCoverage >= 50 ? "text-amber-600" : "text-red-600")}>
-                                {a.visitedThisMonth} ({a.visitCoverage}%)
+                              <td className={cn("py-2 pr-4", a.contactCoverage >= 80 ? "text-green-600" : a.contactCoverage >= 50 ? "text-amber-600" : "text-red-600")}>
+                                {a.contactedThisMonth} ({a.contactCoverage}%)
                               </td>
                               <td className={cn("py-2 pr-4", a.followUpsDue > 0 ? "text-amber-600" : "text-muted-foreground")}>{a.followUpsDue}</td>
                               <td className="py-2 pr-4 text-muted-foreground">{a.openGoals}</td>

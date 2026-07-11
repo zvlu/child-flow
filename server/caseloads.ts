@@ -28,9 +28,10 @@ export type AdvocateOverview = {
   position: string | null;
   familyCount: number;
   overCapacity: boolean;
-  visitedThisMonth: number;
-  /** 0–100: share of the case load visited this month. */
-  visitCoverage: number;
+  /** Families with ANY logged contact this month (visit, call, coordinated services…). */
+  contactedThisMonth: number;
+  /** 0–100: share of the case load contacted this month. */
+  contactCoverage: number;
   openGoals: number;
   followUpsDue: number;
   /** 0–100 blended accountability score (see computeHealthScore). */
@@ -45,18 +46,19 @@ export type CaseloadOverview = {
 };
 
 /**
- * Blended accountability score: monthly visit coverage carries most of the
- * weight, open follow-ups drag it down, over-capacity caps it. Pure so it's
- * unit-testable.
+ * Blended accountability score: monthly CONTACT coverage (any documented
+ * contact — home visit, monthly contact, coordinated services, call) carries
+ * most of the weight, open follow-ups drag it down, over-capacity caps it.
+ * Pure so it's unit-testable.
  */
 export function computeHealthScore(input: {
   familyCount: number;
-  visitedThisMonth: number;
+  contactedThisMonth: number;
   followUpsDue: number;
   overCapacity: boolean;
 }): number {
   if (input.familyCount === 0) return 100;
-  const coverage = Math.min(1, input.visitedThisMonth / input.familyCount);
+  const coverage = Math.min(1, input.contactedThisMonth / input.familyCount);
   const followUpDrag = Math.min(1, input.followUpsDue / input.familyCount);
   let score = coverage * 65 + (1 - followUpDrag) * 35;
   if (input.overCapacity) score = Math.min(score, 70);
@@ -71,12 +73,18 @@ export async function getCaseloadOverview(organizationId: number): Promise<Casel
   const soon = new Date();
   soon.setDate(soon.getDate() + 7);
 
-  const [orgStaff, orgFamilies, visits, goals, services, orgChildren] = await Promise.all([
+  const [orgStaff, orgFamilies, visits, monthContacts, goals, services, orgChildren] = await Promise.all([
     db.select().from(staff).where(eq(staff.organizationId, organizationId)),
     db.select().from(families).where(eq(families.organizationId, organizationId)),
     db.select({ familyId: familyHomeVisits.familyId })
       .from(familyHomeVisits)
       .where(and(eq(familyHomeVisits.organizationId, organizationId), gte(familyHomeVisits.visitDate, monthStart))),
+    // "Monthly contact" the way advocates actually document it: ANY logged
+    // contact this month (monthly contact, coordinated services, calls,
+    // office visits…), not just formal home visits.
+    db.select({ familyId: familyServices.familyId })
+      .from(familyServices)
+      .where(and(eq(familyServices.organizationId, organizationId), gte(familyServices.serviceDate, monthStart))),
     db.select({ familyId: familyGoals.familyId, status: familyGoals.status })
       .from(familyGoals)
       .where(eq(familyGoals.organizationId, organizationId)),
@@ -86,7 +94,7 @@ export async function getCaseloadOverview(organizationId: number): Promise<Casel
     db.select({ familyId: children.familyId }).from(children).where(eq(children.organizationId, organizationId)),
   ]);
 
-  const visitedFamilies = new Set(visits.map((v) => v.familyId));
+  const contactedFamilies = new Set([...visits.map((v) => v.familyId), ...monthContacts.map((c) => c.familyId)]);
   const openGoalsByFamily = new Map<number, number>();
   for (const g of goals) {
     if (g.status === "completed") continue;
@@ -119,7 +127,7 @@ export async function getCaseloadOverview(organizationId: number): Promise<Casel
     .map((s) => {
       const assigned = familiesByAdvocate.get(s.id) ?? [];
       const familyCount = assigned.length;
-      const visitedThisMonth = assigned.filter((f) => visitedFamilies.has(f.id)).length;
+      const contactedThisMonth = assigned.filter((f) => contactedFamilies.has(f.id)).length;
       const followUpsDue = assigned.filter((f) => followUpDueFamilies.has(f.id)).length;
       const openGoals = assigned.reduce((n, f) => n + (openGoalsByFamily.get(f.id) ?? 0), 0);
       const overCapacity = familyCount > CASELOAD_LIMIT;
@@ -129,11 +137,11 @@ export async function getCaseloadOverview(organizationId: number): Promise<Casel
         position: s.position,
         familyCount,
         overCapacity,
-        visitedThisMonth,
-        visitCoverage: familyCount === 0 ? 100 : Math.round((visitedThisMonth / familyCount) * 100),
+        contactedThisMonth,
+        contactCoverage: familyCount === 0 ? 100 : Math.round((contactedThisMonth / familyCount) * 100),
         openGoals,
         followUpsDue,
-        healthScore: computeHealthScore({ familyCount, visitedThisMonth, followUpsDue, overCapacity }),
+        healthScore: computeHealthScore({ familyCount, contactedThisMonth, followUpsDue, overCapacity }),
       };
     })
     // Card wall shows people who carry (or could carry) case loads — everyone,
@@ -339,7 +347,7 @@ export async function generateSupervisorSummary(organizationId: number): Promise
   const lines = active
     .map(
       (a) =>
-        `- ${a.name} (${a.position ?? "staff"}): ${a.familyCount} families, ${a.visitCoverage}% visited this month, ` +
+        `- ${a.name} (${a.position ?? "staff"}): ${a.familyCount} families, ${a.contactCoverage}% contacted this month, ` +
         `${a.followUpsDue} follow-ups due, ${a.openGoals} open goals, health score ${a.healthScore}${a.overCapacity ? " — OVER CAPACITY" : ""}`
     )
     .join("\n");

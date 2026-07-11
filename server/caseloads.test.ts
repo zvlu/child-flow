@@ -17,20 +17,20 @@ vi.mock("./db", () => ({ getDb: () => Promise.resolve(fakeDb) }));
 
 describe("computeHealthScore", () => {
   it("is 100 for an empty case load", () => {
-    expect(computeHealthScore({ familyCount: 0, visitedThisMonth: 0, followUpsDue: 0, overCapacity: false })).toBe(100);
+    expect(computeHealthScore({ familyCount: 0, contactedThisMonth: 0, followUpsDue: 0, overCapacity: false })).toBe(100);
   });
   it("rewards full visit coverage with no follow-ups due", () => {
-    expect(computeHealthScore({ familyCount: 10, visitedThisMonth: 10, followUpsDue: 0, overCapacity: false })).toBe(100);
+    expect(computeHealthScore({ familyCount: 10, contactedThisMonth: 10, followUpsDue: 0, overCapacity: false })).toBe(100);
   });
   it("drops as coverage falls and follow-ups pile up", () => {
-    const good = computeHealthScore({ familyCount: 10, visitedThisMonth: 8, followUpsDue: 1, overCapacity: false });
-    const bad = computeHealthScore({ familyCount: 10, visitedThisMonth: 2, followUpsDue: 6, overCapacity: false });
+    const good = computeHealthScore({ familyCount: 10, contactedThisMonth: 8, followUpsDue: 1, overCapacity: false });
+    const bad = computeHealthScore({ familyCount: 10, contactedThisMonth: 2, followUpsDue: 6, overCapacity: false });
     expect(good).toBeGreaterThan(bad);
     expect(bad).toBeLessThan(50);
   });
   it("caps the score at 70 when over capacity", () => {
     expect(
-      computeHealthScore({ familyCount: CASELOAD_LIMIT + 5, visitedThisMonth: CASELOAD_LIMIT + 5, followUpsDue: 0, overCapacity: true })
+      computeHealthScore({ familyCount: CASELOAD_LIMIT + 5, contactedThisMonth: CASELOAD_LIMIT + 5, followUpsDue: 0, overCapacity: true })
     ).toBeLessThanOrEqual(70);
   });
 });

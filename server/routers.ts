@@ -777,6 +777,16 @@ export const appRouter = router({
       .query(async ({ input: organizationId }) => {
         return getOrganizationStaff(organizationId);
       }),
+    // The signed-in user's own staff record (functional role + position) —
+    // drives the role-aware experience (dashboard emphasis, default views).
+    myRole: staffProcedure.query(async ({ ctx }) => {
+      if (ctx.user.organizationId == null) return null;
+      const staffId = await mod.resolveStaffId(ctx.user.organizationId, ctx.user.id);
+      if (staffId == null) return null;
+      const members = await getOrganizationStaff(ctx.user.organizationId);
+      const me = members.find((m) => m.id === staffId);
+      return me ? { staffId: me.id, role: me.role, position: me.position } : null;
+    }),
     // Creating/modifying staff and their roles is an administrative action.
     create: orgAdminProcedure
       .input(
@@ -787,7 +797,17 @@ export const appRouter = router({
           email: z.string().optional(),
           phone: z.string().optional(),
           position: z.string().optional(),
-          role: z.enum(["admin", "teacher", "assistant", "coordinator"]).optional(),
+          role: z.enum([
+            "admin", "director", "fiscal_officer",
+            "education_coordinator", "coach",
+            "health_coordinator", "nurse", "nutritionist", "mental_health_consultant",
+            "disabilities_coordinator",
+            "family_services_manager", "family_advocate", "home_visitor",
+            "ersea_coordinator",
+            "teacher", "assistant",
+            "cook", "bus_driver",
+            "coordinator",
+          ]).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -805,7 +825,17 @@ export const appRouter = router({
           email: z.string().optional(),
           phone: z.string().optional(),
           position: z.string().optional(),
-          role: z.enum(["admin", "teacher", "assistant", "coordinator"]).optional(),
+          role: z.enum([
+            "admin", "director", "fiscal_officer",
+            "education_coordinator", "coach",
+            "health_coordinator", "nurse", "nutritionist", "mental_health_consultant",
+            "disabilities_coordinator",
+            "family_services_manager", "family_advocate", "home_visitor",
+            "ersea_coordinator",
+            "teacher", "assistant",
+            "cook", "bus_driver",
+            "coordinator",
+          ]).optional(),
           isActive: z.number().optional(),
         })
       )

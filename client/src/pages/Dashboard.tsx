@@ -20,14 +20,43 @@ import { useActionItems } from "@/hooks/useActionItems";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { AuditReadiness } from "@/components/AuditReadiness";
 
-const quickActions = [
+/** Every quick action; each signed-in role sees its own six, most relevant first. */
+const QUICK_ACTION_POOL = [
   { label: "Take Attendance", href: "/attendance", icon: ClipboardCheck, color: "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200" },
   { label: "Add Child", href: "/enrollment", icon: Baby, color: "bg-green-50 text-green-700 hover:bg-green-100 border-green-200" },
   { label: "Health Records", href: "/health", icon: Heart, color: "bg-red-50 text-red-700 hover:bg-red-100 border-red-200" },
   { label: "Family Services", href: "/family-services", icon: Home, color: "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200" },
   { label: "Run Report", href: "/reports", icon: Activity, color: "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200" },
   { label: "Compliance", href: "/compliance", icon: ShieldCheck, color: "bg-[#F1F6F2] text-[#3C5E47] hover:bg-[#E7F0E9] border-[#CFE0D3]" },
+  { label: "Case Loads", href: "/caseloads", icon: Users, color: "bg-teal-50 text-teal-700 hover:bg-teal-100 border-teal-200" },
+  { label: "Meal Planning", href: "/meal-planning", icon: Activity, color: "bg-lime-50 text-lime-700 hover:bg-lime-100 border-lime-200" },
+  { label: "Lesson Planning", href: "/lesson-planning", icon: Calendar, color: "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200" },
+  { label: "Health Deadlines", href: "/health-deadlines", icon: Bell, color: "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200" },
+  { label: "Daily Reports", href: "/daily-reports", icon: Activity, color: "bg-pink-50 text-pink-700 hover:bg-pink-100 border-pink-200" },
+  { label: "Billing", href: "/billing", icon: Activity, color: "bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200" },
 ];
+
+/**
+ * §1302.91 role → the pages that role opens first every morning. Anything
+ * unlisted falls back to the generic ordering above.
+ */
+const ROLE_QUICK_PRIORITY: Record<string, string[]> = {
+  nurse: ["/health", "/health-deadlines", "/children"],
+  health_coordinator: ["/health", "/health-deadlines", "/compliance"],
+  nutritionist: ["/meal-planning", "/health", "/reports"],
+  mental_health_consultant: ["/family-services", "/children"],
+  disabilities_coordinator: ["/family-services", "/children", "/compliance"],
+  education_coordinator: ["/lesson-planning", "/daily-reports", "/reports"],
+  coach: ["/lesson-planning", "/daily-reports"],
+  family_advocate: ["/caseloads", "/family-services"],
+  family_services_manager: ["/caseloads", "/family-services"],
+  home_visitor: ["/caseloads", "/family-services"],
+  ersea_coordinator: ["/enrollment", "/attendance", "/compliance"],
+  teacher: ["/attendance", "/daily-reports", "/lesson-planning"],
+  assistant: ["/attendance", "/daily-reports"],
+  fiscal_officer: ["/billing", "/reports"],
+  director: ["/compliance", "/reports", "/caseloads"],
+};
 
 const severityColors: Record<string, string> = {
   high: "bg-red-100 text-red-700 border-red-200",
@@ -73,6 +102,22 @@ export default function Dashboard() {
 
   const reduced = useReducedMotion() ?? false;
   const { data: stats, isLoading: statsLoading } = trpc.dashboard.stats.useQuery(ORGANIZATION_ID);
+  // Role-aware quick actions: the signed-in staff member's most-used pages
+  // come first (nurse sees Health, nutritionist sees Meal Planning, …).
+  const { data: myRole } = trpc.staff.myRole.useQuery();
+  const quickActions = useMemo(() => {
+    const priority = ROLE_QUICK_PRIORITY[myRole?.role ?? ""] ?? [];
+    const rank = (href: string) => {
+      const i = priority.indexOf(href);
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    return [...QUICK_ACTION_POOL]
+      .map((a, i) => ({ a, i }))
+      .sort((x, y) => rank(x.a.href) - rank(y.a.href) || x.i - y.i)
+      .map(({ a }) => a)
+      .slice(0, 6);
+  }, [myRole]);
+
   // Unified action feed (shared with the Action Queue page) — health
   // follow-ups, AI insights, documents, credentials, chronic absence.
   const { items: actionItems } = useActionItems();

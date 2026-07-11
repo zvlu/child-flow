@@ -186,7 +186,23 @@ export const staff = mysqlTable("staff", {
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 20 }),
   position: varchar("position", { length: 100 }),
-  role: mysqlEnum("role", ["admin", "teacher", "assistant", "coordinator"]).default("teacher"),
+  /**
+   * Program role, grounded in the §1302.91 staffing taxonomy. Original four
+   * values kept for data compatibility; "coordinator" remains as the legacy
+   * generic. users.role stays the ACCESS tier (admin/staff/parent) — this is
+   * the functional role that shapes each staff member's default experience.
+   */
+  role: mysqlEnum("role", [
+    "admin", "director", "fiscal_officer",
+    "education_coordinator", "coach",
+    "health_coordinator", "nurse", "nutritionist", "mental_health_consultant",
+    "disabilities_coordinator",
+    "family_services_manager", "family_advocate", "home_visitor",
+    "ersea_coordinator",
+    "teacher", "assistant",
+    "cook", "bus_driver",
+    "coordinator",
+  ]).default("teacher"),
   isActive: int("isActive").default(1),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

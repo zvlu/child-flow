@@ -267,6 +267,13 @@
       "when": 1783695572904,
       "tag": "0037_nasty_outlaw_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "5",
+      "when": 1783777282860,
+      "tag": "0038_amused_red_hulk",
+      "breakpoints": true
     }
   ]
 }

@@ -15,11 +15,27 @@ import { ORGANIZATION_ID } from "@/const";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
 
+/** §1302.91 staffing taxonomy — grouped roughly by service area. */
 const roleLabels: Record<string, string> = {
+  director: "Head Start Director",
   admin: "Administrator",
+  fiscal_officer: "Fiscal Officer",
+  education_coordinator: "Education Coordinator",
+  coach: "Coach",
   teacher: "Teacher",
-  assistant: "Assistant",
-  coordinator: "Coordinator",
+  assistant: "Assistant Teacher",
+  health_coordinator: "Health Coordinator",
+  nurse: "Nurse",
+  nutritionist: "Nutritionist / RD",
+  mental_health_consultant: "Mental Health Consultant",
+  disabilities_coordinator: "Disabilities Coordinator",
+  family_services_manager: "Family Services Manager",
+  family_advocate: "Family Advocate",
+  home_visitor: "Home Visitor",
+  ersea_coordinator: "ERSEA Coordinator",
+  cook: "Cook / Food Service",
+  bus_driver: "Bus Driver",
+  coordinator: "Coordinator (legacy)",
 };
 
 const roleColors: Record<string, string> = {
@@ -49,13 +65,26 @@ const trainingEvents = [
   { title: "CPR/First Aid Renewal", date: "Jan 15, 2027", hours: 4, required: true },
 ];
 
+const STAFF_ROLES = [
+  "admin", "director", "fiscal_officer",
+  "education_coordinator", "coach",
+  "health_coordinator", "nurse", "nutritionist", "mental_health_consultant",
+  "disabilities_coordinator",
+  "family_services_manager", "family_advocate", "home_visitor",
+  "ersea_coordinator",
+  "teacher", "assistant",
+  "cook", "bus_driver",
+  "coordinator",
+] as const;
+type StaffRole = (typeof STAFF_ROLES)[number];
+
 type StaffFormState = {
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
   position: string;
-  role: "admin" | "teacher" | "assistant" | "coordinator";
+  role: StaffRole;
 };
 
 const emptyForm: StaffFormState = {
@@ -204,7 +233,7 @@ export default function Staff() {
         </div>
         <div className="space-y-1.5">
           <Label>Role</Label>
-          <Select value={form.role} onValueChange={(v) => setForm(f => ({ ...f, role: v as StaffFormState["role"] }))}>
+          <Select value={form.role} onValueChange={(v) => setForm(f => ({ ...f, role: v as StaffRole }))}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
