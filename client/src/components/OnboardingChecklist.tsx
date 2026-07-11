@@ -26,18 +26,20 @@ type Step = {
  */
 export function OnboardingChecklist() {
   const { user } = useAuth();
+  // Program setup is a director/admin task — advocates, teachers, nurses,
+  // and other staff never see this card (their dashboard opens on the work).
   const isAdmin = user?.role === "admin";
   const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISS_KEY) === "1");
 
-  const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID);
-  const { data: classrooms } = trpc.classrooms.list.useQuery(ORGANIZATION_ID);
-  const { data: stats } = trpc.dashboard.stats.useQuery(ORGANIZATION_ID);
-  const { data: invitations } = trpc.families.invitations.useQuery(ORGANIZATION_ID);
+  const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID, { enabled: isAdmin });
+  const { data: classrooms } = trpc.classrooms.list.useQuery(ORGANIZATION_ID, { enabled: isAdmin });
+  const { data: stats } = trpc.dashboard.stats.useQuery(ORGANIZATION_ID, { enabled: isAdmin });
+  const { data: invitations } = trpc.families.invitations.useQuery(ORGANIZATION_ID, { enabled: isAdmin });
 
   // Wait for the core queries before judging progress — otherwise the
   // checklist flashes "0 of 5" at every load.
   const loaded = children !== undefined && classrooms !== undefined && stats !== undefined;
-  if (!loaded || dismissed) return null;
+  if (!isAdmin || !loaded || dismissed) return null;
 
   const attendanceRecorded = (stats.attendanceToday.recorded ?? 0) > 0;
 
