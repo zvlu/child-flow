@@ -277,7 +277,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
   });
 
   return (
-    <div className="p-6 space-y-6 bg-background min-h-full">
+    <div className="p-6 md:p-8 space-y-8 bg-background min-h-full">
       <div className="flex items-center gap-4">
         <Link href="/children">
           <Button variant="ghost" size="sm" className="gap-2 font-bold">
@@ -294,38 +294,16 @@ export default function ChildDetail({ id }: ChildDetailProps) {
               {childStatusBadge(child.status ?? undefined)}
               <span className="text-sm text-muted-foreground font-medium">{age} &bull; {classroomName} &bull; {teacherName}</span>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {childFlagList.map((f: any) => (
-                <span
-                  key={f.id}
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                    f.type === "allergy" ? "bg-red-100 text-red-800"
-                    : f.type === "dietary" ? "bg-amber-100 text-amber-800"
-                    : f.type === "disability" ? "bg-indigo-100 text-indigo-800"
-                    : "bg-blue-100 text-blue-800"}`}
-                  title={f.detail ?? f.label}
+            {childFlagList.length === 0 && (
+              <div className="mt-2">
+                <button
+                  onClick={() => { setFlagType("allergy"); setFlagLabel(""); setShowFlagDialog(true); }}
+                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors"
                 >
-                  {f.label}
-                  <button
-                    onClick={async () => {
-                      if (await confirm({ title: `Remove the "${f.label}" flag?`, confirmLabel: "Remove", destructive: true })) {
-                        removeFlag.mutate({ flagId: f.id });
-                      }
-                    }}
-                    className="ml-0.5 rounded-full hover:bg-black/10 p-0.5"
-                    aria-label={`Remove ${f.label} flag`}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-              <button
-                onClick={() => { setFlagType("allergy"); setFlagLabel(""); setShowFlagDialog(true); }}
-                className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-              >
-                <Plus className="h-3 w-3" /> Flag
-              </button>
-            </div>
+                  <Plus className="h-3 w-3" /> Flag
+                </button>
+              </div>
+            )}
           </div>
         </div>
         <Button
@@ -340,6 +318,55 @@ export default function ChildDetail({ id }: ChildDetailProps) {
           <Edit className="h-4 w-4" /> Edit Profile
         </Button>
       </div>
+
+      {/* Safety & care flags — the one thing every adult must see first. */}
+      {childFlagList.length > 0 && (
+        <div className="rounded-xl border-l-4 border-l-red-500 bg-red-50/60 dark:bg-red-950/20 shadow-sm px-5 py-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 shrink-0 text-red-600 animate-pulse mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">Safety &amp; care flags</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {childFlagList.map((f: any) => (
+                  <span
+                    key={f.id}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold shadow-sm ${
+                      f.type === "allergy" ? "bg-red-600 text-white"
+                      : f.type === "dietary" ? "bg-green-600 text-white"
+                      : f.type === "disability" ? "bg-blue-600 text-white"
+                      : "bg-purple-600 text-white"}`}
+                    title={f.detail ?? f.label}
+                  >
+                    {f.label}
+                    <button
+                      onClick={async () => {
+                        if (await confirm({ title: `Remove the "${f.label}" flag?`, confirmLabel: "Remove", destructive: true })) {
+                          removeFlag.mutate({ flagId: f.id });
+                        }
+                      }}
+                      className="rounded-full p-0.5 hover:bg-white/20"
+                      aria-label={`Remove ${f.label} flag`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                <button
+                  onClick={() => { setFlagType("allergy"); setFlagLabel(""); setShowFlagDialog(true); }}
+                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 hover:border-red-500 transition-colors"
+                >
+                  <Plus className="h-3 w-3" /> Flag
+                </button>
+              </div>
+              {childFlagList.some((f: any) => f.detail) && (
+                <p className="mt-2 text-xs leading-relaxed text-red-900/70 dark:text-red-200/70">
+                  {childFlagList.filter((f: any) => f.detail).map((f: any) => `${f.label}: ${f.detail}`).join(" · ")}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Profile Dialog */}
       {/* Add safety flag */}
@@ -602,7 +629,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                 aria-label={`View ${stat.tab} details`}
                 className="text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                <Card className="rounded-xl border-border shadow-sm h-full cursor-pointer transition-all hover:shadow-md hover:border-primary/40">
+                <Card className="rounded-xl border-transparent shadow-sm h-full cursor-pointer transition-all hover:shadow-md hover:border-primary/40">
                   <CardContent className="p-4 text-center">
                     <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">{stat.label}</p>
                     <p className={`text-xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
@@ -613,18 +640,18 @@ export default function ChildDetail({ id }: ChildDetailProps) {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="bg-card border border-border p-1 rounded-xl w-fit shadow-sm mb-6">
-              <TabsTrigger value="profile" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Profile</TabsTrigger>
-              <TabsTrigger value="health" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Health</TabsTrigger>
-              <TabsTrigger value="attendance" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Attendance</TabsTrigger>
-              <TabsTrigger value="assessments" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Assessments</TabsTrigger>
-              <TabsTrigger value="documents" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Documents</TabsTrigger>
-              <TabsTrigger value="family" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Family</TabsTrigger>
+            <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b border-border bg-transparent p-0 mb-6">
+              <TabsTrigger value="profile" className="rounded-none border-b-2 border-transparent bg-transparent px-4 pb-2.5 pt-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">Profile</TabsTrigger>
+              <TabsTrigger value="health" className="rounded-none border-b-2 border-transparent bg-transparent px-4 pb-2.5 pt-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">Health</TabsTrigger>
+              <TabsTrigger value="attendance" className="rounded-none border-b-2 border-transparent bg-transparent px-4 pb-2.5 pt-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">Attendance</TabsTrigger>
+              <TabsTrigger value="assessments" className="rounded-none border-b-2 border-transparent bg-transparent px-4 pb-2.5 pt-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">Assessments</TabsTrigger>
+              <TabsTrigger value="documents" className="rounded-none border-b-2 border-transparent bg-transparent px-4 pb-2.5 pt-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">Documents</TabsTrigger>
+              <TabsTrigger value="family" className="rounded-none border-b-2 border-transparent bg-transparent px-4 pb-2.5 pt-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none">Family</TabsTrigger>
             </TabsList>
 
             <TabsContent value="profile" className="mt-0 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                <Card className="rounded-xl border-transparent shadow-sm overflow-hidden">
                   <CardHeader className="border-b border-border bg-muted/50 pb-3">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <User className="h-4 w-4 text-primary" /> Child Information
@@ -645,7 +672,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                     ))}
                   </CardContent>
                 </Card>
-                <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                <Card className="rounded-xl border-transparent shadow-sm overflow-hidden">
                   <CardHeader className="border-b border-border bg-muted/50 pb-3">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <FileText className="h-4 w-4 text-primary" /> Enrollment Details
@@ -666,7 +693,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                   </CardContent>
                 </Card>
               </div>
-              <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+              <Card className="rounded-xl border-transparent shadow-sm overflow-hidden">
                 <CardHeader className="border-b border-border bg-muted/50 pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
@@ -710,7 +737,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
 
             <TabsContent value="health" className="mt-0 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                <Card className="rounded-xl border-transparent shadow-sm overflow-hidden">
                   <CardHeader className="border-b border-border bg-muted/50 pb-3">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <Heart className="h-4 w-4 text-red-500" /> Health Records
@@ -740,7 +767,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                     )}
                   </CardContent>
                 </Card>
-                <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                <Card className="rounded-xl border-transparent shadow-sm overflow-hidden">
                   <CardHeader className="border-b border-border bg-muted/50 pb-3">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <ShieldCheck className="h-4 w-4 text-primary" /> Medical Information
@@ -776,7 +803,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
             </TabsContent>
 
             <TabsContent value="attendance" className="mt-0">
-              <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+              <Card className="rounded-xl border-transparent shadow-sm overflow-hidden">
                 <CardHeader className="border-b border-border bg-muted/50 pb-3">
                   <CardTitle className="text-base font-bold flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-primary" /> Attendance Summary (Last 30 Days)
@@ -813,7 +840,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
             </TabsContent>
 
             <TabsContent value="assessments" className="mt-0">
-              <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+              <Card className="rounded-xl border-transparent shadow-sm overflow-hidden">
                 <CardHeader className="border-b border-border bg-muted/50 pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
@@ -858,7 +885,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
             </TabsContent>
 
             <TabsContent value="documents" className="mt-0">
-              <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+              <Card className="rounded-xl border-transparent shadow-sm overflow-hidden">
                 <CardHeader className="border-b border-border bg-muted/50 pb-3">
                   <CardTitle className="text-base font-bold flex items-center gap-2">
                     <FileText className="h-4 w-4 text-primary" /> Documents
@@ -898,7 +925,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
 
             <TabsContent value="family" className="mt-0 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                <Card className="rounded-xl border-transparent shadow-sm overflow-hidden">
                   <CardHeader className="border-b border-border bg-muted/50 pb-3">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <Home className="h-4 w-4 text-primary" /> Primary Contact
@@ -929,7 +956,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
                     )}
                   </CardContent>
                 </Card>
-                <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+                <Card className="rounded-xl border-transparent shadow-sm overflow-hidden">
                   <CardHeader className="border-b border-border bg-muted/50 pb-3">
                     <CardTitle className="text-base font-bold flex items-center gap-2">
                       <ShieldCheck className="h-4 w-4 text-primary" /> Authorized Contacts
@@ -1025,7 +1052,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
           </Card>
 
           {/* Quick Actions Card */}
-          <Card className="rounded-xl border-border shadow-sm overflow-hidden">
+          <Card className="rounded-xl border-transparent shadow-sm overflow-hidden">
             <CardHeader className="border-b border-border bg-muted/50 pb-3">
               <CardTitle className="text-sm font-bold text-foreground uppercase tracking-widest">Quick Actions</CardTitle>
             </CardHeader>

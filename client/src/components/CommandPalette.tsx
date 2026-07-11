@@ -8,14 +8,13 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import { 
-  LayoutDashboard, 
-  Users, 
-  Calendar, 
-  Heart, 
-  Home, 
-  FileText, 
-  ShieldCheck, 
+import {
+  LayoutDashboard,
+  Users,
+  Calendar,
+  Heart,
+  FileText,
+  ShieldCheck,
   Settings,
   Search,
   Plus,
@@ -23,45 +22,104 @@ import {
   BarChart3,
   BookOpen,
   UserCog,
-  Baby
+  Baby,
+  Loader2,
+  Megaphone,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 
+const NAV_COMMANDS = [
+  { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+  { label: "Children", path: "/children", icon: Baby },
+  { label: "Attendance", path: "/attendance", icon: Calendar },
+  { label: "Enrollment", path: "/enrollment", icon: BookOpen },
+  { label: "Health Records", path: "/health", icon: Heart },
+  { label: "Communication Center", path: "/communication", icon: MessageSquare },
+  { label: "Staff Management", path: "/staff", icon: UserCog },
+  { label: "Performance Panel", path: "/performance", icon: BarChart3 },
+  { label: "Compliance & PIR", path: "/compliance", icon: ShieldCheck },
+  { label: "Program Settings", path: "/settings", icon: Settings },
+];
+
+const QUICK_ACTIONS = [
+  { label: "Enroll New Child", path: "/children?action=new", icon: Plus },
+  { label: "Import Roster Data", path: "/data-import", icon: FileText },
+  { label: "Message a Family", path: "/communication", icon: MessageSquare },
+  { label: "Send Program Broadcast", path: "/communication?action=broadcast", icon: Megaphone },
+  { label: "Generate PIR Report", path: "/reports?action=generate", icon: FileText },
+];
+
+const STATUS_TONE: Record<string, string> = {
+  active: "text-primary",
+  inactive: "text-muted-foreground",
+  graduated: "text-blue-600",
+  withdrawn: "text-red-600",
+};
+
+/**
+ * ⌘K palette with two modes: an empty query shows navigation and quick
+ * actions; typing switches to live record search across children, families,
+ * and staff (top 5 per group), each result jumping straight to its page.
+ * Filtering is manual (shouldFilter=false) so we control ranking and caps.
+ */
 export function CommandPalette() {
   const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState("");
   const [, setLocation] = useLocation();
 
-  // Live record search: children and families load once the palette opens
-  // (staff only) and cmdk's fuzzy filter matches them alongside commands.
   const { user } = useAuth();
   const isStaff = user?.role === "admin" || user?.role === "staff";
-  const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID, {
-    enabled: open && isStaff,
-    staleTime: 60_000,
-  });
-  const { data: families } = trpc.families.list.useQuery(ORGANIZATION_ID, {
-    enabled: open && isStaff,
-    staleTime: 60_000,
-  });
+  const enabled = open && isStaff;
+
+  const childrenQuery = trpc.children.list.useQuery(ORGANIZATION_ID, { enabled, staleTime: 60_000 });
+  const familiesQuery = trpc.families.list.useQuery(ORGANIZATION_ID, { enabled, staleTime: 60_000 });
+  const staffQuery = trpc.staff.list.useQuery(ORGANIZATION_ID, { enabled, staleTime: 60_000 });
+  const searching = query.trim().length > 0;
+  const loading = searching && (childrenQuery.isLoading || familiesQuery.isLoading || staffQuery.isLoading);
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setOpen((open) => !open);
+        setOpen((o) => !o);
       }
     };
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
   }, []);
 
+  // Reset to navigation mode each time the palette opens.
+  React.useEffect(() => {
+    if (!open) setQuery("");
+  }, [open]);
+
   const runCommand = (path: string) => {
     setOpen(false);
     setLocation(path);
   };
+
+  const q = query.trim().toLowerCase();
+  const match = (...parts: (string | null | undefined)[]) =>
+    parts.some((p) => (p ?? "").toLowerCase().includes(q));
+
+  const childResults = searching
+    ? ((childrenQuery.data ?? []) as any[]).filter((c) => match(c.firstName, c.lastName, `${c.firstName} ${c.lastName}`)).slice(0, 5)
+    : [];
+  const familyResults = searching
+    ? ((familiesQuery.data ?? []) as any[]).filter((f) => match(f.primaryContactName, f.primaryContactEmail)).slice(0, 5)
+    : [];
+  const staffResults = searching
+    ? ((staffQuery.data ?? []) as any[]).filter((s) => match(s.firstName, s.lastName, `${s.firstName} ${s.lastName}`, s.position)).slice(0, 5)
+    : [];
+  const navResults = searching ? NAV_COMMANDS.filter((n) => n.label.toLowerCase().includes(q)) : NAV_COMMANDS;
+  const actionResults = searching ? QUICK_ACTIONS.filter((a) => a.label.toLowerCase().includes(q)) : QUICK_ACTIONS;
+
+  const noResults =
+    searching && !loading &&
+    childResults.length + familyResults.length + staffResults.length + navResults.length + actionResults.length === 0;
 
   return (
     <>
@@ -75,25 +133,31 @@ export function CommandPalette() {
           <span className="text-xs">⌘</span>K
         </kbd>
       </button>
-      <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Search children, families, or commands..." />
+      <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={false}>
+        <CommandInput
+          placeholder="Search children, families, staff, or commands…"
+          value={query}
+          onValueChange={setQuery}
+        />
         <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
-          {(children?.length ?? 0) > 0 && (
+          {loading && (
+            <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Searching…
+            </div>
+          )}
+          {noResults && <CommandEmpty>No results found for "{query.trim()}"</CommandEmpty>}
+
+          {childResults.length > 0 && (
             <>
               <CommandGroup heading="Children">
-                {children!.map((c) => (
-                  <CommandItem
-                    key={`child-${c.id}`}
-                    value={`child ${c.firstName} ${c.lastName}`}
-                    onSelect={() => runCommand(`/children/${c.id}`)}
-                  >
+                {childResults.map((c) => (
+                  <CommandItem key={`child-${c.id}`} value={`child-${c.id}`} onSelect={() => runCommand(`/children/${c.id}`)}>
                     <Baby className="mr-2 h-4 w-4" />
-                    <span>
+                    <span className="flex-1">
                       {c.firstName} {c.lastName}
                     </span>
-                    {c.status && c.status !== "active" && (
-                      <span className="ml-2 text-xs capitalize text-muted-foreground">{c.status}</span>
+                    {c.status && (
+                      <span className={`text-xs capitalize ${STATUS_TONE[c.status] ?? "text-muted-foreground"}`}>{c.status}</span>
                     )}
                   </CommandItem>
                 ))}
@@ -101,114 +165,67 @@ export function CommandPalette() {
               <CommandSeparator />
             </>
           )}
-          {(families?.length ?? 0) > 0 && (
+
+          {familyResults.length > 0 && (
             <>
               <CommandGroup heading="Families">
-                {families!.map((f) => (
-                  <CommandItem
-                    key={`family-${f.id}`}
-                    value={`family ${f.primaryContactName}`}
-                    onSelect={() => runCommand(`/family-services?family=${f.id}`)}
-                  >
+                {familyResults.map((f) => (
+                  <CommandItem key={`family-${f.id}`} value={`family-${f.id}`} onSelect={() => runCommand(`/family-services?family=${f.id}`)}>
                     <Users className="mr-2 h-4 w-4" />
-                    <span>{f.primaryContactName}</span>
-                    {f.city && <span className="ml-2 text-xs text-muted-foreground">{f.city}</span>}
+                    <span className="flex-1">{f.primaryContactName}</span>
+                    {f.primaryContactPhone && <span className="text-xs text-muted-foreground">{f.primaryContactPhone}</span>}
                   </CommandItem>
                 ))}
               </CommandGroup>
               <CommandSeparator />
             </>
           )}
-          <CommandGroup heading="Navigation">
-            <CommandItem onSelect={() => runCommand("/dashboard")}>
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              <span>Dashboard</span>
-            </CommandItem>
-            <CommandItem onSelect={() => runCommand("/performance")}>
-              <BarChart3 className="mr-2 h-4 w-4" />
-              <span>Performance Panel</span>
-            </CommandItem>
-            <CommandItem onSelect={() => runCommand("/enrollment")}>
-              <BookOpen className="mr-2 h-4 w-4" />
-              <span>Enrollment</span>
-            </CommandItem>
-            <CommandItem onSelect={() => runCommand("/children")}>
-              <Baby className="mr-2 h-4 w-4" />
-              <span>Children Management</span>
-            </CommandItem>
-            <CommandItem onSelect={() => runCommand("/attendance")}>
-              <Calendar className="mr-2 h-4 w-4" />
-              <span>Attendance</span>
-            </CommandItem>
-            <CommandItem onSelect={() => runCommand("/health")}>
-              <Heart className="mr-2 h-4 w-4" />
-              <span>Health Records</span>
-            </CommandItem>
-            <CommandItem onSelect={() => runCommand("/communication")}>
-              <MessageSquare className="mr-2 h-4 w-4" />
-              <span>Communication Center</span>
-            </CommandItem>
-            <CommandItem onSelect={() => runCommand("/staff")}>
-              <UserCog className="mr-2 h-4 w-4" />
-              <span>Staff Management</span>
-            </CommandItem>
-            <CommandItem onSelect={() => runCommand("/compliance")}>
-              <ShieldCheck className="mr-2 h-4 w-4" />
-              <span>Compliance</span>
-            </CommandItem>
-          </CommandGroup>
-          <CommandSeparator />
-          <CommandGroup heading="Quick Actions">
-            <CommandItem onSelect={() => runCommand("/children?action=new")}>
-              <Plus className="mr-2 h-4 w-4" />
-              <span>Enroll New Child</span>
-            </CommandItem>
-            <CommandItem onSelect={() => runCommand("/data-import")}>
-              <FileText className="mr-2 h-4 w-4" />
-              <span>Import Roster Data</span>
-            </CommandItem>
-            <CommandItem onSelect={() => runCommand("/communication")}>
-              <MessageSquare className="mr-2 h-4 w-4" />
-              <span>Message a Family</span>
-            </CommandItem>
-            <CommandItem onSelect={() => runCommand("/communication?action=broadcast")}>
-              <Megaphone className="mr-2 h-4 w-4" />
-              <span>Send Program Broadcast</span>
-            </CommandItem>
-            <CommandItem onSelect={() => runCommand("/reports?action=generate")}>
-              <FileText className="mr-2 h-4 w-4" />
-              <span>Generate PIR Report</span>
-            </CommandItem>
-          </CommandGroup>
-          <CommandSeparator />
-          <CommandGroup heading="Settings">
-            <CommandItem onSelect={() => runCommand("/settings")}>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Program Settings</span>
-            </CommandItem>
-          </CommandGroup>
+
+          {staffResults.length > 0 && (
+            <>
+              <CommandGroup heading="Staff">
+                {staffResults.map((s) => (
+                  <CommandItem key={`staff-${s.id}`} value={`staff-${s.id}`} onSelect={() => runCommand("/staff")}>
+                    <UserCog className="mr-2 h-4 w-4" />
+                    <span className="flex-1">
+                      {s.firstName} {s.lastName}
+                    </span>
+                    {(s.position || s.role) && (
+                      <span className="text-xs capitalize text-muted-foreground">{s.position || s.role}</span>
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+              <CommandSeparator />
+            </>
+          )}
+
+          {navResults.length > 0 && (
+            <CommandGroup heading="Navigation">
+              {navResults.map((n) => (
+                <CommandItem key={n.path} value={`nav-${n.path}`} onSelect={() => runCommand(n.path)}>
+                  <n.icon className="mr-2 h-4 w-4" />
+                  <span>{n.label}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+
+          {actionResults.length > 0 && (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Quick Actions">
+                {actionResults.map((a) => (
+                  <CommandItem key={a.label} value={`action-${a.label}`} onSelect={() => runCommand(a.path)}>
+                    <a.icon className="mr-2 h-4 w-4" />
+                    <span>{a.label}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          )}
         </CommandList>
       </CommandDialog>
     </>
   );
-}
-
-function Megaphone(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m3 11 18-5v12L3 14v-3z" />
-      <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
-    </svg>
-  )
 }

@@ -60,7 +60,7 @@ describe("applySideNav role filtering", () => {
   it("parent only sees the family-facing items, empty sections dropped", () => {
     const secs = applySideNav(null, "parent");
     expect(allSidePaths(secs).sort()).toEqual(
-      ["/calendar", "/dashboard", "/documents", "/glossary", "/parent-portal", "/settings"].sort()
+      ["/calendar", "/communication", "/dashboard", "/documents", "/glossary", "/parent-portal", "/settings"].sort()
     );
   });
   it("staff loses admin-only items (Compliance, Billing, Bulk Actions)", () => {

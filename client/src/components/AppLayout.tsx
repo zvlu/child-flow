@@ -66,7 +66,22 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [moreToolsOpen, setMoreToolsOpen] = useState(false);
+  // Collapsible sidebar clusters. Seeded from each section's defaultOpen and
+  // remembered per browser so the sidebar reopens the way you left it.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem("sprout.nav.sections");
+      if (saved) return JSON.parse(saved);
+    } catch { /* fresh defaults below */ }
+    return {};
+  });
+  const toggleSection = (title: string, fallback: boolean) => {
+    setOpenSections((prev) => {
+      const next = { ...prev, [title]: !(prev[title] ?? fallback) };
+      try { localStorage.setItem("sprout.nav.sections", JSON.stringify(next)); } catch { /* best effort */ }
+      return next;
+    });
+  };
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [location, navigate] = useLocation();
   const { user, logout, loading } = useAuth();
@@ -89,16 +104,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const isTopNavActive = (path: string) => location === path || location.startsWith(`${path}/`);
   const isNavItemActive = (path: string) => location === path || (path !== "/dashboard" && location.startsWith(path));
   const allSideNavItems = ALL_SIDE_NAV_ITEMS;
-  const moreToolsItems = [
-    { path: "/bulk-actions", label: "Bulk Actions", icon: Zap },
-    { path: "/billing", label: "Billing", icon: FileText },
-    { path: "/parent-portal", label: "Parent Portal", icon: Home },
-    { path: "/meal-planning", label: "Meal Planning", icon: FileText },
-    { path: "/staff-operations", label: "Staff Ops", icon: UserCog },
-    { path: "/report-builder", label: "Report Builder", icon: BarChart3 },
-  ];
-  const activeMoreTool = moreToolsItems.some((item) => isNavItemActive(item.path));
-  const showMoreTools = moreToolsOpen || activeMoreTool;
   const { data: healthFollowUps = [] } = trpc.health.followUps.useQuery(
     { organizationId: ORGANIZATION_ID, dueWithinDays: 30 },
     { refetchInterval: 60_000 }
@@ -306,40 +311,62 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
 
           <nav className="flex-1 overflow-y-auto py-4 px-2">
-            <div className="space-y-4">
-              {effectiveSideSections.map((section) => (
-                <div key={section.title}>
-                  {sidebarOpen && (
-                    <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-sidebar-foreground/40">
-                      {section.title}
-                    </p>
-                  )}
-                  <ul className="space-y-1">
-                    {section.items.map((item) => {
-                      const Icon = item.icon;
-                      const isActive = isNavItemActive(item.path);
-                      return (
-                        <li key={item.path}>
-                          <Link href={item.path} asChild>
-                            <a
-                              onClick={() => setMobileNavOpen(false)}
-                              className={cn(
-                                "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-150",
-                                isActive
-                                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                              )}
-                            >
-                              <Icon className="h-4 w-4 flex-shrink-0" />
-                              {sidebarOpen && <span className="flex-1 truncate">{item.label}</span>}
-                            </a>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
+            <div className="space-y-2">
+              {effectiveSideSections.map((section) => {
+                const sectionActive = section.items.some((item) => isNavItemActive(item.path));
+                // Collapsed rail (icons only) always shows items; a section with
+                // the current page inside stays open regardless of the toggle.
+                const isOpen = !sidebarOpen || sectionActive || (openSections[section.title] ?? section.defaultOpen ?? true);
+                return (
+                  <div key={section.title}>
+                    {sidebarOpen && (
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(section.title, section.defaultOpen ?? true)}
+                        aria-expanded={isOpen}
+                        className={cn(
+                          "w-full flex items-center gap-1.5 px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider transition-colors",
+                          sectionActive ? "text-sidebar-foreground/80" : "text-sidebar-foreground/40 hover:text-sidebar-foreground/70"
+                        )}
+                      >
+                        <ChevronRight className={cn("h-3 w-3 transition-transform duration-200", isOpen && "rotate-90")} />
+                        <span className="flex-1 text-left">{section.title}</span>
+                      </button>
+                    )}
+                    <div
+                      className={cn(
+                        "grid transition-[grid-template-rows] duration-200 ease-out",
+                        isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                      )}
+                    >
+                      <ul className="space-y-1 overflow-hidden">
+                        {section.items.map((item) => {
+                          const Icon = item.icon;
+                          const isActive = isNavItemActive(item.path);
+                          return (
+                            <li key={item.path}>
+                              <Link href={item.path} asChild>
+                                <a
+                                  onClick={() => setMobileNavOpen(false)}
+                                  className={cn(
+                                    "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-150",
+                                    isActive
+                                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                  )}
+                                >
+                                  <Icon className="h-4 w-4 flex-shrink-0" />
+                                  {sidebarOpen && <span className="flex-1 truncate">{item.label}</span>}
+                                </a>
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </div>
+                );
+              })}
 
               {isOwner && (
                 <div>
@@ -367,64 +394,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </div>
               )}
 
-              <div className="pt-1">
-                {sidebarOpen ? (
-                  <>
-                    <button
-                      onClick={() => setMoreToolsOpen(!moreToolsOpen)}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-bold transition-all duration-150",
-                        activeMoreTool
-                          ? "bg-sidebar-primary/15 text-sidebar-foreground"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      )}
-                    >
-                      <Briefcase className="h-4 w-4 flex-shrink-0" />
-                      <span className="flex-1 text-left">More tools</span>
-                      <ChevronRight className={cn("h-4 w-4 transition-transform", showMoreTools && "rotate-90")} />
-                    </button>
-                    {showMoreTools && (
-                      <ul className="space-y-1 mt-1 pl-2">
-                        {moreToolsItems.map((item) => {
-                          const Icon = item.icon;
-                          const isActive = isNavItemActive(item.path);
-                          return (
-                            <li key={item.path}>
-                              <Link href={item.path} asChild>
-                                <a
-                                  onClick={() => setMobileNavOpen(false)}
-                                  className={cn(
-                                    "flex items-center gap-3 px-3 py-2 rounded-lg text-[12px] font-semibold transition-all duration-150",
-                                    isActive
-                                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                                  )}
-                                >
-                                  <Icon className="h-4 w-4 flex-shrink-0" />
-                                  <span className="flex-1 truncate">{item.label}</span>
-                                </a>
-                              </Link>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </>
-                ) : (
-                  <button
-                    onClick={() => setMoreToolsOpen(!moreToolsOpen)}
-                    className={cn(
-                      "w-full flex items-center justify-center px-3 py-2 rounded-xl transition-all duration-150",
-                      activeMoreTool
-                        ? "bg-sidebar-primary/15 text-sidebar-foreground"
-                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                    )}
-                    aria-label="Toggle more tools"
-                  >
-                    <Briefcase className="h-4 w-4 flex-shrink-0" />
-                  </button>
-                )}
-              </div>
             </div>
           </nav>
 

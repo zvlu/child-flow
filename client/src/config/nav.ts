@@ -18,7 +18,7 @@ export type NavRole = "admin" | "staff" | "parent";
  * enabled (e.g. Head Start compliance).
  */
 export type NavItem = { path: string; label: string; icon: LucideIcon; roles?: NavRole[]; module?: ModuleId };
-export type NavSection = { title: string; items: NavItem[] };
+export type NavSection = { title: string; items: NavItem[]; /** Collapsible sidebar cluster: start expanded? */ defaultOpen?: boolean };
 
 /** Modules the org has enabled, as consumed by the nav filters. */
 export type EnabledModules = { has: (id: ModuleId) => boolean };
@@ -50,59 +50,64 @@ export const TOP_NAV_PRIMARY_COUNT = 5;
 
 export const SIDE_NAV_SECTIONS: NavSection[] = [
   {
-    title: "Core",
+    title: "Operations",
+    defaultOpen: true,
     items: [
       { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: PARENT_OK },
       { path: "/children", label: "Children", icon: Baby },
-      { path: "/daily-reports", label: "Daily Reports", icon: Sparkles },
       { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
-      { path: "/chronic-absence", label: "Chronic Absence", icon: TrendingDown, module: "head_start" },
-      { path: "/staff", label: "Staff", icon: UserCog },
-      { path: "/family-services", label: "Family Services", icon: Home, module: "head_start" },
-      { path: "/family-partnership", label: "Partnership Agreements", icon: Handshake, module: "head_start" },
-      { path: "/policy-council", label: "Policy Council", icon: Landmark, module: "head_start" },
+      { path: "/daily-reports", label: "Daily Reports", icon: Sparkles },
+      { path: "/health", label: "Health Records", icon: Heart },
       { path: "/classrooms", label: "Classrooms", icon: School },
+      { path: "/staff", label: "Staff", icon: UserCog },
+      { path: "/assessments", label: "Assessments", icon: ClipboardList },
+      { path: "/lesson-planning", label: "Lesson Planning", icon: NotebookPen },
+      { path: "/portfolios", label: "Portfolios", icon: FolderHeart },
+      { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
+      { path: "/calendar", label: "Calendar", icon: CalendarDays, roles: PARENT_OK },
     ],
   },
   {
-    title: "Operations",
+    title: "Family",
+    defaultOpen: true,
     items: [
       { path: "/enrollment", label: "Enrollment", icon: BookOpen },
       { path: "/data-import", label: "Data Import", icon: Upload, roles: ADMIN_ONLY },
-      { path: "/health", label: "Health Records", icon: Heart },
-      { path: "/health-deadlines", label: "Health Deadlines", icon: CalendarClock, module: "head_start" },
-      { path: "/disability-services", label: "Disability Services", icon: Accessibility, module: "head_start" },
-      { path: "/assessments", label: "Assessments", icon: ClipboardList },
-      { path: "/classroom-quality", label: "Classroom Quality", icon: BarChart3, module: "head_start" },
-      { path: "/lesson-planning", label: "Lesson Planning", icon: NotebookPen },
-      { path: "/portfolios", label: "Portfolios", icon: FolderHeart },
-      { path: "/calendar", label: "Calendar", icon: CalendarDays, roles: PARENT_OK },
-      { path: "/documents", label: "Documents", icon: FileText, roles: PARENT_OK },
-      { path: "/digital-documents", label: "E-Signatures", icon: FileSignature },
-      { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
-      { path: "/bulk-actions", label: "Bulk Actions", icon: Layers, roles: ADMIN_ONLY },
-      { path: "/compliance", label: "Compliance", icon: ShieldCheck, roles: ADMIN_ONLY, module: "head_start" },
-    ],
-  },
-  {
-    title: "Business",
-    items: [
-      { path: "/billing", label: "Billing", icon: DollarSign, roles: ADMIN_ONLY },
-      { path: "/subsidies", label: "Subsidies", icon: Landmark },
-      { path: "/grant-budget", label: "Grant & Budget", icon: PiggyBank, roles: ADMIN_ONLY, module: "head_start" },
-      { path: "/in-kind", label: "In-Kind", icon: HandHeart, module: "head_start" },
-      { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
-      { path: "/staff-operations", label: "Staff Operations", icon: Clock },
+      { path: "/family-services", label: "Family Services", icon: Home, module: "head_start" },
+      { path: "/family-partnership", label: "Partnership Agreements", icon: Handshake, module: "head_start" },
+      { path: "/communication", label: "Communication", icon: MessageSquare, roles: PARENT_OK },
       { path: "/parent-portal", label: "Parent Portal", icon: Users, roles: PARENT_OK },
     ],
   },
   {
-    title: "Insights",
+    title: "Compliance",
+    defaultOpen: false,
+    items: [
+      { path: "/compliance", label: "Compliance & PIR", icon: ShieldCheck, roles: ADMIN_ONLY, module: "head_start" },
+      { path: "/health-deadlines", label: "Health Deadlines", icon: CalendarClock, module: "head_start" },
+      { path: "/chronic-absence", label: "Chronic Absence", icon: TrendingDown, module: "head_start" },
+      { path: "/disability-services", label: "Disability Services", icon: Accessibility, module: "head_start" },
+      { path: "/policy-council", label: "Policy Council", icon: Landmark, module: "head_start" },
+      { path: "/classroom-quality", label: "Classroom Quality", icon: BarChart3, module: "head_start" },
+      { path: "/in-kind", label: "In-Kind", icon: HandHeart, module: "head_start" },
+      { path: "/digital-documents", label: "E-Signatures", icon: FileSignature },
+      { path: "/documents", label: "Documents", icon: FileText, roles: PARENT_OK },
+    ],
+  },
+  {
+    title: "Insights & Admin",
+    defaultOpen: false,
     items: [
       { path: "/performance", label: "Performance Panel", icon: BarChart3 },
+      { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
       { path: "/reports", label: "Reports", icon: FileText },
       { path: "/report-builder", label: "Report Builder", icon: Zap },
       { path: "/ai-insights", label: "AI Insights", icon: Zap },
+      { path: "/billing", label: "Billing", icon: DollarSign, roles: ADMIN_ONLY },
+      { path: "/subsidies", label: "Subsidies", icon: Landmark },
+      { path: "/grant-budget", label: "Grant & Budget", icon: PiggyBank, roles: ADMIN_ONLY, module: "head_start" },
+      { path: "/staff-operations", label: "Staff Operations", icon: Clock },
+      { path: "/bulk-actions", label: "Bulk Actions", icon: Layers, roles: ADMIN_ONLY },
       { path: "/glossary", label: "Glossary", icon: BookText, roles: PARENT_OK },
       { path: "/settings", label: "Settings", icon: Settings, roles: PARENT_OK },
     ],
