@@ -221,6 +221,8 @@ export type InsertCustomRole = typeof customRoles.$inferInsert;
 export const families = mysqlTable("families", {
   id: int("id").autoincrement().primaryKey(),
   organizationId: int("organizationId").notNull().references(() => organizations.id),
+  /** Case-load management: the Family Advocate responsible for this family (null = unassigned). */
+  familyAdvocateId: int("familyAdvocateId").references(() => staff.id),
   primaryContactName: varchar("primaryContactName", { length: 100 }).notNull(),
   primaryContactPhone: varchar("primaryContactPhone", { length: 20 }),
   primaryContactEmail: varchar("primaryContactEmail", { length: 320 }),

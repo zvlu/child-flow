@@ -8,6 +8,7 @@ import { publicProcedure, protectedProcedure, router, staffProcedure, adminProce
 import { isPlatformOwner } from "./_core/env";
 import { invalidateModuleCache, orgHasModule } from "./_core/modules";
 import { checkChronicAbsenceAlerts } from "./absenceAlerts";
+import { getCaseloadOverview, assignAdvocate, getMyCaseload, suggestAssignments, generateSupervisorSummary } from "./caseloads";
 import { SUPPORTED_LANGUAGES } from "./translation";
 import { rateLimit } from "./_core/rateLimit";
 import { computeAuditReadiness } from "./auditReadiness";
@@ -566,6 +567,59 @@ export const appRouter = router({
           resourceType: "child",
           detail: `roster_import:children=${result.childrenCreated},families=${result.familiesCreated},health=${result.healthRecordsCreated}`,
         });
+        return result;
+      }),
+  }),
+
+  // Family Advocate case-load management (supervisor control tower +
+  // advocate "my families" queue). See server/caseloads.ts.
+  caseloads: router({
+    overview: hsAdminProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId }) => {
+        return getCaseloadOverview(organizationId);
+      }),
+    assign: hsAdminProcedure
+      .input(
+        z.object({
+          organizationId: z.number(),
+          familyIds: z.array(z.number()).min(1).max(500),
+          advocateId: z.number().nullable(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const result = await assignAdvocate(input.organizationId, input.familyIds, input.advocateId);
+        await auditAccess(ctx, {
+          action: "update",
+          resourceType: "family",
+          detail: `caseload_assign:advocate=${input.advocateId ?? "none"}:families=${input.familyIds.length}`,
+        });
+        return result;
+      }),
+    mine: hsStaffProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId, ctx }) => {
+        const staffId = await mod.resolveStaffId(organizationId, ctx.user.id);
+        if (staffId == null) return [];
+        return getMyCaseload(organizationId, staffId);
+      }),
+    suggestions: hsAdminProcedure
+      .input(z.number())
+      .query(async ({ input: organizationId }) => {
+        return suggestAssignments(organizationId);
+      }),
+    supervisorSummary: hsAdminProcedure
+      .input(z.number())
+      .mutation(async ({ input: organizationId, ctx }) => {
+        const { ok, retryAfterSec } = rateLimit(`supervisor-summary:${ctx.user.id}`, 6, 60_000);
+        if (!ok) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Try again in ${retryAfterSec}s.` });
+        }
+        const result = await generateSupervisorSummary(organizationId);
+        if (!result) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "No advocates carry a case load yet — assign families first." });
+        }
+        await auditAccess(ctx, { action: "read", resourceType: "family", detail: "supervisor_summary" });
         return result;
       }),
   }),

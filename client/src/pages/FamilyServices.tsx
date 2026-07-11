@@ -78,6 +78,12 @@ export default function FamilyServices() {
   }, [searchParams, families]);
   const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID);
   const { data: services, isLoading: servicesLoading } = trpc.familyServices.list.useQuery({ organizationId: ORGANIZATION_ID });
+  const { data: staffList } = trpc.staff.list.useQuery(ORGANIZATION_ID);
+  const advocateName = (id: number | null | undefined) => {
+    if (id == null) return null;
+    const s = (staffList ?? []).find((m: any) => m.id === id);
+    return s ? `${s.firstName} ${s.lastName}` : null;
+  };
 
   const createService = trpc.familyServices.create.useMutation({
     onSuccess: () => {
@@ -303,6 +309,18 @@ export default function FamilyServices() {
                           <p className="text-xs text-muted-foreground mt-0.5">
                             Children: {kids.length > 0 ? kids.join(", ") : "None enrolled"}
                           </p>
+                          {(() => {
+                            const adv = advocateName((family as any).familyAdvocateId);
+                            return (
+                              <p className="mt-1 inline-flex items-center gap-1 text-xs">
+                                {adv ? (
+                                  <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">Advocate: {adv}</span>
+                                ) : (
+                                  <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">No advocate assigned</span>
+                                )}
+                              </p>
+                            );
+                          })()}
                           <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
                             {family.primaryContactPhone && (
                               <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5" />{family.primaryContactPhone}</div>

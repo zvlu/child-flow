@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Children from "./pages/Children";
 import DataImport from "./pages/DataImport";
 import Kiosk from "./pages/Kiosk";
+import Caseloads from "./pages/Caseloads";
 import ChildDetail from "./pages/ChildDetail";
 import DailyReports from "./pages/DailyReports";
 import LessonPlanning from "./pages/LessonPlanning";
@@ -93,6 +94,13 @@ function Router() {
         {() => (
           <AppLayout>
             <Children />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/caseloads">
+        {() => (
+          <AppLayout>
+            <Caseloads />
           </AppLayout>
         )}
       </Route>

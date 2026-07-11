@@ -6,6 +6,7 @@
  */
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/mysql2";
+import { eq } from "drizzle-orm";
 import mysql from "mysql2/promise";
 import { hashPassword } from "../server/_core/password";
 import {
@@ -475,6 +476,15 @@ async function main() {
     { organizationId: ORG, familyId: 5, authorId: 6, type: "phone_call", confidentiality: "standard", body: "Check-in about Madison's attendance gaps. Grandmother shared that the family car broke down two weeks ago and repairs are unaffordable this month. Shared bus route info and voucher program.", followUpRequired: 1, followUpDue: daysAhead(10), createdAt: daysAgo(3) },
     { organizationId: ORG, familyId: 5, authorId: 2, type: "general", confidentiality: "sensitive", body: "Madison arrived visibly tired two days this week and mentioned the family is staying with relatives temporarily. Monitoring; will raise gently at next family contact. No safety concerns observed.", followUpRequired: 1, followUpDue: daysAhead(5), createdAt: daysAgo(1) },
   ]);
+
+  console.log("Assigning family case loads…");
+  // Family advocates for the caseload control tower: staff 6 carries most
+  // families, staff 7 a couple, family 6 left unassigned so the supervisor
+  // queue has something to triage.
+  const advocateAssignments: Array<[number, number]> = [[1, 6], [2, 6], [3, 6], [4, 7], [5, 7]];
+  for (const [familyId, advocateId] of advocateAssignments) {
+    await db.update(families).set({ familyAdvocateId: advocateId }).where(eq(families.id, familyId));
+  }
 
   console.log("Seeding chat conversations…");
   await db.insert(conversations).values([

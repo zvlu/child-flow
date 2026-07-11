@@ -3,7 +3,7 @@ import {
   ShieldCheck, Settings, Baby, BookOpen, FileText, CalendarDays, DollarSign,
   UtensilsCrossed, Clock, FileSignature, Layers, School, AlertTriangle, Zap,
   MessageSquare, HandHeart, ClipboardList, Sparkles, NotebookPen, FolderHeart, Landmark, BookText,
-  TrendingDown, Handshake, CalendarClock, Accessibility, PiggyBank, Upload, type LucideIcon,
+  TrendingDown, Handshake, CalendarClock, Accessibility, PiggyBank, Upload, Briefcase, type LucideIcon,
 } from "lucide-react";
 
 import type { ModuleId } from "@shared/modules";
@@ -74,6 +74,7 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
       { path: "/enrollment", label: "Enrollment", icon: BookOpen },
       { path: "/data-import", label: "Data Import", icon: Upload, roles: ADMIN_ONLY },
       { path: "/family-services", label: "Family Services", icon: Home, module: "head_start" },
+      { path: "/caseloads", label: "Case Loads", icon: Briefcase, module: "head_start" },
       { path: "/family-partnership", label: "Partnership Agreements", icon: Handshake, module: "head_start" },
       { path: "/communication", label: "Communication", icon: MessageSquare, roles: PARENT_OK },
       { path: "/parent-portal", label: "Parent Portal", icon: Users, roles: PARENT_OK },

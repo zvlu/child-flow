@@ -428,6 +428,12 @@ export function registerMessagingRoutes(app: Express) {
       const staffId = await resolveStaffId(orgId, viewer.user.id);
       let familyIdSet = new Set<number>();
       if (staffId != null) {
+        // Family Advocates: families assigned directly to them (case load).
+        const advocateFamilies = await db
+          .select({ id: families.id })
+          .from(families)
+          .where(and(eq(families.organizationId, orgId), eq(families.familyAdvocateId, staffId)));
+        for (const f of advocateFamilies) familyIdSet.add(f.id);
         const myRooms = await db
           .select({ id: classrooms.id })
           .from(classrooms)
