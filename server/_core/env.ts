@@ -1,6 +1,16 @@
+const isExplicitDevelopment = process.env.NODE_ENV === "development";
+
 export const ENV = {
-  appId: process.env.VITE_APP_ID ?? "",
-  cookieSecret: process.env.JWT_SECRET ?? "",
+  /**
+   * appId and cookieSecret get stable local fallbacks ONLY in explicit
+   * development. Without them, sessions were created with an empty appId and
+   * signed with an empty secret — every verification failed, so email/password
+   * sign-in silently fell through to the dev-bypass mock admin ("stuck as
+   * Test Administrator"). Production still requires real values (see
+   * assertSafeAuthConfig).
+   */
+  appId: process.env.VITE_APP_ID || (isExplicitDevelopment ? "local-dev" : ""),
+  cookieSecret: process.env.JWT_SECRET || (isExplicitDevelopment ? "sprout-local-dev-secret-not-for-production" : ""),
   databaseUrl: process.env.DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
@@ -36,6 +46,18 @@ export function assertSafeAuthConfig(): void {
     throw new Error(
       "ALLOW_DEV_AUTH_BYPASS=true but NODE_ENV is not 'development'. " +
       "Refusing to start with an open auth bypass. Unset ALLOW_DEV_AUTH_BYPASS for this environment."
+    );
+  }
+  // Sessions are HS256-signed with this secret; an empty secret in production
+  // would make every login silently unverifiable (or trivially forgeable).
+  if (ENV.isProduction && !process.env.JWT_SECRET) {
+    throw new Error(
+      "JWT_SECRET is not set. Production sessions cannot be signed without it — set JWT_SECRET to a long random string."
+    );
+  }
+  if (ENV.isDevelopment && !process.env.JWT_SECRET) {
+    console.warn(
+      "[Auth] JWT_SECRET not set — using the built-in DEV-ONLY session secret. Sign-ins will work locally; set JWT_SECRET for anything shared."
     );
   }
 }
