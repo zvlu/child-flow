@@ -1,0 +1,1 @@
+ALTER TABLE `staff` MODIFY COLUMN `role` enum('admin','director','fiscal_officer','education_coordinator','coach','health_coordinator','nurse','nutritionist','mental_health_consultant','disabilities_coordinator','family_services_manager','family_advocate','home_visitor','ersea_coordinator','teacher','assistant','cook','bus_driver','coordinator') DEFAULT 'teacher';
