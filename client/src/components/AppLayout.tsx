@@ -163,8 +163,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <Menu className="h-4 w-4" />
         </Button>
         <div className="flex items-center gap-2 mr-4">
-          <img src="/brand/logo-mark-64.png" alt="Sprout" className="w-7 h-7 rounded-lg" />
-          <span className="font-bold text-base tracking-tight">Sprout</span>
+          <img src="/brand/logo-mark-64.png" alt="Sprout" className="w-9 h-9 rounded-lg" />
+          <span className="font-bold text-lg tracking-tight">Sprout</span>
         </div>
         
         <nav className="hidden md:flex flex-1 items-center h-full min-w-0 overflow-x-auto no-scrollbar">

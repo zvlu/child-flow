@@ -62,9 +62,9 @@ export default function SignIn() {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
-        <div className="flex items-center gap-2 mb-6 justify-center">
-          <img src="/brand/logo-mark-64.png" alt="Sprout" className="w-8 h-8 rounded-lg" />
-          <span className="font-bold text-lg tracking-tight text-foreground">Sprout</span>
+        <div className="flex items-center gap-3 mb-8 justify-center">
+          <img src="/brand/logo-mark-192.png" alt="Sprout" className="w-16 h-16 rounded-2xl" />
+          <span className="font-bold text-4xl tracking-tight text-foreground">Sprout</span>
         </div>
         <Card>
           <CardHeader>

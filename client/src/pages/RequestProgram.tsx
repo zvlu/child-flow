@@ -40,7 +40,7 @@ export default function RequestProgram() {
     <div className="min-h-screen bg-[#FBF6EE] flex flex-col items-center px-4 py-10">
       <div className="w-full max-w-xl">
         <div className="flex items-center gap-2 mb-6">
-          <img src="/brand/logo-mark-64.png" alt="Sprout" className="w-8 h-8 rounded-lg" />
+          <img src="/brand/logo-mark-192.png" alt="Sprout" className="w-14 h-14 rounded-2xl" />
           <span className="font-bold text-lg tracking-tight text-foreground">Sprout</span>
         </div>
 

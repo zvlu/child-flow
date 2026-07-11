@@ -110,7 +110,7 @@ export default function Kiosk() {
       {/* Kiosk header */}
       <header className="flex items-center justify-between border-b border-border bg-card px-6 py-4">
         <div className="flex items-center gap-3">
-          <img src="/brand/logo-mark-64.png" alt="Sprout" className="h-10 w-10 rounded-xl" />
+          <img src="/brand/logo-mark-192.png" alt="Sprout" className="h-14 w-14 rounded-2xl" />
           <div>
             <h1 className="text-xl font-bold text-foreground">Good morning!</h1>
             <p className="text-sm text-muted-foreground">Tap your child's name to check in or out</p>

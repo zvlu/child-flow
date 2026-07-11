@@ -144,7 +144,7 @@ export default function Home() {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-white/40 to-transparent" />
 
       <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-10">
-        <img src="/brand/logo-horizontal-96.png" alt="Sprout" className="h-8 w-auto sm:h-9" />
+        <img src="/brand/logo-horizontal-96.png" alt="Sprout" className="h-10 w-auto sm:h-12" />
         <Link href="/dashboard" className="text-sm font-semibold text-[#5b5145] transition-colors hover:text-[#2E2A26]">
           Sign in
         </Link>
