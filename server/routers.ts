@@ -2375,7 +2375,7 @@ export const appRouter = router({
   compliance: router({
     // Live "if the reviewer walked in today" score across the Performance
     // Standards. Read-only aggregation of data staff already maintain.
-    auditReadiness: hsStaffProcedure
+    auditReadiness: hsAdminProcedure
       .input(z.number())
       .query(async ({ input: organizationId }) => {
         return computeAuditReadiness(organizationId);

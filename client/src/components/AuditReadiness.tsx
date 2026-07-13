@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { cn } from "@/lib/utils";
 import { useOrgModules } from "@/hooks/useOrgModules";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const GRADE_META: Record<string, { label: string; badge: string; ring: string }> = {
   strong: { label: "Review-ready", badge: "bg-green-100 text-green-700 border-green-200", ring: "text-green-600" },
@@ -45,13 +46,18 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
  */
 export function AuditReadiness({ compact = false }: { compact?: boolean }) {
   const modules = useOrgModules();
+  const { user } = useAuth();
+  // Program-wide compliance posture is leadership information — directors and
+  // admins only. Staff see their own slice of compliance on their work pages.
+  const isAdmin = user?.role === "admin";
   const hasHeadStart = modules.has("head_start");
+  const enabled = isAdmin && hasHeadStart;
   const query = trpc.compliance.auditReadiness.useQuery(ORGANIZATION_ID, {
-    enabled: hasHeadStart,
+    enabled,
     staleTime: 60_000,
   });
 
-  if (!hasHeadStart) return null;
+  if (!enabled) return null;
 
   if (query.isLoading) {
     return (

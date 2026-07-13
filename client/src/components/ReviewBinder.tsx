@@ -4,6 +4,7 @@ import { FileDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 /**
  * One-click federal-review evidence binder: pulls the audit-readiness
@@ -11,11 +12,14 @@ import { ORGANIZATION_ID } from "@/const";
  * partnership agreements, and staff credentials into a single dated,
  * print-ready document (browser print → Save as PDF). What used to be a
  * week of assembling spreadsheets before a monitoring visit becomes a
- * button.
+ * button. Audit readiness is admin-only data, so the binder is too.
  */
 export function ReviewBinderButton() {
+  const { user } = useAuth();
   const [building, setBuilding] = useState(false);
   const utils = trpc.useUtils();
+
+  if (user?.role !== "admin") return null;
 
   const esc = (v: unknown) =>
     String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

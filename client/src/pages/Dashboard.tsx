@@ -17,6 +17,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useActionItems } from "@/hooks/useActionItems";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { AuditReadiness } from "@/components/AuditReadiness";
 
@@ -105,18 +106,24 @@ export default function Dashboard() {
   // Role-aware quick actions: the signed-in staff member's most-used pages
   // come first (nurse sees Health, nutritionist sees Meal Planning, …).
   const { data: myRole } = trpc.staff.myRole.useQuery();
+  const { user: authUser } = useAuth();
   const quickActions = useMemo(() => {
+    // Admin-only destinations never appear as quick actions for staff.
+    const ADMIN_ONLY_ACTIONS = new Set(["/billing", "/compliance"]);
+    const pool = authUser?.role === "admin"
+      ? QUICK_ACTION_POOL
+      : QUICK_ACTION_POOL.filter((a) => !ADMIN_ONLY_ACTIONS.has(a.href));
     const priority = ROLE_QUICK_PRIORITY[myRole?.role ?? ""] ?? [];
     const rank = (href: string) => {
       const i = priority.indexOf(href);
       return i === -1 ? Number.MAX_SAFE_INTEGER : i;
     };
-    return [...QUICK_ACTION_POOL]
+    return [...pool]
       .map((a, i) => ({ a, i }))
       .sort((x, y) => rank(x.a.href) - rank(y.a.href) || x.i - y.i)
       .map(({ a }) => a)
       .slice(0, 6);
-  }, [myRole]);
+  }, [myRole, authUser]);
 
   // Unified action feed (shared with the Action Queue page) — health
   // follow-ups, AI insights, documents, credentials, chronic absence.
