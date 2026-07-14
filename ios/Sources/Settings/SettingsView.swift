@@ -149,12 +149,27 @@ class SettingsViewModel: ObservableObject {
     @Published var programName = ""
     @Published var region = ""
     @Published var fiscalYear = ""
-    @Published var attendanceReminders = true
-    @Published var healthAlerts = true
-    @Published var complianceAlerts = true
+    // These three used to reset to "on" every launch no matter what the user
+    // picked — the toggles moved, but nothing ever saved the choice. There's
+    // no server-side notification-preference model yet, so this persists
+    // per-device for now; still real, just not synced across devices.
+    @Published var attendanceReminders = true { didSet { UserDefaults.standard.set(attendanceReminders, forKey: Self.attendanceKey) } }
+    @Published var healthAlerts = true { didSet { UserDefaults.standard.set(healthAlerts, forKey: Self.healthKey) } }
+    @Published var complianceAlerts = true { didSet { UserDefaults.standard.set(complianceAlerts, forKey: Self.complianceKey) } }
+
+    private static let attendanceKey = "settings.notify.attendance"
+    private static let healthKey = "settings.notify.health"
+    private static let complianceKey = "settings.notify.compliance"
 
     var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
+
+    init() {
+        let d = UserDefaults.standard
+        if d.object(forKey: Self.attendanceKey) != nil { attendanceReminders = d.bool(forKey: Self.attendanceKey) }
+        if d.object(forKey: Self.healthKey) != nil { healthAlerts = d.bool(forKey: Self.healthKey) }
+        if d.object(forKey: Self.complianceKey) != nil { complianceAlerts = d.bool(forKey: Self.complianceKey) }
     }
 
     func load() async {

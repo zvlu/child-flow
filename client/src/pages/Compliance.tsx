@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, CheckCircle2, ChevronRight, Loader2, TrendingUp } from "lucide-react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import PirReportEditor from "@/components/PirReportEditor";
@@ -12,13 +13,22 @@ import { Glossary } from "@/components/Glossary";
 import { AuditReadiness } from "@/components/AuditReadiness";
 import { ReviewBinderButton } from "@/components/ReviewBinder";
 
-const monitoringItems = [
-  { area: "Child-to-Staff Ratio", status: "compliant", lastReview: "Nov 1, 2024", notes: "All classrooms within required ratios" },
-  { area: "Health & Safety Checks", status: "compliant", lastReview: "Nov 1, 2024", notes: "Monthly safety inspections completed" },
-  { area: "Fiscal Management", status: "compliant", lastReview: "Oct 15, 2024", notes: "Budget on track, no findings" },
-  { area: "Program Governance", status: "compliant", lastReview: "Oct 1, 2024", notes: "Policy council meetings held monthly" },
-  { area: "Transportation Safety", status: "needs_attention", lastReview: "Oct 20, 2024", notes: "2 buses due for safety inspection" },
-  { area: "Food Service", status: "compliant", lastReview: "Nov 1, 2024", notes: "CACFP records up to date" },
+// Relative to today rather than a fixed date, so this list doesn't read as
+// "reviewed Nov 2024" forever — it used to be hardcoded and would silently
+// drift further stale every time someone opened this page.
+const daysAgo = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
+const initialMonitoringItems = [
+  { area: "Child-to-Staff Ratio", status: "compliant", lastReview: daysAgo(3), notes: "All classrooms within required ratios" },
+  { area: "Health & Safety Checks", status: "compliant", lastReview: daysAgo(3), notes: "Monthly safety inspections completed" },
+  { area: "Fiscal Management", status: "compliant", lastReview: daysAgo(18), notes: "Budget on track, no findings" },
+  { area: "Program Governance", status: "compliant", lastReview: daysAgo(25), notes: "Policy council meetings held monthly" },
+  { area: "Transportation Safety", status: "needs_attention", lastReview: daysAgo(20), notes: "2 buses due for safety inspection" },
+  { area: "Food Service", status: "compliant", lastReview: daysAgo(3), notes: "CACFP records up to date" },
 ];
 
 const monitoringBadge = (status: string) => {
@@ -93,6 +103,19 @@ function ComplianceHistory() {
 }
 
 export default function Compliance() {
+  // The "Update" button below used to have no onClick at all — clicking it
+  // did nothing, silently. This at least lets a reviewer mark an area
+  // resolved; still local-only (no server model for this checklist yet).
+  const [monitoringItems, setMonitoringItems] = useState(initialMonitoringItems);
+  const markReviewed = (area: string) => {
+    setMonitoringItems((items) =>
+      items.map((item) =>
+        item.area === area ? { ...item, status: "compliant", lastReview: "Today" } : item
+      )
+    );
+    toast.success(`${area} marked reviewed`);
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -141,7 +164,15 @@ export default function Compliance() {
                     <p className="text-xs text-muted-foreground mt-1">{item.notes}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">Last reviewed: {item.lastReview}</p>
                   </div>
-                  <Button variant="ghost" size="sm" className="text-xs flex-shrink-0">Update</Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs flex-shrink-0"
+                    disabled={item.status === "compliant"}
+                    onClick={() => markReviewed(item.area)}
+                  >
+                    {item.status === "compliant" ? "Reviewed" : "Mark Reviewed"}
+                  </Button>
                 </div>
               ))}
             </CardContent>

@@ -21,6 +21,15 @@ struct StaffView: View {
                     }
                 }
             }
+            if !viewModel.unmatched.isEmpty {
+                Section("Other") {
+                    ForEach(viewModel.unmatched) { member in
+                        NavigationLink(destination: StaffDetailView(member: member, viewModel: viewModel)) {
+                            StaffRow(member: member)
+                        }
+                    }
+                }
+            }
         }
         .navigationTitle("Staff")
         .searchable(text: $viewModel.searchText, prompt: "Search staff")
@@ -52,16 +61,7 @@ struct StaffView: View {
 struct StaffRow: View {
     let member: StaffMember
 
-    var roleColor: Color {
-        switch member.roleKey {
-        case "director":          return .cfPrimary
-        case "teacher":           return .cfChildren
-        case "assistant":         return .cfGoals
-        case "familyWorker":      return .cfFamily
-        case "healthCoordinator": return .cfHealth
-        default:                  return .cfTextSecondary
-        }
-    }
+    var roleColor: Color { StaffRole(rawValue: member.roleKey)?.color ?? .cfTextSecondary }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -117,16 +117,7 @@ struct StaffDetailView: View {
     @State private var showLogTraining = false
     @State private var showEditClassroom = false
 
-    var roleColor: Color {
-        switch member.roleKey {
-        case "director":          return .cfPrimary
-        case "teacher":           return .cfChildren
-        case "assistant":         return .cfGoals
-        case "familyWorker":      return .cfFamily
-        case "healthCoordinator": return .cfHealth
-        default:                  return .cfTextSecondary
-        }
-    }
+    var roleColor: Color { StaffRole(rawValue: member.roleKey)?.color ?? .cfTextSecondary }
 
     // Pull the live version of this member from the viewModel
     var liveMember: StaffMember {
@@ -401,26 +392,92 @@ struct AddStaffSheet: View {
 
 // MARK: - Enums & ViewModel
 
+/// Mirrors the full §1302.91 staff taxonomy used server-side (see
+/// `server/routers.ts` staff.create's `role` enum). This used to only
+/// recognize 5 legacy keys (director/teacher/assistant/familyWorker/
+/// healthCoordinator), so any staff member seeded with a real role like
+/// "nurse", "nutritionist", or "family_advocate" simply never showed up
+/// in this list — no error, they just silently vanished from the directory.
 enum StaffRole: String, CaseIterable {
-    case director, teacher, assistant, familyWorker, healthCoordinator
+    case director
+    case fiscalOfficer = "fiscal_officer"
+    case educationCoordinator = "education_coordinator"
+    case coach
+    case healthCoordinator = "health_coordinator"
+    case nurse
+    case nutritionist
+    case mentalHealthConsultant = "mental_health_consultant"
+    case disabilitiesCoordinator = "disabilities_coordinator"
+    case familyServicesManager = "family_services_manager"
+    case familyAdvocate = "family_advocate"
+    case homeVisitor = "home_visitor"
+    case erseaCoordinator = "ersea_coordinator"
+    case teacher
+    case assistant
+    case cook
+    case busDriver = "bus_driver"
+    case coordinator
+    case admin
 
     var displayName: String {
         switch self {
-        case .director:          return "Program Directors"
-        case .teacher:           return "Lead Teachers"
-        case .assistant:         return "Teacher Assistants"
-        case .familyWorker:      return "Family Service Workers"
-        case .healthCoordinator: return "Health Coordinators"
+        case .director:                return "Program Directors"
+        case .fiscalOfficer:            return "Fiscal Officers"
+        case .educationCoordinator:     return "Education Coordinators"
+        case .coach:                    return "Coaches"
+        case .healthCoordinator:        return "Health Coordinators"
+        case .nurse:                    return "Nurses"
+        case .nutritionist:             return "Nutritionists"
+        case .mentalHealthConsultant:   return "Mental Health Consultants"
+        case .disabilitiesCoordinator:  return "Disabilities Coordinators"
+        case .familyServicesManager:    return "Family Services Managers"
+        case .familyAdvocate:           return "Family Advocates"
+        case .homeVisitor:              return "Home Visitors"
+        case .erseaCoordinator:         return "ERSEA Coordinators"
+        case .teacher:                  return "Lead Teachers"
+        case .assistant:                return "Teacher Assistants"
+        case .cook:                     return "Cooks"
+        case .busDriver:                return "Bus Drivers"
+        case .coordinator:              return "Coordinators"
+        case .admin:                    return "Administrators"
         }
     }
 
     var singleName: String {
         switch self {
-        case .director:          return "Program Director"
-        case .teacher:           return "Lead Teacher"
-        case .assistant:         return "Teacher Assistant"
-        case .familyWorker:      return "Family Service Worker"
-        case .healthCoordinator: return "Health Coordinator"
+        case .director:                return "Program Director"
+        case .fiscalOfficer:            return "Fiscal Officer"
+        case .educationCoordinator:     return "Education Coordinator"
+        case .coach:                    return "Coach"
+        case .healthCoordinator:        return "Health Coordinator"
+        case .nurse:                    return "Nurse"
+        case .nutritionist:             return "Nutritionist"
+        case .mentalHealthConsultant:   return "Mental Health Consultant"
+        case .disabilitiesCoordinator:  return "Disabilities Coordinator"
+        case .familyServicesManager:    return "Family Services Manager"
+        case .familyAdvocate:           return "Family Advocate"
+        case .homeVisitor:              return "Home Visitor"
+        case .erseaCoordinator:         return "ERSEA Coordinator"
+        case .teacher:                  return "Lead Teacher"
+        case .assistant:                return "Teacher Assistant"
+        case .cook:                     return "Cook"
+        case .busDriver:                return "Bus Driver"
+        case .coordinator:              return "Coordinator"
+        case .admin:                    return "Administrator"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .director, .admin:                                     return .cfPrimary
+        case .fiscalOfficer, .coordinator:                           return .cfCompliance
+        case .educationCoordinator, .coach:                         return .cfGoals
+        case .healthCoordinator, .nurse, .nutritionist,
+             .mentalHealthConsultant, .disabilitiesCoordinator:      return .cfHealth
+        case .familyServicesManager, .familyAdvocate, .homeVisitor:  return .cfFamily
+        case .erseaCoordinator:                                      return .cfAttendance
+        case .teacher, .assistant:                                   return .cfChildren
+        case .cook, .busDriver:                                      return .cfAccent
         }
     }
 }
@@ -435,6 +492,15 @@ class StaffViewModel: ObservableObject {
         let byRole = allStaff.filter { $0.roleKey == role.rawValue }
         guard !searchText.isEmpty else { return byRole }
         return byRole.filter { $0.fullName.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    /// Anyone whose roleKey doesn't match a known case — shown under "Other"
+    /// instead of silently disappearing if the taxonomy drifts again.
+    var unmatched: [StaffMember] {
+        let known = Set(StaffRole.allCases.map { $0.rawValue })
+        let rest = allStaff.filter { !known.contains($0.roleKey) }
+        guard !searchText.isEmpty else { return rest }
+        return rest.filter { $0.fullName.localizedCaseInsensitiveContains(searchText) }
     }
 
     func add(_ member: StaffMember) { allStaff.append(member) }

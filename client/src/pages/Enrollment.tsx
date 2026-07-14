@@ -726,18 +726,19 @@ function IncidentLogTab({ childList }: { childList: Array<{ id: number; firstNam
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ERSEA Eligibility Calculator (45 CFR §1302.12)
-// 2025 HHS Poverty Guidelines — 48 contiguous states + D.C.
+// 2026 HHS Poverty Guidelines — 48 contiguous states + D.C. (aspe.hhs.gov).
+// These are reissued every January — this was still running on 2025 figures.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const FPL_2025: Record<number, number> = {
-  1: 15_650, 2: 21_150, 3: 26_650, 4: 32_150,
-  5: 37_650, 6: 43_150, 7: 48_650, 8: 54_150,
+const FPL_2026: Record<number, number> = {
+  1: 15_960, 2: 21_640, 3: 27_320, 4: 33_000,
+  5: 38_680, 6: 44_360, 7: 50_040, 8: 55_720,
 };
-const FPL_EXTRA_PERSON = 5_500;
+const FPL_EXTRA_PERSON = 5_680;
 
 function fplFor(householdSize: number): number {
-  if (householdSize <= 8) return FPL_2025[Math.max(1, householdSize)];
-  return FPL_2025[8] + (householdSize - 8) * FPL_EXTRA_PERSON;
+  if (householdSize <= 8) return FPL_2026[Math.max(1, householdSize)];
+  return FPL_2026[8] + (householdSize - 8) * FPL_EXTRA_PERSON;
 }
 
 type CategoricalFlag = "homeless" | "foster" | "public_assistance";
@@ -895,7 +896,7 @@ function ErseaCalculatorDialog({
                 </div>
                 <p className="text-xs text-muted-foreground">{result.detail}</p>
                 <p className="text-[11px] text-muted-foreground">
-                  2025 HHS Poverty Guidelines (48 contiguous states + D.C.). Verify with source documents
+                  2026 HHS Poverty Guidelines (48 contiguous states + D.C.). Verify with source documents
                   (pay stubs, W-2, TANF/SSI letters) and keep them with the application.
                 </p>
               </CardContent>

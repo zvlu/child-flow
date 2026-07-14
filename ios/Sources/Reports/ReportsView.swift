@@ -242,7 +242,7 @@ enum ReportType: String, CaseIterable {
         switch self {
         case .attendance:
             return """
-CHILDFLOW HEAD START — ATTENDANCE REPORT
+SPROUT HEAD START — ATTENDANCE REPORT
 Generated: \(dateStr)
 ──────────────────────────────────────────
 
@@ -265,7 +265,7 @@ ACTION: Follow up with families for chronic absentees.
 """
         case .enrollment:
             return """
-CHILDFLOW HEAD START — ENROLLMENT REPORT
+SPROUT HEAD START — ENROLLMENT REPORT
 Generated: \(dateStr)
 ──────────────────────────────────────────
 
@@ -291,7 +291,7 @@ PRIORITY CATEGORIES
 """
         case .health:
             return """
-CHILDFLOW HEAD START — HEALTH COMPLIANCE REPORT
+SPROUT HEAD START — HEALTH COMPLIANCE REPORT
 Generated: \(dateStr)
 ──────────────────────────────────────────
 
@@ -313,7 +313,7 @@ ACTIONS REQUIRED
 """
         case .pir:
             return """
-CHILDFLOW HEAD START — PIR REPORT SUMMARY
+SPROUT HEAD START — PIR REPORT SUMMARY
 Generated: \(dateStr)
 ──────────────────────────────────────────
 
@@ -338,7 +338,7 @@ SUBMISSION DEADLINE: June 30, 2026
 """
         case .staffTraining:
             return """
-CHILDFLOW HEAD START — STAFF TRAINING REPORT
+SPROUT HEAD START — STAFF TRAINING REPORT
 Generated: \(dateStr)
 ──────────────────────────────────────────
 
@@ -362,7 +362,7 @@ CERTIFICATIONS
 """
         default:
             return """
-CHILDFLOW HEAD START — \(displayName.uppercased())
+SPROUT HEAD START — \(displayName.uppercased())
 Generated: \(dateStr)
 ──────────────────────────────────────────
 

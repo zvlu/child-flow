@@ -45,10 +45,18 @@ const initialMessages = [
   { id: 4, sender: "David Wilson", subject: "Tuition Question", preview: "I had a question regarding the latest invoice for April...", time: "3 days ago", unread: false, type: "Email", category: "Billing" },
 ];
 
+// Relative to today so this log doesn't read as "Apr 2024" forever — it used
+// to be a fixed date that just got more stale-looking every month.
+const logDaysAgo = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
 const initialLogs = [
-  { id: 1, family: "Johnson Family", staff: "Lisa T.", type: "Phone Call", outcome: "Discussed enrollment paperwork", date: "Apr 20, 2024", status: "Completed" },
-  { id: 2, family: "Williams Family", staff: "Patricia L.", type: "Home Visit", outcome: "Completed initial family assessment", date: "Apr 18, 2024", status: "Completed" },
-  { id: 3, family: "Garcia Family", staff: "Lisa T.", type: "Office Visit", outcome: "Resource referral for housing", date: "Apr 15, 2024", status: "Follow-up Required" },
+  { id: 1, family: "Johnson Family", staff: "Lisa T.", type: "Phone Call", outcome: "Discussed enrollment paperwork", date: logDaysAgo(2), status: "Completed" },
+  { id: 2, family: "Williams Family", staff: "Patricia L.", type: "Home Visit", outcome: "Completed initial family assessment", date: logDaysAgo(4), status: "Completed" },
+  { id: 3, family: "Garcia Family", staff: "Lisa T.", type: "Office Visit", outcome: "Resource referral for housing", date: logDaysAgo(7), status: "Follow-up Required" },
 ];
 
 export default function Communication() {
@@ -546,8 +554,8 @@ export default function Communication() {
                 <h3 className="text-xs font-bold uppercase text-muted-foreground tracking-widest mb-4">Recent Broadcasts</h3>
                 <div className="space-y-3">
                   {[
-                    { title: "Weather Alert: School Closed", date: "Jan 15, 2024", reach: "100% Families" },
-                    { title: "Reminder: Spring Festival", date: "Mar 10, 2024", reach: "98% Families" }
+                    { title: "Weather Alert: School Closed", date: logDaysAgo(9), reach: "100% Families" },
+                    { title: "Reminder: Spring Festival", date: logDaysAgo(35), reach: "98% Families" }
                   ].map((b, i) => (
                     <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-muted border border-border">
                       <div>

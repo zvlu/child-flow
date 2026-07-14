@@ -33,14 +33,22 @@ const HEALTH_TYPE_LABELS: Record<string, string> = {
   immunization: "Immunizations",
 };
 
+// Relative to today so this list doesn't read as "last run Nov 2024" forever
+// — it used to be a fixed date that just got more stale-looking every month.
+const daysAgo = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
 // `module` marks entries that only make sense with Head Start compliance on
 // (PIR, income eligibility) — filtered out below for core-only orgs.
 const savedReports: Array<{ name: string; type: string; lastRun: string; format: string; module?: "head_start" }> = [
-  { name: "Monthly Attendance Summary", type: "Attendance", lastRun: "Nov 1, 2024", format: "PDF" },
-  { name: "Health Compliance Report", type: "Health", lastRun: "Oct 31, 2024", format: "Excel" },
-  { name: "PIR Data Extract", type: "Compliance", lastRun: "Oct 15, 2024", format: "CSV", module: "head_start" },
-  { name: "Family Services Log", type: "Family Services", lastRun: "Nov 1, 2024", format: "PDF", module: "head_start" },
-  { name: "Staff Training Hours", type: "Staff", lastRun: "Oct 30, 2024", format: "Excel" },
+  { name: "Monthly Attendance Summary", type: "Attendance", lastRun: daysAgo(2), format: "PDF" },
+  { name: "Health Compliance Report", type: "Health", lastRun: daysAgo(3), format: "Excel" },
+  { name: "PIR Data Extract", type: "Compliance", lastRun: daysAgo(19), format: "CSV", module: "head_start" },
+  { name: "Family Services Log", type: "Family Services", lastRun: daysAgo(2), format: "PDF", module: "head_start" },
+  { name: "Staff Training Hours", type: "Staff", lastRun: daysAgo(4), format: "Excel" },
 ];
 
 const reportTemplates: Array<{ name: string; description: string; icon: typeof ShieldCheck; color: string; module?: "head_start" }> = [

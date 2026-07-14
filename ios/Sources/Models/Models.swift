@@ -226,17 +226,18 @@ struct EnrollmentApplication: Codable, Identifiable {
 
 // MARK: - ERSEA (Eligibility / Recruitment / Selection / Enrollment / Attendance)
 
-/// 2024 Federal Poverty Level guidelines — household size → annual income limit (100% FPL)
-/// Source: HHS 2024 FPL guidelines. Head Start income limit = 100% FPL.
+/// 2026 Federal Poverty Level guidelines — household size → annual income limit (100% FPL)
+/// Source: HHS 2026 poverty guidelines, 48 contiguous states + D.C. (aspe.hhs.gov).
+/// These are reissued every January — this was still running on 2024 figures.
 struct FederalPovertyLevel {
-    static let limits2024: [Int: Int] = [
-        1: 15060, 2: 20440, 3: 25820, 4: 31200, 5: 36580,
-        6: 41960, 7: 47340, 8: 52720
+    static let limits2026: [Int: Int] = [
+        1: 15960, 2: 21640, 3: 27320, 4: 33000, 5: 38680,
+        6: 44360, 7: 50040, 8: 55720
     ]
-    /// Returns annual income limit for household size (adds $5,380 per person beyond 8)
+    /// Returns annual income limit for household size (adds $5,680 per person beyond 8)
     static func limit(for householdSize: Int) -> Int {
-        if householdSize <= 8 { return limits2024[householdSize] ?? 52720 }
-        return 52720 + (householdSize - 8) * 5380
+        if householdSize <= 8 { return limits2026[householdSize] ?? 55720 }
+        return 55720 + (householdSize - 8) * 5680
     }
     /// Returns percentage of FPL (e.g. 85 for 85% FPL)
     static func percentage(income: Int, householdSize: Int) -> Double {

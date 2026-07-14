@@ -205,15 +205,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   More
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56 rounded-xl">
+              <DropdownMenuContent align="start" sideOffset={8} className="w-60 rounded-xl overflow-hidden p-1.5">
                 {topNavOverflowItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = isTopNavActive(item.path);
                   return (
-                    <DropdownMenuItem key={item.path} asChild>
+                    <DropdownMenuItem key={item.path} asChild className="rounded-lg px-2.5 py-2.5 focus:bg-primary/[0.06]">
                       <Link href={item.path} asChild>
-                        <a className={cn("flex items-center gap-2", isActive && "font-semibold")}>
-                          <Icon className="h-4 w-4" />
+                        <a className={cn(
+                          "flex items-center gap-2.5 text-sm",
+                          isActive ? "text-primary font-semibold" : "text-foreground"
+                        )}>
+                          <Icon className={cn("h-4 w-4", isActive ? "text-primary" : "text-muted-foreground")} />
                           {item.label}
                         </a>
                       </Link>
