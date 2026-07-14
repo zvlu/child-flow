@@ -3,6 +3,7 @@ import { hasModule, MODULE_IDS } from "@shared/modules";
 import type { Express, Request, Response } from "express";
 import { randomUUID } from "crypto";
 import * as db from "../db";
+import { resolveStaffId } from "../moduleDb";
 import { hashPassword, verifyPassword } from "./password";
 import { getSessionCookieOptions } from "./cookies";
 import { rateLimit } from "./rateLimit";
@@ -69,15 +70,24 @@ export function registerAuthRoutes(app: Express) {
       // app can hide module-gated screens for core-only orgs. The server
       // enforces every permission independently — this is presentation only.
       let enabledModules: string[] = [];
+      // Real job title (e.g. "Family Advocate", "Center Director") — the
+      // mobile app shows this instead of the generic admin/staff access tier.
+      let position: string | null = null;
       if (user.organizationId != null) {
         const org = await db.getOrganizationById(user.organizationId);
         enabledModules = MODULE_IDS.filter((m) => hasModule(org, m));
+        const staffId = await resolveStaffId(user.organizationId, user.id);
+        if (staffId != null) {
+          const members = await db.getOrganizationStaff(user.organizationId);
+          position = members.find((m) => m.id === staffId)?.position ?? null;
+        }
       }
       res.json({
         id: String(user.id),
         fullName: user.name ?? "",
         email: user.email ?? "",
         role: user.role,
+        position,
         enabledModules,
       });
     } catch {

@@ -218,6 +218,11 @@ function AccountForm({ user, initials, onSaved }: { user: any; initials: string;
   const [name, setName] = useState<string>(user.name ?? "");
   useEffect(() => { setName(user.name ?? ""); }, [user.name]);
 
+  // Real job title (e.g. "Family Advocate") beats the generic admin/staff
+  // access tier badge here too.
+  const { data: myStaffRole } = trpc.staff.myRole.useQuery(undefined, { enabled: user.role !== "parent" });
+  const titleLabel = myStaffRole?.position || roleLabel[user.role] || user.role || "Member";
+
   const [avatar, setAvatar] = useState<string | null>(user.avatarUrl ?? null);
   useEffect(() => { setAvatar(user.avatarUrl ?? null); }, [user.avatarUrl]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -278,7 +283,7 @@ function AccountForm({ user, initials, onSaved }: { user: any; initials: string;
           <p className="text-lg font-bold text-foreground">{user.name || "Unnamed user"}</p>
           <p className="text-sm text-muted-foreground">{user.email || "No email on file"}</p>
           <Badge className="mt-1 bg-primary/10 text-primary hover:bg-primary/10 text-xs">
-            {roleLabel[user.role] ?? user.role ?? "Member"}
+            {titleLabel}
           </Badge>
           <div className="flex items-center gap-2 mt-2">
             <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" disabled={setAvatarMut.isPending} onClick={() => fileRef.current?.click()}>
@@ -304,7 +309,7 @@ function AccountForm({ user, initials, onSaved }: { user: any; initials: string;
         </div>
         <div className="space-y-1">
           <Label className="text-muted-foreground">Role</Label>
-          <p className="text-sm font-medium">{roleLabel[user.role] ?? "—"}</p>
+          <p className="text-sm font-medium">{titleLabel}</p>
         </div>
         <div className="space-y-1">
           <Label className="text-muted-foreground">Account ID</Label>

@@ -27,7 +27,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(user.fullName)
                                 .font(.subheadline.weight(.medium))
-                            Text(user.role)
+                            Text(user.displayTitle)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }

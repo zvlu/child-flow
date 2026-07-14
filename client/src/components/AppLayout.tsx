@@ -113,6 +113,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
   // Aggregated notifications for the bell (health, attendance, absences,
   // messages, documents) — same engine as the dashboard, refreshed each minute.
   const { data: bellAlerts = [] } = trpc.dashboard.alerts.useQuery(undefined, { refetchInterval: 60_000 });
+  // Real job title (e.g. "Family Advocate", "Center Director") beats the
+  // generic access tier ("staff"/"admin") everywhere we show who's signed in.
+  const { data: myStaffRole } = trpc.staff.myRole.useQuery(undefined, { enabled: navRole !== "parent" });
+  const displayTitle =
+    myStaffRole?.position ||
+    (navRole === "admin" ? "Administrator" : navRole === "parent" ? "Parent" : "Staff");
   const alertHref = (a: { type: string; filter?: string }) => {
     switch (a.type) {
       case "health": return `/health?status=${a.filter === "Overdue" ? "overdue" : "due_soon"}`;
@@ -250,7 +256,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                 )}
                 <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mt-1">
-                  {(user as any)?.role ?? "staff"}
+                  {displayTitle}
                 </p>
               </div>
               <DropdownMenuSeparator />
@@ -411,7 +417,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <p className="text-[12px] font-bold text-sidebar-foreground truncate">{user?.name || "User"}</p>
-                  <p className="text-[10px] text-sidebar-foreground/50 truncate uppercase font-bold tracking-tighter">{user?.role || "Staff"}</p>
+                  <p className="text-[10px] text-sidebar-foreground/50 truncate uppercase font-bold tracking-tighter">{displayTitle}</p>
                 </div>
                 <button
                   onClick={() => logout()}

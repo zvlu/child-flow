@@ -6,6 +6,10 @@ struct User: Codable, Identifiable {
     let fullName: String
     let email: String
     let role: String
+    /// The staff member's actual §1302.91 job title (e.g. "Family Advocate",
+    /// "Center Director") — distinct from `role`, which is just the admin/staff
+    /// access tier. nil for parents or staff with no position on file.
+    var position: String?
     /// Optional feature modules enabled for this user's org, e.g. ["head_start"].
     /// Absent in older/mocked payloads, so default to empty rather than fail decoding.
     var enabledModules: [String] = []
@@ -14,15 +18,27 @@ struct User: Codable, Identifiable {
         fullName.split(separator: " ").compactMap { $0.first }.map(String.init).joined()
     }
 
-    private enum CodingKeys: String, CodingKey {
-        case id, fullName, email, role, enabledModules
+    /// What to show the user for "who am I" — their real title when we have
+    /// one, otherwise a friendly fallback based on the access tier.
+    var displayTitle: String {
+        if let position, !position.isEmpty { return position }
+        switch role {
+        case "admin": return "Administrator"
+        case "parent": return "Parent"
+        default: return "Staff"
+        }
     }
 
-    init(id: String, fullName: String, email: String, role: String, enabledModules: [String] = []) {
+    private enum CodingKeys: String, CodingKey {
+        case id, fullName, email, role, position, enabledModules
+    }
+
+    init(id: String, fullName: String, email: String, role: String, position: String? = nil, enabledModules: [String] = []) {
         self.id = id
         self.fullName = fullName
         self.email = email
         self.role = role
+        self.position = position
         self.enabledModules = enabledModules
     }
 
@@ -32,6 +48,7 @@ struct User: Codable, Identifiable {
         fullName = try c.decode(String.self, forKey: .fullName)
         email = try c.decode(String.self, forKey: .email)
         role = try c.decode(String.self, forKey: .role)
+        position = try c.decodeIfPresent(String.self, forKey: .position)
         enabledModules = try c.decodeIfPresent([String].self, forKey: .enabledModules) ?? []
     }
 }
