@@ -30,6 +30,7 @@ struct ChronicAbsenceView: View {
     }
 
     var body: some View {
+        HeadStartGate(featureDescription: "Chronic absence tracking") {
         List {
             // ── Program summary ────────────────────────────────────
             Section {
@@ -100,6 +101,7 @@ struct ChronicAbsenceView: View {
         }
         .task { await vm.load() }
         .overlay { if vm.isLoading { ProgressView() } }
+        }
     }
 
     private func countFor(_ filter: RiskFilter) -> Int {

@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Reports View
 
 struct ReportsView: View {
+    @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = ReportsViewModel()
 
     var body: some View {
@@ -26,7 +27,9 @@ struct ReportsView: View {
             }
 
             ForEach(ReportCategory.allCases, id: \.self) { category in
-                let types = ReportType.allCases.filter { $0.category == category }
+                let types = ReportType.allCases.filter {
+                    $0.category == category && (appState.hasModule(.headStart) || !$0.isHeadStartOnly)
+                }
                 if !types.isEmpty {
                     Section(category.displayName) {
                         ForEach(types, id: \.self) { type in
@@ -182,6 +185,15 @@ enum ReportType: String, CaseIterable {
         case .familyServices, .pir:                             return .program
         case .staffTraining:                                    return .staff
         case .compliance:                                       return .finance
+        }
+    }
+
+    /// §1302 Head Start-only report types — meaningless for a core-only
+    /// daycare, so these are filtered out of the list below for those orgs.
+    var isHeadStartOnly: Bool {
+        switch self {
+        case .familyServices, .pir, .compliance: return true
+        default:                                 return false
         }
     }
 

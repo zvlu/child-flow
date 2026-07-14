@@ -20,6 +20,7 @@ import { useActionItems } from "@/hooks/useActionItems";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { AuditReadiness } from "@/components/AuditReadiness";
+import { useOrgModules } from "@/hooks/useOrgModules";
 
 /** Every quick action; each signed-in role sees its own six, most relevant first. */
 const QUICK_ACTION_POOL = [
@@ -107,12 +108,17 @@ export default function Dashboard() {
   // come first (nurse sees Health, nutritionist sees Meal Planning, …).
   const { data: myRole } = trpc.staff.myRole.useQuery();
   const { user: authUser } = useAuth();
+  const hasHeadStart = useOrgModules().has("head_start");
   const quickActions = useMemo(() => {
     // Admin-only destinations never appear as quick actions for staff.
     const ADMIN_ONLY_ACTIONS = new Set(["/billing", "/compliance"]);
-    const pool = authUser?.role === "admin"
-      ? QUICK_ACTION_POOL
-      : QUICK_ACTION_POOL.filter((a) => !ADMIN_ONLY_ACTIONS.has(a.href));
+    // These are Head Start-only pages (§1302 compliance features) — a
+    // core-only daycare would just hit a "not enabled" wall, so don't
+    // dangle them as quick actions in the first place.
+    const HEAD_START_ONLY_ACTIONS = new Set(["/family-services", "/compliance", "/caseloads", "/health-deadlines"]);
+    const pool = QUICK_ACTION_POOL
+      .filter((a) => authUser?.role === "admin" || !ADMIN_ONLY_ACTIONS.has(a.href))
+      .filter((a) => hasHeadStart || !HEAD_START_ONLY_ACTIONS.has(a.href));
     const priority = ROLE_QUICK_PRIORITY[myRole?.role ?? ""] ?? [];
     const rank = (href: string) => {
       const i = priority.indexOf(href);
@@ -123,7 +129,7 @@ export default function Dashboard() {
       .sort((x, y) => rank(x.a.href) - rank(y.a.href) || x.i - y.i)
       .map(({ a }) => a)
       .slice(0, 6);
-  }, [myRole, authUser]);
+  }, [myRole, authUser, hasHeadStart]);
 
   // Unified action feed (shared with the Action Queue page) — health
   // follow-ups, AI insights, documents, credentials, chronic absence.
@@ -621,7 +627,10 @@ export default function Dashboard() {
               <ShieldCheck className="h-4 w-4 text-primary" />
               Compliance Overview
             </CardTitle>
-            <Link href="/compliance">
+            {/* This card is health-record completion (immunizations, physicals…)
+                — a core feature every org has, so it links to Health, not the
+                Head Start-only /compliance (PIR) page. */}
+            <Link href="/health">
               <Button variant="ghost" size="sm" className="gap-1 text-xs">
                 Full Report <ArrowRight className="h-3 w-3" />
               </Button>

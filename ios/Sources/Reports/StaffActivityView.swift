@@ -36,52 +36,54 @@ struct StaffActivityView: View {
     @StateObject private var vm = StaffActivityViewModel()
 
     var body: some View {
-        List {
-            Section {
-                Picker("Period", selection: $vm.preset) {
-                    ForEach(activityPresets, id: \.key) { Text($0.label).tag($0.key) }
-                }
-                .pickerStyle(.segmented)
-            }
-
-            if let r = vm.report {
+        HeadStartGate(featureDescription: "Family advocate workload reporting") {
+            List {
                 Section {
-                    HStack(spacing: 10) {
-                        ActivityStatPill(value: "\(r.totals.total)", label: "Contacts", color: .cfPrimary)
-                        ActivityStatPill(value: "\(r.staff.filter { $0.total > 0 }.count)/\(r.staff.count)", label: "Active", color: .cfGoals)
-                        ActivityStatPill(value: "\(r.totals.byType["monthly_contact"] ?? 0)", label: "Monthly", color: .cfAttendance)
+                    Picker("Period", selection: $vm.preset) {
+                        ForEach(activityPresets, id: \.key) { Text($0.label).tag($0.key) }
                     }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                    .pickerStyle(.segmented)
                 }
 
-                Section {
-                    if r.staff.isEmpty {
-                        Text("No staff found for this organization.")
-                            .font(.cfCaption).foregroundColor(.cfTextSecondary)
+                if let r = vm.report {
+                    Section {
+                        HStack(spacing: 10) {
+                            ActivityStatPill(value: "\(r.totals.total)", label: "Contacts", color: .cfPrimary)
+                            ActivityStatPill(value: "\(r.staff.filter { $0.total > 0 }.count)/\(r.staff.count)", label: "Active", color: .cfGoals)
+                            ActivityStatPill(value: "\(r.totals.byType["monthly_contact"] ?? 0)", label: "Monthly", color: .cfAttendance)
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                     }
-                    ForEach(r.staff) { s in
-                        if let id = s.staffId, s.total > 0 {
-                            NavigationLink(destination: StaffContactLogView(staffId: id, name: s.name, position: s.position, preset: vm.preset)) {
+
+                    Section {
+                        if r.staff.isEmpty {
+                            Text("No staff found for this organization.")
+                                .font(.cfCaption).foregroundColor(.cfTextSecondary)
+                        }
+                        ForEach(r.staff) { s in
+                            if let id = s.staffId, s.total > 0 {
+                                NavigationLink(destination: StaffContactLogView(staffId: id, name: s.name, position: s.position, preset: vm.preset)) {
+                                    StaffActivityRowView(row: s)
+                                }
+                            } else {
                                 StaffActivityRowView(row: s)
                             }
-                        } else {
-                            StaffActivityRowView(row: s)
                         }
+                    } header: {
+                        Text("Workload by Staff")
+                    } footer: {
+                        Text("Tap a staff member to see their full contact log.")
                     }
-                } header: {
-                    Text("Workload by Staff")
-                } footer: {
-                    Text("Tap a staff member to see their full contact log.")
                 }
             }
+            .navigationTitle("Staff Activity")
+            .navigationBarTitleDisplayMode(.inline)
+            .task { if vm.report == nil { await vm.load() } }
+            .overlay { if vm.isLoading && vm.report == nil { ProgressView() } }
+            .alert("Staff Activity", isPresented: .constant(vm.errorMessage != nil)) {
+                Button("OK") { vm.errorMessage = nil }
+            } message: { Text(vm.errorMessage ?? "") }
         }
-        .navigationTitle("Staff Activity")
-        .navigationBarTitleDisplayMode(.inline)
-        .task { if vm.report == nil { await vm.load() } }
-        .overlay { if vm.isLoading && vm.report == nil { ProgressView() } }
-        .alert("Staff Activity", isPresented: .constant(vm.errorMessage != nil)) {
-            Button("OK") { vm.errorMessage = nil }
-        } message: { Text(vm.errorMessage ?? "") }
     }
 }
 

@@ -57,24 +57,26 @@ struct ComplianceView: View {
     @State private var tab = 0
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("", selection: $tab) {
-                Text("PIR Report").tag(0)
-                Text("Monitoring").tag(1)
-                Text("History").tag(2)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+        HeadStartGate(featureDescription: "PIR reporting and compliance tracking") {
+            VStack(spacing: 0) {
+                Picker("", selection: $tab) {
+                    Text("PIR Report").tag(0)
+                    Text("Monitoring").tag(1)
+                    Text("History").tag(2)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
 
-            switch tab {
-            case 0: PIRReportEditorView()
-            case 1: MonitoringChecklistView()
-            default: PIRHistoryView()
+                switch tab {
+                case 0: PIRReportEditorView()
+                case 1: MonitoringChecklistView()
+                default: PIRHistoryView()
+                }
             }
+            .navigationTitle("Compliance & PIR")
+            .navigationBarTitleDisplayMode(.inline)
         }
-        .navigationTitle("Compliance & PIR")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

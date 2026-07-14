@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useOrgModules } from "@/hooks/useOrgModules";
 
 /**
  * One-click federal-review evidence binder: pulls the audit-readiness
@@ -12,14 +13,18 @@ import { useAuth } from "@/_core/hooks/useAuth";
  * partnership agreements, and staff credentials into a single dated,
  * print-ready document (browser print → Save as PDF). What used to be a
  * week of assembling spreadsheets before a monitoring visit becomes a
- * button. Audit readiness is admin-only data, so the binder is too.
+ * button. Audit readiness is admin-only, Head Start-only data, so the
+ * binder is gated the same way (defense in depth — this only currently
+ * renders inside the already-ModuleGated /compliance page, but a review
+ * binder full of §1302 sections makes no sense for a core-only org).
  */
 export function ReviewBinderButton() {
   const { user } = useAuth();
+  const hasHeadStart = useOrgModules().has("head_start");
   const [building, setBuilding] = useState(false);
   const utils = trpc.useUtils();
 
-  if (user?.role !== "admin") return null;
+  if (user?.role !== "admin" || !hasHeadStart) return null;
 
   const esc = (v: unknown) =>
     String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

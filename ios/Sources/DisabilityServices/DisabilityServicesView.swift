@@ -58,47 +58,49 @@ struct DisabilityServicesView: View {
     @StateObject private var viewModel = DisabilityServicesViewModel()
 
     var body: some View {
-        List {
-            if viewModel.isLoading && viewModel.summary == nil {
-                HStack { Spacer(); ProgressView(); Spacer() }
-                    .listRowBackground(Color.clear)
-            } else if let summary = viewModel.summary {
-                Section {
-                    DisabilitySummaryCard(summary: summary)
-                        .listRowInsets(EdgeInsets())
+        HeadStartGate(featureDescription: "IEP/IFSP disability services tracking") {
+            List {
+                if viewModel.isLoading && viewModel.summary == nil {
+                    HStack { Spacer(); ProgressView(); Spacer() }
                         .listRowBackground(Color.clear)
-                }
+                } else if let summary = viewModel.summary {
+                    Section {
+                        DisabilitySummaryCard(summary: summary)
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                    }
 
-                if summary.records.isEmpty {
-                    Text("No IEP/IFSP records yet.")
+                    if summary.records.isEmpty {
+                        Text("No IEP/IFSP records yet.")
+                            .font(.cfCaption)
+                            .foregroundColor(.cfTextSecondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 24)
+                            .listRowBackground(Color.clear)
+                    } else {
+                        Section("Plans") {
+                            ForEach(summary.records) { record in
+                                NavigationLink(destination: DisabilityRecordDetailView(record: record, viewModel: viewModel)) {
+                                    DisabilityRecordRow(record: record)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Text("Couldn't load disability services data.")
                         .font(.cfCaption)
                         .foregroundColor(.cfTextSecondary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 24)
                         .listRowBackground(Color.clear)
-                } else {
-                    Section("Plans") {
-                        ForEach(summary.records) { record in
-                            NavigationLink(destination: DisabilityRecordDetailView(record: record, viewModel: viewModel)) {
-                                DisabilityRecordRow(record: record)
-                            }
-                        }
-                    }
                 }
-            } else {
-                Text("Couldn't load disability services data.")
-                    .font(.cfCaption)
-                    .foregroundColor(.cfTextSecondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
-                    .listRowBackground(Color.clear)
             }
+            .listStyle(.insetGrouped)
+            .background(Color.cfBackground)
+            .navigationTitle("Disability Services")
+            .navigationBarTitleDisplayMode(.inline)
+            .task { await viewModel.load() }
         }
-        .listStyle(.insetGrouped)
-        .background(Color.cfBackground)
-        .navigationTitle("Disability Services")
-        .navigationBarTitleDisplayMode(.inline)
-        .task { await viewModel.load() }
     }
 }
 

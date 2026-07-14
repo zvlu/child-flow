@@ -7,6 +7,7 @@ struct AttendancePlansView: View {
     @State private var showNewPlan = false
 
     var body: some View {
+        HeadStartGate(featureDescription: "Attendance improvement plans") {
         List {
             if !viewModel.plans.isEmpty {
                 Section {
@@ -57,6 +58,7 @@ struct AttendancePlansView: View {
         }
         .task { await viewModel.load() }
         .overlay { if viewModel.isLoading { ProgressView() } }
+        }
     }
 }
 

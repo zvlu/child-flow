@@ -6,20 +6,22 @@ struct FamilyServicesView: View {
     @StateObject private var viewModel = FamilyServicesViewModel()
 
     var body: some View {
-        List {
-            ForEach(viewModel.filteredFamilies) { family in
-                NavigationLink(destination: FamilyDetailView(family: family)) {
-                    FamilyRow(family: family)
+        HeadStartGate(featureDescription: "Family services case management") {
+            List {
+                ForEach(viewModel.filteredFamilies) { family in
+                    NavigationLink(destination: FamilyDetailView(family: family)) {
+                        FamilyRow(family: family)
+                    }
                 }
             }
-        }
-        .navigationTitle("Family Services")
-        .searchable(text: $viewModel.searchText, prompt: "Search families")
-        .task { await viewModel.load() }
-        .overlay {
-            if viewModel.isLoading { ProgressView() }
-            else if viewModel.filteredFamilies.isEmpty && !viewModel.searchText.isEmpty {
-                ContentUnavailableView.search
+            .navigationTitle("Family Services")
+            .searchable(text: $viewModel.searchText, prompt: "Search families")
+            .task { await viewModel.load() }
+            .overlay {
+                if viewModel.isLoading { ProgressView() }
+                else if viewModel.filteredFamilies.isEmpty && !viewModel.searchText.isEmpty {
+                    ContentUnavailableView.search
+                }
             }
         }
     }
@@ -53,6 +55,7 @@ enum FamilyDetailTab: Int {
 
 struct FamilyDetailView: View {
     let family: Family
+    @EnvironmentObject var appState: AppState
     @State private var selectedTab: Int
 
     init(family: Family, initialTab: FamilyDetailTab = .overview) {
@@ -60,9 +63,28 @@ struct FamilyDetailView: View {
         _selectedTab = State(initialValue: initialTab.rawValue)
     }
 
-    var tabs = ["Overview", "Contacts", "Goals", "FNA", "CFCR", "Notes", "Moments"]
+    /// Contacts/Goals/FNA/CFCR/Notes are all Head Start case-management
+    /// features (§1302 family services). This view is reached from Children,
+    /// global search, and dashboard task links — all core, ungated screens —
+    /// so unlike the rest of Family Services, this can't just be gated as a
+    /// whole; only the HS-only tabs are hidden for a core-only org.
+    private static let allTabs: [(title: String, tab: FamilyDetailTab)] = [
+        ("Overview", .overview), ("Contacts", .contacts), ("Goals", .goals),
+        ("FNA", .fna), ("CFCR", .cfcr), ("Notes", .notes), ("Moments", .moments),
+    ]
+    private static let headStartOnlyTabs: Set<FamilyDetailTab> = [.contacts, .goals, .fna, .cfcr, .notes]
+
+    private var visibleTabs: [(title: String, tab: FamilyDetailTab)] {
+        let hasHeadStart = appState.hasModule(.headStart)
+        return Self.allTabs.filter { hasHeadStart || !Self.headStartOnlyTabs.contains($0.tab) }
+    }
 
     var body: some View {
+        let tabs = visibleTabs
+        // If we launched on a tab that just got filtered out (e.g. a stale
+        // deep link to .goals for a core-only org), fall back to Overview.
+        let activeTab = tabs.first { $0.tab.rawValue == selectedTab }?.tab ?? .overview
+
         VStack(spacing: 0) {
             // Family header card
             VStack(spacing: 4) {
@@ -90,15 +112,15 @@ struct FamilyDetailView: View {
             // Tab picker
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 0) {
-                    ForEach(tabs.indices, id: \.self) { i in
-                        Button(action: { withAnimation { selectedTab = i } }) {
-                            Text(tabs[i])
-                                .font(.subheadline.weight(selectedTab == i ? .semibold : .regular))
+                    ForEach(tabs, id: \.tab) { entry in
+                        Button(action: { withAnimation { selectedTab = entry.tab.rawValue } }) {
+                            Text(entry.title)
+                                .font(.subheadline.weight(activeTab == entry.tab ? .semibold : .regular))
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 10)
-                                .foregroundColor(selectedTab == i ? .accentColor : .secondary)
+                                .foregroundColor(activeTab == entry.tab ? .accentColor : .secondary)
                                 .overlay(alignment: .bottom) {
-                                    if selectedTab == i {
+                                    if activeTab == entry.tab {
                                         Rectangle().fill(Color.accentColor).frame(height: 2)
                                     }
                                 }
@@ -112,15 +134,14 @@ struct FamilyDetailView: View {
 
             // Tab content — plain Group avoids TabView/NavigationStack conflicts
             Group {
-                switch selectedTab {
-                case 0: FamilyOverviewTab(family: family)
-                case 1: MonthlyContactsTab(familyId: family.id)
-                case 2: FamilyGoalsTab(family: family)
-                case 3: FNATab(familyId: family.id, familyName: family.name)
-                case 4: CFCRTab(familyId: family.id)
-                case 5: CaseNotesTab(familyId: family.id)
-                case 6: ChildMomentsTab(familyId: family.id, familyName: family.name)
-                default: EmptyView()
+                switch activeTab {
+                case .overview: FamilyOverviewTab(family: family)
+                case .contacts: MonthlyContactsTab(familyId: family.id)
+                case .goals:    FamilyGoalsTab(family: family)
+                case .fna:      FNATab(familyId: family.id, familyName: family.name)
+                case .cfcr:     CFCRTab(familyId: family.id)
+                case .notes:    CaseNotesTab(familyId: family.id)
+                case .moments:  ChildMomentsTab(familyId: family.id, familyName: family.name)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -133,16 +154,24 @@ struct FamilyDetailView: View {
 // MARK: - Overview Tab
 
 struct FamilyOverviewTab: View {
+    @EnvironmentObject var appState: AppState
     let family: Family
 
     var body: some View {
+        // Home visits and family goals are Head Start case-management
+        // concepts (§1302 Family Services) — hidden here too for core-only
+        // orgs, same as the Contacts/Goals/FNA/CFCR/Notes tabs above.
+        let hasHeadStart = appState.hasModule(.headStart)
+
         List {
-            // Home Visit Mode — top of every family's Overview tab
-            Section {
-                StartHomeVisitButton(family: family)
+            if hasHeadStart {
+                // Home Visit Mode — top of every family's Overview tab
+                Section {
+                    StartHomeVisitButton(family: family)
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(.init(.init(top: 4, leading: 16, bottom: 4, trailing: 16)))
             }
-            .listRowBackground(Color.clear)
-            .listRowInsets(.init(.init(top: 4, leading: 16, bottom: 4, trailing: 16)))
 
             Section("Contact Information") {
                 LabeledContent("Phone", value: family.phone)
@@ -151,9 +180,11 @@ struct FamilyOverviewTab: View {
             }
             Section("Schedule") {
                 LabeledContent("Last Contact", value: family.lastContact)
-                LabeledContent("Next Home Visit", value: family.nextHomeVisit)
+                if hasHeadStart {
+                    LabeledContent("Next Home Visit", value: family.nextHomeVisit)
+                }
             }
-            if !family.goals.isEmpty {
+            if hasHeadStart && !family.goals.isEmpty {
                 Section("Active Goals") {
                     ForEach(family.goals, id: \.self) { goal in
                         Label(goal, systemImage: "target")

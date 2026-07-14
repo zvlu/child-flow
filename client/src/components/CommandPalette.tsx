@@ -30,7 +30,11 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useOrgModules } from "@/hooks/useOrgModules";
 
+// `headStart: true` marks entries that only make sense for Head Start-funded
+// programs (§1302 compliance) — filtered out below for core-only orgs so a
+// generic daycare never sees PIR/compliance vocabulary in ⌘K.
 const NAV_COMMANDS = [
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { label: "Children", path: "/children", icon: Baby },
@@ -40,7 +44,7 @@ const NAV_COMMANDS = [
   { label: "Communication Center", path: "/communication", icon: MessageSquare },
   { label: "Staff Management", path: "/staff", icon: UserCog },
   { label: "Performance Panel", path: "/performance", icon: BarChart3 },
-  { label: "Compliance & PIR", path: "/compliance", icon: ShieldCheck },
+  { label: "Compliance & PIR", path: "/compliance", icon: ShieldCheck, headStart: true },
   { label: "Program Settings", path: "/settings", icon: Settings },
 ];
 
@@ -49,7 +53,7 @@ const QUICK_ACTIONS = [
   { label: "Import Roster Data", path: "/data-import", icon: FileText },
   { label: "Message a Family", path: "/communication", icon: MessageSquare },
   { label: "Send Program Broadcast", path: "/communication?action=broadcast", icon: Megaphone },
-  { label: "Generate PIR Report", path: "/reports?action=generate", icon: FileText },
+  { label: "Generate PIR Report", path: "/reports?action=generate", icon: FileText, headStart: true },
 ];
 
 const STATUS_TONE: Record<string, string> = {
@@ -73,6 +77,7 @@ export function CommandPalette() {
   const { user } = useAuth();
   const isStaff = user?.role === "admin" || user?.role === "staff";
   const enabled = open && isStaff;
+  const hasHeadStart = useOrgModules().has("head_start");
 
   const childrenQuery = trpc.children.list.useQuery(ORGANIZATION_ID, { enabled, staleTime: 60_000 });
   const familiesQuery = trpc.families.list.useQuery(ORGANIZATION_ID, { enabled, staleTime: 60_000 });
@@ -114,8 +119,10 @@ export function CommandPalette() {
   const staffResults = searching
     ? ((staffQuery.data ?? []) as any[]).filter((s) => match(s.firstName, s.lastName, `${s.firstName} ${s.lastName}`, s.position)).slice(0, 5)
     : [];
-  const navResults = searching ? NAV_COMMANDS.filter((n) => n.label.toLowerCase().includes(q)) : NAV_COMMANDS;
-  const actionResults = searching ? QUICK_ACTIONS.filter((a) => a.label.toLowerCase().includes(q)) : QUICK_ACTIONS;
+  const availableNav = NAV_COMMANDS.filter((n) => hasHeadStart || !n.headStart);
+  const availableActions = QUICK_ACTIONS.filter((a) => hasHeadStart || !a.headStart);
+  const navResults = searching ? availableNav.filter((n) => n.label.toLowerCase().includes(q)) : availableNav;
+  const actionResults = searching ? availableActions.filter((a) => a.label.toLowerCase().includes(q)) : availableActions;
 
   const noResults =
     searching && !loading &&
