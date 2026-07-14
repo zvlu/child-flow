@@ -159,14 +159,20 @@ struct AppMenuSheet: View {
                             bgColor: .cfFamilyBg,
                             destination: AnyView(EnrollmentView())
                         )
-                        ModuleCard(
-                            label: "ERSEA",
-                            subtitle: "Eligibility, waitlist & selection",
-                            icon: "list.number",
-                            color: .cfGoals,
-                            bgColor: .cfGoalsBg,
-                            destination: AnyView(ERSEAView())
-                        )
+                        // ERSEA (Eligibility, Recruitment, Selection, Enrollment,
+                        // Attendance) and its FPL income-eligibility calculator are a
+                        // §1302.12 Head Start requirement — meaningless for a core-only
+                        // daycare, so gate it the same way the web app already does.
+                        if appState.hasModule(.headStart) {
+                            ModuleCard(
+                                label: "ERSEA",
+                                subtitle: "Eligibility, waitlist & selection",
+                                icon: "list.number",
+                                color: .cfGoals,
+                                bgColor: .cfGoalsBg,
+                                destination: AnyView(ERSEAView())
+                            )
+                        }
                         ModuleCard(
                             label: "Verification",
                             subtitle: "Document checklists",

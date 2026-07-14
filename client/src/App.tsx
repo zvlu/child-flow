@@ -100,7 +100,9 @@ function Router() {
       <Route path="/caseloads">
         {() => (
           <AppLayout>
-            <Caseloads />
+            <ModuleGate module="head_start">
+              <Caseloads />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>
