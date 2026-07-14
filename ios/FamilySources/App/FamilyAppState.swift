@@ -12,6 +12,8 @@ class FamilyAppState: ObservableObject {
     @Published var phase: FamilyAppPhase = .onboarding
     @Published var familyProfile: FamilyProfile?
 
+    private var sessionExpiredObserver: NSObjectProtocol?
+
     init() {
         // One-time cleanup of the legacy plaintext token location.
         UserDefaults.standard.removeObject(forKey: "family_auth_token")
@@ -22,6 +24,26 @@ class FamilyAppState: ObservableObject {
             if hasToken {
                 await MainActor.run { phase = .authenticated }
             }
+        }
+
+        // The staff app signs out on a rejected/expired session token (see
+        // AppState.swift); this target shares the same APIClient and posts
+        // the same notification on any 401, but had no listener at all — a
+        // parent whose session expired stayed on FamilyTabView forever,
+        // just hitting silent 401s on every screen instead of being
+        // returned to sign-in like every other account type in the app.
+        sessionExpiredObserver = NotificationCenter.default.addObserver(
+            forName: .cfSessionExpired,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.signOut()
+        }
+    }
+
+    deinit {
+        if let observer = sessionExpiredObserver {
+            NotificationCenter.default.removeObserver(observer)
         }
     }
 
