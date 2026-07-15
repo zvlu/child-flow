@@ -23,6 +23,11 @@ import { registerHealthComplianceRoutes } from "../healthComplianceRest";
 import { registerNutritionFormRoutes } from "../nutritionForms";
 import { registerFamilyEngagementEventsRoutes } from "../familyEngagementEvents";
 import { registerReportsRoutes } from "../reportsRest";
+import { registerGrantBudgetRoutes } from "../grantBudgetRest";
+import { registerPolicyCouncilRoutes } from "../policyCouncilRest";
+import { registerClassroomQualityRoutes } from "../classroomQualityRest";
+import { registerInKindRoutes } from "../inKindRest";
+import { registerBulkActionsRoutes } from "../bulkActionsRest";
 import { UPLOADS_ROOT } from "../fileStorage";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -108,6 +113,16 @@ async function startServer() {
   registerFamilyEngagementEventsRoutes(app);
   // Bare compliance snapshot + on-demand text reports (iOS) under /api/compliance, /api/reports/generate
   registerReportsRoutes(app);
+  // Grant & Budget tracking (iOS) under /api/grants/* — Head Start-gated
+  registerGrantBudgetRoutes(app);
+  // Policy Council membership + meetings (iOS) under /api/policy-council/* — Head Start-gated
+  registerPolicyCouncilRoutes(app);
+  // Classroom Quality CLASS/ECERS observations (iOS) under /api/classroom-quality — Head Start-gated
+  registerClassroomQualityRoutes(app);
+  // In-Kind Contributions / 20% non-federal match tracking (iOS) under /api/in-kind — Head Start-gated
+  registerInKindRoutes(app);
+  // Bulk Action Center (iOS) under /api/bulk-actions/* — generic, not Head Start-gated
+  registerBulkActionsRoutes(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API

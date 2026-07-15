@@ -79,6 +79,35 @@ struct AppMenuSheet: View {
                             bgColor: .cfAccentLight,
                             destination: AnyView(SubsidiesView())
                         )
+                        // Grant & Budget, Classroom Quality, and In-Kind
+                        // Contributions are all Head Start §1302 compliance
+                        // features — meaningless for a core-only daycare.
+                        if appState.hasModule(.headStart) {
+                            ModuleCard(
+                                label: "Grant & Budget",
+                                subtitle: "Burn rate & 20% non-federal match",
+                                icon: "chart.bar.fill",
+                                color: .cfCompliance,
+                                bgColor: .cfComplianceBg,
+                                destination: AnyView(GrantBudgetView())
+                            )
+                            ModuleCard(
+                                label: "Classroom Quality",
+                                subtitle: "CLASS® / ECERS observations",
+                                icon: "checkmark.seal.fill",
+                                color: .cfCompliance,
+                                bgColor: .cfComplianceBg,
+                                destination: AnyView(ClassroomQualityView())
+                            )
+                            ModuleCard(
+                                label: "In-Kind Contributions",
+                                subtitle: "Track the 20% non-federal match",
+                                icon: "hand.raised.fill",
+                                color: .cfAttendance,
+                                bgColor: .cfAttendanceBg,
+                                destination: AnyView(InKindView())
+                            )
+                        }
                     }
 
                     // Families & Engagement — Family Services (FNA/CFCR) and
@@ -284,7 +313,26 @@ struct AppMenuSheet: View {
                                 bgColor: .cfPrimaryLight,
                                 destination: AnyView(StaffActivityView())
                             )
+                            // Policy Council (§1302.50-51 parent-majority governance body)
+                            ModuleCard(
+                                label: "Policy Council",
+                                subtitle: "Membership, roles & minutes",
+                                icon: "person.3.sequence.fill",
+                                color: .cfCompliance,
+                                bgColor: .cfComplianceBg,
+                                destination: AnyView(PolicyCouncilView())
+                            )
                         }
+                        // Bulk Action Center is generic (not Head Start-specific) —
+                        // any org type can mass-mark attendance for a classroom.
+                        ModuleCard(
+                            label: "Bulk Actions",
+                            subtitle: "Mass attendance & classroom actions",
+                            icon: "square.stack.3d.up.fill",
+                            color: .cfPrimary,
+                            bgColor: .cfPrimaryLight,
+                            destination: AnyView(BulkActionCenterView())
+                        )
                     }
 
                     // Settings
