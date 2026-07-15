@@ -26,6 +26,12 @@ struct FamilyProgressView: View {
                         if progress.attendance.isEmpty && progress.goals.isEmpty {
                             emptyState
                         }
+                    } else if viewModel.loadFailed {
+                        // Previously this fell through to the same emptyState
+                        // as "no progress data yet" — indistinguishable from a
+                        // failed fetch, so a parent on a bad connection would
+                        // conclude there was simply nothing to see.
+                        errorState
                     } else {
                         emptyState
                     }
@@ -46,6 +52,20 @@ struct FamilyProgressView: View {
             Text(L(.noProgressData))
                 .font(.headline)
             Text(L(.progressWillAppear))
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .padding(.top, 60)
+    }
+
+    private var errorState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.largeTitle)
+                .foregroundColor(.orange)
+            Text(L(.somethingWentWrong))
+                .font(.headline)
+            Text(L(.pullToRefreshRetry))
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
@@ -152,10 +172,20 @@ struct GoalsCard: View {
 class FamilyProgressViewModel: ObservableObject {
     @Published var progress: FamilyProgress?
     @Published var isLoading = false
+    /// Previously there was no way to tell "the fetch failed" apart from
+    /// "the family genuinely has no progress data" — both rendered the same
+    /// emptyState. This distinguishes the two so a parent on a dropped
+    /// connection doesn't read a real error as "nothing to see here yet."
+    @Published var loadFailed = false
 
     func load() async {
         isLoading = true
-        progress = (try? await APIClient.shared.getFamilyProgress()) ?? progress
+        if let latest = try? await APIClient.shared.getFamilyProgress() {
+            progress = latest
+            loadFailed = false
+        } else {
+            loadFailed = progress == nil
+        }
         isLoading = false
     }
 }

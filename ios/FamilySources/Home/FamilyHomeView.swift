@@ -58,6 +58,13 @@ struct FamilyHomeView: View {
                     }
                     .padding(.horizontal)
 
+                    if let loadErrorMessage = viewModel.loadErrorMessage {
+                        Label(loadErrorMessage, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                            .padding(.horizontal)
+                    }
+
                     // Child cards
                     if viewModel.isLoading {
                         ProgressView().padding(.top, 40)
@@ -606,6 +613,13 @@ class FamilyHomeViewModel: ObservableObject {
     @Published var busyChildId: String? = nil
     @Published var isLoading = false
     @Published var errorMessage: String?
+    /// Set when one or more of load()'s independent fetches failed. Every
+    /// fetch below used `try?` with a silent fallback to the previous
+    /// value — on this, the primary check-in screen, a parent whose
+    /// connection dropped mid-morning would see yesterday's data with no
+    /// indication anything was stale or wrong. This surfaces that instead
+    /// of staying silent.
+    @Published var loadErrorMessage: String?
 
     /// Children for the report-absence sheet when the profile isn't cached.
     var profileChildren: [FamilyChild] { children }
@@ -614,22 +628,48 @@ class FamilyHomeViewModel: ObservableObject {
 
     func load() async {
         isLoading = true
-        // Each section loads independently; one failure shouldn't blank the rest.
+        var failures = 0
+        // Each section loads independently; one failure shouldn't blank the
+        // rest, but a run where everything (or the attendance check-in state
+        // specifically) fails shouldn't look identical to a clean load.
         if let profile = try? await APIClient.shared.getFamilyProfile() {
             children = profile.children
+        } else {
+            failures += 1
         }
-        upcomingEvents = (try? await APIClient.shared.getFamilyEvents()) ?? upcomingEvents
-        schoolStatus = (try? await APIClient.shared.getSchoolStatus()) ?? schoolStatus
-        absences = (try? await APIClient.shared.getFamilyAbsences()) ?? absences
-        notifications = (try? await APIClient.shared.getFamilyNotifications()) ?? notifications
-        await loadAttendance()
+        if let events = try? await APIClient.shared.getFamilyEvents() {
+            upcomingEvents = events
+        } else {
+            failures += 1
+        }
+        if let status = try? await APIClient.shared.getSchoolStatus() {
+            schoolStatus = status
+        } else {
+            failures += 1
+        }
+        if let reports = try? await APIClient.shared.getFamilyAbsences() {
+            absences = reports
+        } else {
+            failures += 1
+        }
+        if let notes = try? await APIClient.shared.getFamilyNotifications() {
+            notifications = notes
+        } else {
+            failures += 1
+        }
+        let attendanceOk = await loadAttendance()
+        if !attendanceOk { failures += 1 }
+        loadErrorMessage = failures > 0
+            ? "Some information couldn't be updated. What you see below may be out of date — pull down to try again."
+            : nil
         isLoading = false
     }
 
-    private func loadAttendance() async {
-        if let rows = try? await APIClient.shared.getFamilyAttendanceToday() {
-            attendanceToday = Dictionary(uniqueKeysWithValues: rows.map { ($0.childId, $0) })
-        }
+    @discardableResult
+    private func loadAttendance() async -> Bool {
+        guard let rows = try? await APIClient.shared.getFamilyAttendanceToday() else { return false }
+        attendanceToday = Dictionary(uniqueKeysWithValues: rows.map { ($0.childId, $0) })
+        return true
     }
 
     func checkIn(_ childId: String) async {

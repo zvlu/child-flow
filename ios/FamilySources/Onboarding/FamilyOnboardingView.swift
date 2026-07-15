@@ -128,6 +128,7 @@ struct InviteCodeView: View {
     @State private var code = ""
     @State private var isVerifying = false
     @State private var errorMessage: String?
+    @State private var showWhereFindHelp = false
     @ObservedObject private var l10n = FamilyL10n.shared
 
     var body: some View {
@@ -178,7 +179,10 @@ struct InviteCodeView: View {
                     .disabled(code.isEmpty || isVerifying)
 
                     Button(L(.whereFind)) {
-                        // Link to help
+                        // Previously an empty action body — tapping this did
+                        // nothing at all, a dead tappable element on the one
+                        // screen where a stuck parent needs help most.
+                        showWhereFindHelp = true
                     }
                     .font(.footnote)
                     .foregroundColor(.accentColor)
@@ -194,6 +198,11 @@ struct InviteCodeView: View {
                     Image(systemName: "chevron.left")
                 }
             }
+        }
+        .alert(L(.whereFind), isPresented: $showWhereFindHelp) {
+            Button("OK") { showWhereFindHelp = false }
+        } message: {
+            Text(L(.whereFindHelp))
         }
     }
 
@@ -283,7 +292,11 @@ struct FamilyRegistrationView: View {
                         .textInputAutocapitalization(.never)
 
                     DatePicker(L(.dateOfBirth), selection: $dateOfBirth,
-                               in: ...Calendar.current.date(byAdding: .year, value: -18, to: Date())!,
+                               // Force-unwrapped before; this arithmetic can't
+                               // realistically fail, but a crash here would be
+                               // an unusually bad first impression for a
+                               // brand-new parent signing up.
+                               in: ...(Calendar.current.date(byAdding: .year, value: -18, to: Date()) ?? Date()),
                                displayedComponents: .date)
                         .datePickerStyle(.compact)
 

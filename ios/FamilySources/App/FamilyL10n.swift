@@ -61,7 +61,7 @@ enum FamilyLanguage: String, CaseIterable, Identifiable {
 enum L10nKey: String {
     // Welcome / onboarding
     case appTagline, getStarted, haveAccount, inviteNeeded
-    case enterInviteTitle, enterInviteSubtitle, uniqueCode, continueBtn, whereFind
+    case enterInviteTitle, enterInviteSubtitle, uniqueCode, continueBtn, whereFind, whereFindHelp
     case signUpTitle, invalidCode, codeVerified, programLabel, childLabel
     case createAccountTitle, createAccountSubtitle, emailAddress, dateOfBirth
     case createPassword, confirmPassword, passwordsDontMatch, createAccountBtn, registrationFailed
@@ -86,6 +86,7 @@ enum L10nKey: String {
     // Progress
     case noProgressData, progressWillAppear, attendanceChartFmt, thisWeekFmt
     case noAttendanceRecorded, dashedLine85, familyGoals, done
+    case somethingWentWrong, pullToRefreshRetry
     // Profile
     case myChildren, support, contactSupport, aboutSprout
     case signOut, signOutConfirm, about, appWord, forWord, versionWord, headStartFamilies
@@ -229,6 +230,7 @@ extension FamilyL10n {
         .uniqueCode: "Unique Code",
         .continueBtn: "Continue",
         .whereFind: "Where do I find this?",
+        .whereFindHelp: "Your invitation code is on the welcome letter or email from your program. If you can't find it, ask your child's teacher or family advocate for a new one.",
         .signUpTitle: "Sign Up",
         .invalidCode: "Invalid code. Please check and try again.",
         .codeVerified: "Code verified!",
@@ -286,6 +288,8 @@ extension FamilyL10n {
         .reFmt: "Re: %@", .messagePlaceholder: "Message",
         .noProgressData: "No progress data yet",
         .progressWillAppear: "Attendance and goal progress will appear here.",
+        .somethingWentWrong: "Couldn't load this right now",
+        .pullToRefreshRetry: "Pull down to try again.",
         .attendanceChartFmt: "%@ — Attendance", .thisWeekFmt: "%d%% this week",
         .noAttendanceRecorded: "No attendance recorded yet.",
         .dashedLine85: "Dashed line: the 85% attendance goal",
@@ -308,6 +312,7 @@ extension FamilyL10n {
         .uniqueCode: "Código único",
         .continueBtn: "Continuar",
         .whereFind: "¿Dónde encuentro esto?",
+        .whereFindHelp: "Su código de invitación está en la carta de bienvenida o el correo electrónico de su programa. Si no lo encuentra, pídale uno nuevo al maestro o al defensor familiar de su hijo.",
         .signUpTitle: "Registrarse",
         .invalidCode: "Código inválido. Verifíquelo e intente de nuevo.",
         .codeVerified: "¡Código verificado!",
@@ -365,6 +370,8 @@ extension FamilyL10n {
         .reFmt: "Sobre: %@", .messagePlaceholder: "Mensaje",
         .noProgressData: "Aún no hay datos de progreso",
         .progressWillAppear: "La asistencia y el progreso de metas aparecerán aquí.",
+        .somethingWentWrong: "No se pudo cargar esto ahora",
+        .pullToRefreshRetry: "Desliza hacia abajo para volver a intentarlo.",
         .attendanceChartFmt: "%@ — Asistencia", .thisWeekFmt: "%d%% esta semana",
         .noAttendanceRecorded: "Aún no hay asistencia registrada.",
         .dashedLine85: "Línea punteada: la meta de asistencia del 85%",
@@ -387,6 +394,7 @@ extension FamilyL10n {
         .uniqueCode: "Kòd inik",
         .continueBtn: "Kontinye",
         .whereFind: "Ki kote mwen jwenn sa?",
+        .whereFindHelp: "Kòd envitasyon ou a sou lèt oswa imèl byenveni pwogram ou an voye ba ou. Si ou pa jwenn li, mande pwofesè pitit ou a oswa defansè fanmi an yon nouvo kòd.",
         .signUpTitle: "Enskri",
         .invalidCode: "Kòd la pa bon. Tanpri verifye epi eseye ankò.",
         .codeVerified: "Kòd verifye!",
@@ -444,6 +452,8 @@ extension FamilyL10n {
         .reFmt: "Konsènan: %@", .messagePlaceholder: "Mesaj",
         .noProgressData: "Poko gen done pwogrè",
         .progressWillAppear: "Prezans ak pwogrè objektif yo ap parèt isit la.",
+        .somethingWentWrong: "Pa t kapab chaje sa a kounye a",
+        .pullToRefreshRetry: "Rale desann pou eseye ankò.",
         .attendanceChartFmt: "%@ — Prezans", .thisWeekFmt: "%d%% semèn sa a",
         .noAttendanceRecorded: "Poko gen prezans anrejistre.",
         .dashedLine85: "Liy pwentiye a: objektif prezans 85% la",
@@ -466,6 +476,7 @@ extension FamilyL10n {
         .uniqueCode: "专属邀请码",
         .continueBtn: "继续",
         .whereFind: "在哪里能找到？",
+        .whereFindHelp: "您的邀请码在项目发送的欢迎信或邮件中。如果找不到，请向孩子的老师或家庭顾问索取新的邀请码。",
         .signUpTitle: "注册",
         .invalidCode: "邀请码无效。请检查后重试。",
         .codeVerified: "验证成功！",
@@ -523,6 +534,8 @@ extension FamilyL10n {
         .reFmt: "关于：%@", .messagePlaceholder: "消息",
         .noProgressData: "暂无进展数据",
         .progressWillAppear: "出勤和目标进展将显示在这里。",
+        .somethingWentWrong: "暂时无法加载",
+        .pullToRefreshRetry: "下拉以重试。",
         .attendanceChartFmt: "%@ — 出勤", .thisWeekFmt: "本周 %d%%",
         .noAttendanceRecorded: "尚无出勤记录。",
         .dashedLine85: "虚线：85% 出勤目标",
@@ -545,6 +558,7 @@ extension FamilyL10n {
         .uniqueCode: "Mã riêng",
         .continueBtn: "Tiếp tục",
         .whereFind: "Tôi tìm mã này ở đâu?",
+        .whereFindHelp: "Mã mời của bạn có trên thư hoặc email chào mừng từ chương trình. Nếu không tìm thấy, hãy hỏi giáo viên hoặc người ủng hộ gia đình của con bạn để lấy mã mới.",
         .signUpTitle: "Đăng ký",
         .invalidCode: "Mã không hợp lệ. Vui lòng kiểm tra và thử lại.",
         .codeVerified: "Đã xác minh mã!",
@@ -602,6 +616,8 @@ extension FamilyL10n {
         .reFmt: "Về: %@", .messagePlaceholder: "Tin nhắn",
         .noProgressData: "Chưa có dữ liệu tiến độ",
         .progressWillAppear: "Chuyên cần và tiến độ mục tiêu sẽ hiển thị tại đây.",
+        .somethingWentWrong: "Không thể tải lúc này",
+        .pullToRefreshRetry: "Kéo xuống để thử lại.",
         .attendanceChartFmt: "%@ — Chuyên cần", .thisWeekFmt: "%d%% tuần này",
         .noAttendanceRecorded: "Chưa có dữ liệu chuyên cần.",
         .dashedLine85: "Đường đứt nét: mục tiêu chuyên cần 85%",
@@ -624,6 +640,7 @@ extension FamilyL10n {
         .uniqueCode: "الرمز الخاص",
         .continueBtn: "متابعة",
         .whereFind: "أين أجد هذا الرمز؟",
+        .whereFindHelp: "رمز الدعوة موجود في رسالة الترحيب أو البريد الإلكتروني من برنامجك. إذا لم تجده، اطلب رمزًا جديدًا من معلم طفلك أو أخصائي شؤون الأسرة.",
         .signUpTitle: "التسجيل",
         .invalidCode: "الرمز غير صحيح. يرجى التحقق والمحاولة مرة أخرى.",
         .codeVerified: "تم التحقق من الرمز!",
@@ -681,6 +698,8 @@ extension FamilyL10n {
         .reFmt: "بخصوص: %@", .messagePlaceholder: "رسالة",
         .noProgressData: "لا توجد بيانات تقدّم بعد",
         .progressWillAppear: "سيظهر الحضور وتقدّم الأهداف هنا.",
+        .somethingWentWrong: "تعذّر تحميل هذا الآن",
+        .pullToRefreshRetry: "اسحب للأسفل للمحاولة مرة أخرى.",
         .attendanceChartFmt: "%@ — الحضور", .thisWeekFmt: "%d%% هذا الأسبوع",
         .noAttendanceRecorded: "لم يُسجَّل حضور بعد.",
         .dashedLine85: "الخط المتقطع: هدف الحضور 85%",
