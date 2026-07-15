@@ -160,6 +160,7 @@ struct HealthComplianceView: View {
             LogConsultSheet { consult in vm.consults.insert(consult, at: 0) }
         }
         .task { await vm.load() }
+        .refreshable { await vm.load() }
         .overlay { if vm.isLoading { ProgressView() } }
     }
 

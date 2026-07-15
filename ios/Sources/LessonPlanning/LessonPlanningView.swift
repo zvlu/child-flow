@@ -79,6 +79,7 @@ struct LessonPlanningView: View {
             ToolbarItem(placement: .navigationBarTrailing) { Button { showNew = true } label: { Image(systemName: "plus") } }
         }
         .task { await vm.load() }
+        .refreshable { await vm.load() }
         .sheet(isPresented: $showNew) { NewLessonPlanSheet(vm: vm, isPresented: $showNew) }
         .overlay { if vm.isLoading { ProgressView() } }
         .alert("Lesson Planning", isPresented: .constant(vm.errorMessage != nil)) {

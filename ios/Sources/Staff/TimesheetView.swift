@@ -93,6 +93,7 @@ struct TimesheetView: View {
                 }
             }
             .task { await viewModel.load() }
+            .refreshable { await viewModel.load() }
         }
     }
 }

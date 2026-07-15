@@ -56,6 +56,7 @@ struct DocumentsView: View {
                 Button("OK") { viewModel.errorMessage = nil }
             } message: { Text(viewModel.errorMessage ?? "") }
             .task { await viewModel.load() }
+            .refreshable { await viewModel.load() }
         }
     }
 }

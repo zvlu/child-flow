@@ -47,6 +47,7 @@ struct MealsView: View {
         .navigationTitle("Meal Plans")
         .navigationBarTitleDisplayMode(.inline)
         .task { await vm.load() }
+        .refreshable { await vm.load() }
         .overlay { if vm.isLoading { ProgressView() } }
         .alert("Meal Plans", isPresented: .constant(vm.errorMessage != nil)) {
             Button("OK") { vm.errorMessage = nil }

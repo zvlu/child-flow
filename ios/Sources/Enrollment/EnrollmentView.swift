@@ -78,6 +78,7 @@ struct EnrollmentView: View {
             AddApplicationSheet { app in viewModel.add(app) }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
     }
 }
 

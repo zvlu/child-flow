@@ -100,6 +100,7 @@ struct DisabilityServicesView: View {
             .navigationTitle("Disability Services")
             .navigationBarTitleDisplayMode(.inline)
             .task { await viewModel.load() }
+            .refreshable { await viewModel.load() }
         }
     }
 }

@@ -185,6 +185,7 @@ struct DailyReportsView: View {
         .navigationTitle("Daily Reports")
         .navigationBarTitleDisplayMode(.inline)
         .task { await vm.load() }
+        .refreshable { await vm.load() }
         .alert("Daily Reports", isPresented: .constant(vm.errorMessage != nil), actions: {
             Button("OK") { vm.errorMessage = nil }
         }, message: { Text(vm.errorMessage ?? "") })

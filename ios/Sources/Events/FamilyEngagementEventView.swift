@@ -76,6 +76,7 @@ struct FamilyEngagementEventView: View {
             NewEventSheet { _ in Task { await viewModel.load() } }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
         .overlay { if viewModel.isLoading { ProgressView() } }
     }
 }

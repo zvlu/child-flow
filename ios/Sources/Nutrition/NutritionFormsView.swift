@@ -77,6 +77,7 @@ struct NutritionalPreferencesListView: View {
             }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
         .overlay { if viewModel.isLoading { ProgressView() } }
     }
 }
@@ -308,6 +309,7 @@ struct InfantFormulaListView: View {
             }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
         .overlay { if viewModel.isLoading { ProgressView() } }
     }
 }
@@ -493,6 +495,7 @@ struct MedicalStatementListView: View {
             }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
         .overlay { if viewModel.isLoading { ProgressView() } }
     }
 }

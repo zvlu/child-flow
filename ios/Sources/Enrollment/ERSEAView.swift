@@ -100,6 +100,7 @@ struct ERSEAView: View {
             SuspensionLogView(logs: vm.suspensionLogs)
         }
         .task { await vm.load() }
+        .refreshable { await vm.load() }
         .overlay { if vm.isLoading { ProgressView() } }
     }
 }

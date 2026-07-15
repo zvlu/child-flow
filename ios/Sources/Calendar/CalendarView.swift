@@ -107,6 +107,7 @@ struct CalendarView: View {
             ToolbarItem(placement: .navigationBarTrailing) { Button { showAdd = true } label: { Image(systemName: "plus") } }
         }
         .task { await vm.load() }
+        .refreshable { await vm.load() }
         .sheet(isPresented: $showAdd) { AddEventSheet(vm: vm, isPresented: $showAdd) }
         .alert("Calendar", isPresented: .constant(vm.errorMessage != nil)) {
             Button("OK") { vm.errorMessage = nil }

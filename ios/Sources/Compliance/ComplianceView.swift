@@ -213,6 +213,7 @@ struct PIRReportEditorView: View {
         }
         .searchable(text: $search, prompt: "Search fields (e.g. dental, enrollment)")
         .task { if vm.detail == nil { await vm.load() } }
+        .refreshable { await vm.load() }
         .alert("PIR", isPresented: .constant(vm.errorMessage != nil), actions: {
             Button("OK") { vm.errorMessage = nil }
         }, message: { Text(vm.errorMessage ?? "") })
@@ -465,6 +466,7 @@ struct PIRHistoryView: View {
             .padding(.bottom, 32)
         }
         .task { await vm.load() }
+        .refreshable { await vm.load() }
     }
 }
 

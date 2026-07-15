@@ -77,6 +77,7 @@ struct InviteFamiliesView: View {
             }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
         .confirmationDialog(
             "Send \(viewModel.selectedIds.count) invitation\(viewModel.selectedIds.count == 1 ? "" : "s")?",
             isPresented: $viewModel.showConfirmation,

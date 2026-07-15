@@ -94,6 +94,7 @@ struct AttendanceView: View {
                 }
             }
             .task { await viewModel.load() }
+            .refreshable { await viewModel.load() }
             .alert("Couldn't Save", isPresented: .constant(viewModel.errorMessage != nil)) {
                 Button("OK") { viewModel.errorMessage = nil }
             } message: { Text(viewModel.errorMessage ?? "") }

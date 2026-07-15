@@ -79,6 +79,7 @@ struct StaffActivityView: View {
             .navigationTitle("Staff Activity")
             .navigationBarTitleDisplayMode(.inline)
             .task { if vm.report == nil { await vm.load() } }
+            .refreshable { await vm.load() }
             .overlay { if vm.isLoading && vm.report == nil { ProgressView() } }
             .alert("Staff Activity", isPresented: .constant(vm.errorMessage != nil)) {
                 Button("OK") { vm.errorMessage = nil }

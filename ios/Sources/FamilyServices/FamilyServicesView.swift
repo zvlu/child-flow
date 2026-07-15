@@ -17,6 +17,7 @@ struct FamilyServicesView: View {
             .navigationTitle("Family Services")
             .searchable(text: $viewModel.searchText, prompt: "Search families")
             .task { await viewModel.load() }
+            .refreshable { await viewModel.load() }
             .overlay {
                 if viewModel.isLoading { ProgressView() }
                 else if viewModel.filteredFamilies.isEmpty && !viewModel.searchText.isEmpty {

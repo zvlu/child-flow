@@ -57,6 +57,7 @@ struct AttendancePlansView: View {
             }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
         .overlay { if viewModel.isLoading { ProgressView() } }
         }
     }

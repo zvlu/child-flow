@@ -93,6 +93,7 @@ struct AssessmentsView: View {
             }
         }
         .task { await vm.loadChildren() }
+        .refreshable { await vm.loadChildren() }
         .onChange(of: childId) { _, v in Task { await vm.load(childId: v) } }
         .sheet(isPresented: $showAdd) { AddAssessmentSheet(vm: vm, childId: childId, isPresented: $showAdd) }
         .alert("Assessments", isPresented: .constant(vm.errorMessage != nil)) {

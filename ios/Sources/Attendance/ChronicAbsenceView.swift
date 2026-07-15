@@ -100,6 +100,7 @@ struct ChronicAbsenceView: View {
             }
         }
         .task { await vm.load() }
+        .refreshable { await vm.load() }
         .overlay { if vm.isLoading { ProgressView() } }
         }
     }

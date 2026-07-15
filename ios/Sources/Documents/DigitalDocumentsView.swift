@@ -90,6 +90,7 @@ struct DigitalDocumentsView: View {
         .navigationTitle("E-Signatures")
         .navigationBarTitleDisplayMode(.inline)
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
     }
 }
 

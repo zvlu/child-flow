@@ -96,6 +96,10 @@ struct DashboardView: View {
                 await viewModel.load()
                 await clockViewModel.load()
             }
+            .refreshable {
+                await viewModel.load()
+                await clockViewModel.load()
+            }
             .sheet(isPresented: $showMenu) { AppMenuSheet() }
             .sheet(isPresented: $showSearch) { GlobalSearchView() }
         }

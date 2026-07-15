@@ -106,6 +106,7 @@ struct PortfoliosView: View {
             }
         }
         .task { await vm.loadChildren() }
+        .refreshable { await vm.loadChildren() }
         .onChange(of: childId) { _, newValue in Task { await vm.loadEntries(childId: newValue) } }
         .sheet(isPresented: $showAdd) { AddObservationSheet(vm: vm, childId: childId, isPresented: $showAdd) }
         .alert("Portfolios", isPresented: .constant(vm.errorMessage != nil)) {

@@ -73,6 +73,7 @@ struct ApplicationVerificationView: View {
             }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
         .overlay { if viewModel.isLoading { ProgressView() } }
         .alert("Not Saved", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") { viewModel.errorMessage = nil }

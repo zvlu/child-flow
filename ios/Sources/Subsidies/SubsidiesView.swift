@@ -87,6 +87,7 @@ struct SubsidiesView: View {
             }
         }
         .task { await vm.load() }
+        .refreshable { await vm.load() }
         .sheet(isPresented: $showAdd) { AddSubsidySheet(vm: vm, isPresented: $showAdd) }
         .overlay { if vm.isLoading { ProgressView() } }
         .alert("Subsidies", isPresented: .constant(vm.errorMessage != nil)) {

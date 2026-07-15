@@ -67,6 +67,7 @@ struct SettingsView: View {
             }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
     }
 }
 

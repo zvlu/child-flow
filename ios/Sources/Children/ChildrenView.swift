@@ -101,6 +101,7 @@ struct ChildrenView: View {
             }
             .sheet(isPresented: $showMenu) { AppMenuSheet() }
             .task { await viewModel.load() }
+            .refreshable { await viewModel.load() }
             .overlay {
                 if viewModel.isLoading {
                     ProgressView()
