@@ -171,7 +171,10 @@ export function registerAuthRoutes(app: Express) {
     }
     await setWebSession(req, res, user.openId, user.name ?? "");
     await db.insertAuditLog({ userId: user.id, actorOpenId: user.openId, action: "login", resourceType: "auth", ipAddress: ip });
-    res.json({ success: true });
+    // The client needs this to send parent accounts to /parent-portal instead
+    // of the staff /dashboard — without it, every parent login landed on a
+    // page full of staff-only queries that fail auth and never stop loading.
+    res.json({ success: true, role: user.role });
   });
 
   /**

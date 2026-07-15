@@ -19,10 +19,13 @@ export default function SignIn() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Redirect already-authenticated users away from the sign-in page.
+  // Redirect already-authenticated users away from the sign-in page. Parents
+  // go straight to /parent-portal — sending them to /dashboard (the staff
+  // operations view) first meant every one of that page's queries failed
+  // auth for a parent session and it never stopped showing loading skeletons.
   useEffect(() => {
     if (!authLoading && user) {
-      window.location.href = "/dashboard";
+      window.location.href = (user as { role?: string }).role === "parent" ? "/parent-portal" : "/dashboard";
     }
   }, [authLoading, user]);
 
@@ -51,7 +54,10 @@ export default function SignIn() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data?.error || "Something went wrong. Please try again."); return; }
       // Full navigation so the new session cookie is picked up server-side.
-      window.location.href = "/dashboard";
+      // Parent accounts land on /parent-portal, not the staff dashboard —
+      // web-signup always creates an admin account, but existing parent
+      // accounts sign in through this same form and need the right home page.
+      window.location.href = data?.role === "parent" ? "/parent-portal" : "/dashboard";
     } catch {
       setError("Network error. Please try again.");
     } finally {

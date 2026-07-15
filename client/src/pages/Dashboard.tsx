@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { Link } from "wouter";
+import { useEffect, useMemo } from "react";
+import { Link, useLocation } from "wouter";
 import { motion, useReducedMotion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -103,11 +103,23 @@ export default function Dashboard() {
   }, []);
 
   const reduced = useReducedMotion() ?? false;
-  const { data: stats, isLoading: statsLoading } = trpc.dashboard.stats.useQuery(ORGANIZATION_ID);
+  const { user: authUser, loading: authLoading } = useAuth();
+  const [, setLocation] = useLocation();
+
+  // This is the staff/admin operations dashboard — every query below assumes
+  // an org-scoped staff session. Sign-in used to send every account here
+  // regardless of role, so a parent landed on a page full of staff-only
+  // queries that just fail auth and never resolve, leaving the loading
+  // skeletons on screen forever. Parents belong on /parent-portal instead.
+  const isParent = authUser?.role === "parent";
+  useEffect(() => {
+    if (!authLoading && isParent) setLocation("/parent-portal");
+  }, [authLoading, isParent, setLocation]);
+
+  const { data: stats, isLoading: statsLoading } = trpc.dashboard.stats.useQuery(ORGANIZATION_ID, { enabled: !isParent });
   // Role-aware quick actions: the signed-in staff member's most-used pages
   // come first (nurse sees Health, nutritionist sees Meal Planning, …).
-  const { data: myRole } = trpc.staff.myRole.useQuery();
-  const { user: authUser } = useAuth();
+  const { data: myRole } = trpc.staff.myRole.useQuery(undefined, { enabled: !isParent });
   const hasHeadStart = useOrgModules().has("head_start");
   const quickActions = useMemo(() => {
     // Admin-only destinations never appear as quick actions for staff.
@@ -138,9 +150,9 @@ export default function Dashboard() {
     organizationId: ORGANIZATION_ID,
     start: rangeStart,
     end: rangeEnd,
-  });
-  const { data: healthRecords } = trpc.health.list.useQuery({ organizationId: ORGANIZATION_ID });
-  const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID);
+  }, { enabled: !isParent });
+  const { data: healthRecords } = trpc.health.list.useQuery({ organizationId: ORGANIZATION_ID }, { enabled: !isParent });
+  const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID, { enabled: !isParent });
 
   // ---- KPI cards (derived from dashboard.stats) ----
   const kpiCards = useMemo(() => {
@@ -304,6 +316,18 @@ export default function Dashboard() {
         };
       });
   }, [healthRecords]);
+
+  if (authLoading || isParent) {
+    // Parent accounts are redirected to /parent-portal above; this staff
+    // dashboard's queries are disabled for them (`enabled: !isParent`), so
+    // `statsLoading` below would otherwise stay true forever instead of the
+    // redirect ever getting a chance to render something else.
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (statsLoading) {
     // Skeleton mirrors the real layout so the page doesn't jump when data lands.
