@@ -418,7 +418,10 @@ export const healthRecords = mysqlTable("health_records", {
   id: int("id").autoincrement().primaryKey(),
   childId: int("childId").notNull().references(() => children.id),
   organizationId: int("organizationId").notNull().references(() => organizations.id),
-  type: mysqlEnum("type", ["immunization", "dental", "physical", "vision", "hearing", "lead", "hemoglobin", "other"]).notNull(),
+  // "developmental" added for the iOS Health Compliance screen's ASQ-style
+  // developmental screening deadline — same shape as vision/hearing, just a
+  // new category rather than a new table.
+  type: mysqlEnum("type", ["immunization", "dental", "physical", "vision", "hearing", "lead", "hemoglobin", "developmental", "other"]).notNull(),
   status: mysqlEnum("status", ["up_to_date", "due_soon", "overdue", "exempt", "not_required"]).default("up_to_date"),
   recordDate: timestamp("recordDate").notNull(),
   expiryDate: timestamp("expiryDate"),
@@ -1387,6 +1390,18 @@ export const suspensionExpulsionLogs = mysqlTable("suspension_expulsion_logs", {
   status: mysqlEnum("status", ["open", "resolved"]).default("open").notNull(),
   resolvedAt: timestamp("resolvedAt"),
   recordedBy: int("recordedBy").references(() => staff.id),
+  // Added for the iOS SuspensionExpulsionLog screen, which tracks each
+  // §1302.17 intervention as its own discrete date rather than the web's
+  // single `stepsTaken` list, plus a state-agency notification step (required
+  // before an actual expulsion) that the web feature never needed to record.
+  // All additive/nullable — existing rows and the web ERSEA feature are
+  // unaffected.
+  incidentTypeDetail: varchar("incidentTypeDetail", { length: 64 }),
+  mentalHealthConsultDate: timestamp("mentalHealthConsultDate"),
+  familyMeetingDate: timestamp("familyMeetingDate"),
+  behaviourSupportPlanDate: timestamp("behaviourSupportPlanDate"),
+  stateAgencyNotified: int("stateAgencyNotified").default(0),
+  stateNotificationDate: timestamp("stateNotificationDate"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -1530,3 +1545,171 @@ export const classroomAssessments = mysqlTable("classroom_assessments", {
 
 export type ClassroomAssessment = typeof classroomAssessments.$inferSelect;
 export type InsertClassroomAssessment = typeof classroomAssessments.$inferInsert;
+
+/**
+ * Fire/lockdown/severe-weather safety drills. New for the iOS staff app's
+ * Health Compliance screen — previously called an endpoint that didn't exist.
+ */
+export const safetyDrillLogs = mysqlTable("safety_drill_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  drillType: varchar("drillType", { length: 64 }).notNull(),
+  drillDate: timestamp("drillDate").notNull(),
+  conductedBy: int("conductedBy").references(() => staff.id),
+  durationMinutes: int("durationMinutes").default(0).notNull(),
+  participantCount: int("participantCount").default(0).notNull(),
+  notes: text("notes"),
+  issuesFound: text("issuesFound"),
+  resolvedDate: timestamp("resolvedDate"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SafetyDrillLog = typeof safetyDrillLogs.$inferSelect;
+export type InsertSafetyDrillLog = typeof safetyDrillLogs.$inferInsert;
+
+/**
+ * Mental health consultant visits — either about a specific child or
+ * program-wide (childId null). New for the iOS Health Compliance screen.
+ */
+export const mentalHealthConsults = mysqlTable("mental_health_consults", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  childId: int("childId").references(() => children.id),
+  consultDate: timestamp("consultDate").notNull(),
+  consultantName: varchar("consultantName", { length: 200 }).notNull(),
+  consultType: varchar("consultType", { length: 64 }).notNull(),
+  summary: text("summary"),
+  followUpDate: timestamp("followUpDate"),
+  followUpNotes: text("followUpNotes"),
+  recordedBy: int("recordedBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type MentalHealthConsult = typeof mentalHealthConsults.$inferSelect;
+export type InsertMentalHealthConsult = typeof mentalHealthConsults.$inferInsert;
+
+/**
+ * ERSEA eligibility/selection records (§1302.12–14). Represents an applicant
+ * from initial income/categorical-eligibility determination through
+ * enrollment or withdrawal — may exist before the child has an enrolled
+ * `children` row at all, so `childId` is a soft link (nullable, no FK) and
+ * the applicant's name/DOB are captured directly. New for the iOS ERSEA
+ * screen, which previously called an endpoint that didn't exist.
+ */
+export const eligibilityRecords = mysqlTable("eligibility_records", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  childName: varchar("childName", { length: 200 }).notNull(),
+  childDateOfBirth: timestamp("childDateOfBirth").notNull(),
+  familyId: int("familyId").references(() => families.id),
+  applicationDate: timestamp("applicationDate").notNull(),
+  householdSize: int("householdSize").notNull(),
+  annualIncomeCents: int("annualIncomeCents").notNull(),
+  incomeSource: varchar("incomeSource", { length: 255 }),
+  categoricalEligibility: varchar("categoricalEligibility", { length: 100 }).notNull(),
+  priorityScore: int("priorityScore").default(0).notNull(),
+  riskFactors: json("riskFactors").$type<string[]>(),
+  status: varchar("status", { length: 64 }).notNull(),
+  enrolledDate: timestamp("enrolledDate"),
+  classroom: varchar("classroom", { length: 200 }),
+  waitlistPosition: int("waitlistPosition"),
+  notes: text("notes"),
+  recordedBy: int("recordedBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type EligibilityRecordRow = typeof eligibilityRecords.$inferSelect;
+export type InsertEligibilityRecord = typeof eligibilityRecords.$inferInsert;
+
+/**
+ * CACFP nutrition forms (§226 meal-program recordkeeping) — three related
+ * one-per-child paper forms digitized for the iOS Nutrition Forms screen,
+ * which previously called endpoints that didn't exist.
+ */
+export const nutritionPreferenceForms = mysqlTable("nutrition_preference_forms", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  childId: int("childId").notNull().references(() => children.id),
+  classroom: varchar("classroom", { length: 200 }),
+  completedDate: timestamp("completedDate").notNull(),
+  parentName: varchar("parentName", { length: 200 }),
+  /** Array of { id, foodGroup, item, preference } — see FoodPreferenceEntry (iOS). */
+  preferences: json("preferences").$type<Array<{ id: string; foodGroup: string; item: string; preference: string }>>(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type NutritionPreferenceForm = typeof nutritionPreferenceForms.$inferSelect;
+export type InsertNutritionPreferenceForm = typeof nutritionPreferenceForms.$inferInsert;
+
+export const nutritionInfantFormulaForms = mysqlTable("nutrition_infant_formula_forms", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  childId: int("childId").notNull().references(() => children.id),
+  classroom: varchar("classroom", { length: 200 }),
+  completedDate: timestamp("completedDate").notNull(),
+  parentName: varchar("parentName", { length: 200 }),
+  formulaBrand: varchar("formulaBrand", { length: 200 }),
+  formulaType: varchar("formulaType", { length: 200 }),
+  preparationInstructions: text("preparationInstructions"),
+  feedingSchedule: text("feedingSchedule"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type NutritionInfantFormulaForm = typeof nutritionInfantFormulaForms.$inferSelect;
+export type InsertNutritionInfantFormulaForm = typeof nutritionInfantFormulaForms.$inferInsert;
+
+export const nutritionMedicalStatements = mysqlTable("nutrition_medical_statements", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  childId: int("childId").notNull().references(() => children.id),
+  classroom: varchar("classroom", { length: 200 }),
+  physicianName: varchar("physicianName", { length: 200 }),
+  physicianPhone: varchar("physicianPhone", { length: 32 }),
+  diagnosis: text("diagnosis"),
+  foodsToAvoid: json("foodsToAvoid").$type<string[]>(),
+  substitutions: text("substitutions"),
+  signedDate: timestamp("signedDate").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type NutritionMedicalStatement = typeof nutritionMedicalStatements.$inferSelect;
+export type InsertNutritionMedicalStatement = typeof nutritionMedicalStatements.$inferInsert;
+
+/**
+ * Family engagement events (parent orientations, family nights, workshops,
+ * etc.) with three pre/day-of/post checklists. New for the iOS Events
+ * screen, which previously called an endpoint that didn't exist.
+ */
+export const familyEngagementEvents = mysqlTable("family_engagement_events", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  eventType: varchar("eventType", { length: 64 }).notNull(),
+  plannedDate: timestamp("plannedDate").notNull(),
+  actualDate: timestamp("actualDate"),
+  location: varchar("location", { length: 255 }),
+  createdBy: int("createdBy").references(() => staff.id),
+  objectives: json("objectives").$type<string[]>(),
+  /** Each checklist is an array of { id, title, isComplete, notes } — see EventChecklistItem (iOS). */
+  preEventChecklist: json("preEventChecklist").$type<Array<{ id: string; title: string; isComplete: boolean; notes: string }>>(),
+  dayOfChecklist: json("dayOfChecklist").$type<Array<{ id: string; title: string; isComplete: boolean; notes: string }>>(),
+  postEventChecklist: json("postEventChecklist").$type<Array<{ id: string; title: string; isComplete: boolean; notes: string }>>(),
+  expectedAttendance: int("expectedAttendance").default(0),
+  actualAttendance: int("actualAttendance"),
+  notes: text("notes"),
+  status: varchar("status", { length: 32 }).default("Planning").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type FamilyEngagementEventRow = typeof familyEngagementEvents.$inferSelect;
+export type InsertFamilyEngagementEvent = typeof familyEngagementEvents.$inferInsert;

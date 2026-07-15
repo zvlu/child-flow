@@ -281,6 +281,13 @@
       "when": 1783778199023,
       "tag": "0039_early_energizer",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "5",
+      "when": 1784127532366,
+      "tag": "0040_charming_wildside",
+      "breakpoints": true
     }
   ]
 }

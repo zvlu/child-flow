@@ -103,32 +103,122 @@ export function registerRosterRoutes(app: Express) {
         .filter(f => f.childId === childId)
         .map(f => ({ id: String(f.id), type: f.type, label: f.label }));
 
-    res.json(
-      kids.map(c => {
-        const assignment = roomByChild.get(c.id);
-        const room = assignment ? roomById.get(assignment.classroomId) : undefined;
-        const family = c.familyId != null ? familyById.get(c.familyId) : undefined;
-        return {
-          id: String(c.id),
-          familyId: c.familyId != null ? String(c.familyId) : null,
-          firstName: c.firstName,
-          lastName: c.lastName,
-          dateOfBirth: c.dateOfBirth ? dateOnly(c.dateOfBirth) : "",
-          gender: c.gender ?? "",
-          // Not tracked in the schema yet; empty rather than invented.
-          primaryLanguage: "",
-          classroom: room?.name ?? "",
-          teacher: room?.teacherName ?? "",
-          enrollmentStatus: c.status ?? "active",
-          healthStatus: healthFor(c.id),
-          attendanceRate: rateFor(c.id),
-          parentName: family?.primaryContactName ?? "",
-          parentPhone: family?.primaryContactPhone ?? "",
-          allergies: [] as string[],
-          flags: flagsForChild(c.id),
-        };
-      })
-    );
+    const buildChildDto = (c: (typeof kids)[number]) => {
+      const assignment = roomByChild.get(c.id);
+      const room = assignment ? roomById.get(assignment.classroomId) : undefined;
+      const family = c.familyId != null ? familyById.get(c.familyId) : undefined;
+      return {
+        id: String(c.id),
+        familyId: c.familyId != null ? String(c.familyId) : null,
+        firstName: c.firstName,
+        lastName: c.lastName,
+        dateOfBirth: c.dateOfBirth ? dateOnly(c.dateOfBirth) : "",
+        gender: c.gender ?? "",
+        // Not tracked in the schema yet; empty rather than invented.
+        primaryLanguage: "",
+        classroom: room?.name ?? "",
+        teacher: room?.teacherName ?? "",
+        enrollmentStatus: c.status ?? "active",
+        healthStatus: healthFor(c.id),
+        attendanceRate: rateFor(c.id),
+        parentName: family?.primaryContactName ?? "",
+        parentPhone: family?.primaryContactPhone ?? "",
+        allergies: [] as string[],
+        flags: flagsForChild(c.id),
+      };
+    };
+
+    // The single-child route below (GET /api/children/:id) needs the exact
+    // same per-child shape as this list — stash it on the response object
+    // isn't practical across requests, so that route re-derives its own
+    // (much smaller) version rather than sharing this closure. Kept here
+    // only for the list response.
+    res.json(kids.map(buildChildDto));
+  });
+
+  // The iOS app's getChild(id:) has always called this — a single-child
+  // fetch was never registered, so any screen depending on it (child detail
+  // deep links, etc.) 404'd. Mirrors the same shape as GET /api/children's
+  // per-child object, just scoped to one id instead of building the whole
+  // roster's supporting maps.
+  app.get("/api/children/:id", async (req: Request, res: Response) => {
+    const user = await requireStaff(req);
+    if (!user) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const org = user.organizationId != null ? { id: user.organizationId } : null;
+    if (!org) {
+      res.status(404).json({ error: "Child not found" });
+      return;
+    }
+    const childId = Number(req.params.id);
+    if (!childId) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+
+    const [c] = await db
+      .select()
+      .from(children)
+      .where(and(eq(children.id, childId), eq(children.organizationId, org.id)))
+      .limit(1);
+    if (!c) {
+      res.status(404).json({ error: "Child not found" });
+      return;
+    }
+
+    const family = c.familyId != null
+      ? (await db.select().from(families).where(eq(families.id, c.familyId)).limit(1))[0]
+      : undefined;
+    const map = await getChildClassroomMap(org.id);
+    const assignment = map.find(m => m.childId === c.id);
+    const rooms = await getOrganizationClassrooms(org.id);
+    const room = assignment ? rooms.find(r => r.id === assignment.classroomId) : undefined;
+
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const attendanceRows = await db
+      .select({ status: attendance.status })
+      .from(attendance)
+      .where(and(eq(attendance.childId, c.id), gte(attendance.date, since)));
+    const isPresent = (s: string | null) => s === "present" || s === "half_day";
+    const attendanceRate = attendanceRows.length === 0
+      ? 100
+      : Math.round((attendanceRows.filter(r => isPresent(r.status)).length / attendanceRows.length) * 100);
+
+    const healthAlerts = await getHealthFollowUpAlerts(org.id, 30);
+    const childAlerts = healthAlerts.filter(a => a.childId === c.id);
+    const healthStatus = childAlerts.some(a => a.severity === "overdue")
+      ? "Action needed"
+      : childAlerts.length > 0
+        ? "Due soon"
+        : "Up to date";
+
+    const flagRows = await db.select().from(childFlags).where(eq(childFlags.childId, c.id));
+
+    res.json({
+      id: String(c.id),
+      familyId: c.familyId != null ? String(c.familyId) : null,
+      firstName: c.firstName,
+      lastName: c.lastName,
+      dateOfBirth: c.dateOfBirth ? dateOnly(c.dateOfBirth) : "",
+      gender: c.gender ?? "",
+      primaryLanguage: "",
+      classroom: room?.name ?? "",
+      teacher: room?.teacherName ?? "",
+      enrollmentStatus: c.status ?? "active",
+      healthStatus,
+      attendanceRate,
+      parentName: family?.primaryContactName ?? "",
+      parentPhone: family?.primaryContactPhone ?? "",
+      allergies: [] as string[],
+      flags: flagRows.map(f => ({ id: String(f.id), type: f.type, label: f.label })),
+    });
   });
 
   app.get("/api/classrooms", async (req: Request, res: Response) => {

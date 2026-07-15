@@ -15,6 +15,8 @@ import { clientIpFromReq } from "./_core/audit";
 import { sdk } from "./_core/sdk";
 import { getDb, insertAuditLog, updateUserSettings } from "./db";
 import { resolveStaffId } from "./moduleDb";
+import { createFamilyInvitation } from "./family";
+import { familyInvitations } from "../drizzle/schema";
 import {
   isSupportedLanguage,
   translateThreadForViewer,
@@ -539,5 +541,163 @@ export function registerMessagingRoutes(app: Express) {
     }
     await updateUserSettings(viewer.user.openId, { preferredLanguage: language });
     res.json({ ok: true, language });
+  });
+
+  // ---- Family Invitations (staff-side) ----
+  // ios/Sources/Messaging/InviteFamiliesView.swift has always called these —
+  // previously unregistered, which showed a misleading "check your
+  // connection" network-error banner instead of the real problem (a missing
+  // route). One row per family (this schema doesn't model a second
+  // invitable adult per family, so `excludeOneOfTwoParents` is accepted but
+  // has no effect — every family has exactly one row here).
+  app.post("/api/messaging/invitations/search", async (req: Request, res: Response) => {
+    const viewer = await requireViewer(req);
+    if (!viewer || viewer.side !== "staff") {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const orgId = viewer.user.organizationId;
+    if (orgId == null) {
+      res.json({ invitations: [], locations: [], programTerms: [] });
+      return;
+    }
+
+    const location = typeof req.body?.location === "string" ? req.body.location.trim() : "";
+    const enrollmentStatus = typeof req.body?.enrollmentStatus === "string" ? req.body.enrollmentStatus.trim() : "";
+    const excludeWithAccounts = Boolean(req.body?.excludeWithAccounts);
+
+    const familyRows = await db.select().from(families).where(eq(families.organizationId, orgId));
+    const kidRows = await db
+      .select({ familyId: children.familyId, firstName: children.firstName, lastName: children.lastName, status: children.status })
+      .from(children)
+      .where(eq(children.organizationId, orgId));
+    const kidsByFamily = new Map<number, typeof kidRows>();
+    for (const k of kidRows) {
+      if (k.familyId == null) continue;
+      const list = kidsByFamily.get(k.familyId) ?? [];
+      list.push(k);
+      kidsByFamily.set(k.familyId, list);
+    }
+
+    const familyIds = familyRows.map((f) => f.id);
+    const parentUsers = familyIds.length
+      ? await db.select({ familyId: users.familyId, createdAt: users.createdAt }).from(users)
+          .where(and(eq(users.role, "parent"), inArray(users.familyId, familyIds)))
+      : [];
+    const accountCreatedAt = new Map<number, Date>();
+    for (const u of parentUsers) {
+      if (u.familyId != null && !accountCreatedAt.has(u.familyId)) accountCreatedAt.set(u.familyId, u.createdAt ?? new Date());
+    }
+    const invites = familyIds.length
+      ? await db.select().from(familyInvitations).where(inArray(familyInvitations.familyId, familyIds))
+      : [];
+    const latestInviteByFamily = new Map<number, (typeof invites)[number]>();
+    for (const inv of invites) {
+      const cur = latestInviteByFamily.get(inv.familyId);
+      if (!cur || inv.createdAt > cur.createdAt) latestInviteByFamily.set(inv.familyId, inv);
+    }
+
+    const rows = familyRows
+      .filter((f) => !location || (f.city ?? "").toLowerCase() === location.toLowerCase())
+      .filter((f) => {
+        if (!enrollmentStatus || enrollmentStatus.toLowerCase() === "all") return true;
+        const kids = kidsByFamily.get(f.id) ?? [];
+        return kids.some((k) => (k.status ?? "").toLowerCase() === enrollmentStatus.toLowerCase());
+      })
+      .map((f) => {
+        const kids = kidsByFamily.get(f.id) ?? [];
+        const hasAccount = accountCreatedAt.has(f.id);
+        const invite = latestInviteByFamily.get(f.id);
+        const accountStatus = hasAccount
+          ? "Account created"
+          : invite
+            ? "Invitation sent"
+            : "No invitation sent";
+        const statusDate = hasAccount
+          ? accountCreatedAt.get(f.id)!
+          : invite
+            ? invite.createdAt
+            : f.createdAt;
+        const missingInfo: string[] = [];
+        if (!f.primaryContactEmail) missingInfo.push("Email");
+        if (!f.primaryContactPhone) missingInfo.push("Phone");
+        return {
+          id: String(f.id),
+          childName: kids[0] ? `${kids[0].firstName} ${kids[0].lastName}` : "—",
+          adultName: f.primaryContactName,
+          adultEmail: f.primaryContactEmail ?? "",
+          adultStatus: "Primary",
+          accountStatus,
+          statusDate,
+          missingInfo,
+        };
+      })
+      .filter((r) => !excludeWithAccounts || r.accountStatus !== "Account created");
+
+    const locations = Array.from(new Set(familyRows.map((f) => f.city).filter((c): c is string => !!c))).sort();
+    // No "program term" concept in this schema yet — an honest empty list
+    // beats inventing values the UI would otherwise treat as real filters.
+    res.json({ invitations: rows, locations, programTerms: [] });
+  });
+
+  app.post("/api/messaging/invitations/send", async (req: Request, res: Response) => {
+    const viewer = await requireViewer(req);
+    if (!viewer || viewer.side !== "staff") {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const orgId = viewer.user.organizationId;
+    if (orgId == null) {
+      res.status(400).json({ error: "No organization" });
+      return;
+    }
+    const recipientIds = Array.isArray(req.body?.recipientIds) ? req.body.recipientIds.map(Number).filter(Boolean) : [];
+    if (recipientIds.length === 0) {
+      res.status(400).json({ error: "recipientIds is required" });
+      return;
+    }
+
+    // Only invite families that actually belong to this org — a recipientId
+    // list is client-supplied and shouldn't be trusted blindly.
+    const orgFamilies = await db
+      .select({ id: families.id, primaryContactEmail: families.primaryContactEmail })
+      .from(families)
+      .where(and(eq(families.organizationId, orgId), inArray(families.id, recipientIds)));
+
+    let sent = 0;
+    for (const f of orgFamilies) {
+      try {
+        await createFamilyInvitation({
+          organizationId: orgId,
+          familyId: f.id,
+          adultEmail: f.primaryContactEmail,
+          createdBy: viewer.user.id,
+        });
+        sent += 1;
+      } catch {
+        // One bad family shouldn't fail the whole batch send.
+      }
+    }
+
+    await insertAuditLog({
+      userId: viewer.user.id,
+      actorOpenId: viewer.user.openId,
+      action: "create",
+      resourceType: "family_invitation",
+      resourceId: null,
+      ipAddress: clientIpFromReq(req),
+      detail: `bulk invite sent to ${sent} of ${recipientIds.length} requested families`,
+    });
+    res.json({ success: true, sentCount: sent });
   });
 }

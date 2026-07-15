@@ -17,6 +17,12 @@ import { registerAttendanceRoutes } from "../attendance";
 import { registerFamilyCaseManagementRoutes } from "../familyCaseManagementRest";
 import { registerSettingsRoutes } from "../settingsRest";
 import { registerEnrollmentVerificationRoutes } from "../enrollmentVerificationsRest";
+import { registerStaffDirectoryRoutes } from "../staffDirectory";
+import { registerErseaRoutes } from "../erseaRest";
+import { registerHealthComplianceRoutes } from "../healthComplianceRest";
+import { registerNutritionFormRoutes } from "../nutritionForms";
+import { registerFamilyEngagementEventsRoutes } from "../familyEngagementEvents";
+import { registerReportsRoutes } from "../reportsRest";
 import { UPLOADS_ROOT } from "../fileStorage";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -90,6 +96,18 @@ async function startServer() {
   registerSettingsRoutes(app);
   // ERSEA application-verification checklist (iOS) under /api/enrollment/verifications
   registerEnrollmentVerificationRoutes(app);
+  // Staff Directory (iOS) under /api/staff
+  registerStaffDirectoryRoutes(app);
+  // ERSEA eligibility + suspension/expulsion logs (iOS) under /api/ersea/* — Head Start-gated
+  registerErseaRoutes(app);
+  // Health Compliance, Safety Drills, Mental Health Consults (iOS) under /api/health/*
+  registerHealthComplianceRoutes(app);
+  // CACFP nutrition forms (iOS) under /api/nutrition/*
+  registerNutritionFormRoutes(app);
+  // Family engagement events (iOS) under /api/events
+  registerFamilyEngagementEventsRoutes(app);
+  // Bare compliance snapshot + on-demand text reports (iOS) under /api/compliance, /api/reports/generate
+  registerReportsRoutes(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API
