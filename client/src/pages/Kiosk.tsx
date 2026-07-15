@@ -43,9 +43,9 @@ export default function Kiosk() {
   }, []);
 
   const ready = !authLoading && !!user;
-  const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID, { refetchInterval: 60_000, enabled: ready });
+  const { data: children, isLoading: childrenLoading } = trpc.children.list.useQuery(ORGANIZATION_ID, { refetchInterval: 60_000, enabled: ready });
   const { data: classrooms } = trpc.classrooms.list.useQuery(ORGANIZATION_ID, { enabled: ready });
-  const { data: classroomMap } = trpc.children.classroomMap.useQuery(ORGANIZATION_ID, { enabled: ready });
+  const { data: classroomMap, isLoading: classroomMapLoading } = trpc.children.classroomMap.useQuery(ORGANIZATION_ID, { enabled: ready });
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(12, 0, 0, 0); // noon avoids TZ edge cases in the date-range query
@@ -146,7 +146,11 @@ export default function Kiosk() {
 
       {/* Roster grid */}
       <main className="flex-1 overflow-y-auto p-6">
-        {roster.length === 0 ? (
+        {childrenLoading || classroomMapLoading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : roster.length === 0 ? (
           <p className="py-20 text-center text-lg text-muted-foreground">No active children in this classroom.</p>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">

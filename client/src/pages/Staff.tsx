@@ -14,6 +14,7 @@ import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
+import { formatDate } from "@/lib/date";
 
 /** §1302.91 staffing taxonomy — grouped roughly by service area. */
 const roleLabels: Record<string, string> = {
@@ -98,12 +99,6 @@ const emptyForm: StaffFormState = {
 
 function initials(first: string, last: string) {
   return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
-}
-
-function formatDate(value: string | Date | null | undefined) {
-  if (!value) return "—";
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
 }
 
 export default function Staff() {

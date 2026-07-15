@@ -17,6 +17,7 @@ import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { objectsToCsv, downloadCsv } from "@/lib/csv";
+import { formatDateLong as formatDate, formatAge as ageString } from "@/lib/date";
 
 type HealthType = "immunization" | "dental" | "physical" | "vision" | "hearing" | "lead" | "hemoglobin" | "other";
 type HealthStatus = "up_to_date" | "due_soon" | "overdue" | "exempt" | "not_required";
@@ -51,20 +52,6 @@ const statusBadge = (status?: string) => {
   if (status === "not_required") return <Badge className="bg-muted text-muted-foreground border-border hover:bg-muted text-xs">Not Required</Badge>;
   return <Badge variant="outline" className="text-muted-foreground text-xs">No Record</Badge>;
 };
-
-const ageString = (dob: unknown) => {
-  if (!dob) return "—";
-  const birth = new Date(dob as string | Date);
-  if (isNaN(birth.getTime())) return "—";
-  const now = new Date();
-  let months = (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
-  if (now.getDate() < birth.getDate()) months -= 1;
-  months = Math.max(0, months);
-  return `${Math.floor(months / 12)}y ${months % 12}m`;
-};
-
-const formatDate = (d: unknown) =>
-  d ? new Date(d as string | Date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "—";
 
 const VALID_HEALTH_FILTERS = ["all", "current", "due_soon", "overdue"];
 

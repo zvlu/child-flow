@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { FlagChips } from "@/components/FlagChips";
 import { EmptyState } from "@/components/EmptyState";
 import { objectsToCsv, downloadCsv, parseCsvToObjects } from "@/lib/csv";
+import { formatDate, formatAge } from "@/lib/date";
 
 const GENDERS = new Set(["male", "female", "other", "prefer_not_to_say"]);
 const STATUSES = new Set(["active", "inactive", "graduated", "withdrawn"]);
@@ -35,23 +36,6 @@ const statusBadge = (status: string) => {
   if (status === "withdrawn") return <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100">Withdrawn</Badge>;
   return <Badge variant="secondary">Inactive</Badge>;
 };
-
-function formatAge(dob: string | Date | null | undefined): string {
-  if (!dob) return "—";
-  const d = new Date(dob);
-  if (isNaN(d.getTime())) return "—";
-  const now = new Date();
-  let months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
-  if (now.getDate() < d.getDate()) months--;
-  if (months < 0) months = 0;
-  return `${Math.floor(months / 12)}y ${months % 12}m`;
-}
-
-function formatDate(x: string | Date | null | undefined): string {
-  if (!x) return "—";
-  const d = new Date(x);
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
-}
 
 export default function Children() {
   const [search, setSearch] = useState("");

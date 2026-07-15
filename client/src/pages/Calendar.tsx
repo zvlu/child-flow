@@ -218,6 +218,9 @@ export default function Calendar() {
           const isToday = sameDay(date, new Date());
           return (
             <div key={date.toISOString()} onClick={() => openCreate(date)}
+              role="button" tabIndex={0}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCreate(date); } }}
+              aria-label={`Add event on ${date.toLocaleDateString()}`}
               className={`rounded-xl border-2 min-h-[360px] p-2 cursor-pointer transition-all ${isToday ? "border-primary bg-primary/5" : "border-border hover:border-primary/30 hover:bg-muted"}`}>
               <p className={`text-center font-bold text-xs uppercase tracking-wide ${isToday ? "text-primary" : "text-muted-foreground"}`}>{daysOfWeek[date.getDay()]}</p>
               <p className={`text-center font-bold text-lg mb-2 ${isToday ? "text-primary" : "text-muted-foreground"}`}>{date.getDate()}</p>
@@ -237,7 +240,11 @@ export default function Calendar() {
     return (
       <div className="space-y-2" onClick={() => openCreate(currentDate)}>
         {dayEvents.length === 0 ? (
-          <div className="py-16 text-center cursor-pointer">
+          <div
+            role="button" tabIndex={0}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCreate(currentDate); } }}
+            aria-label={`Add event on ${currentDate.toLocaleDateString()}`}
+            className="py-16 text-center cursor-pointer">
             <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground font-bold">No events — click to add one</p>
           </div>

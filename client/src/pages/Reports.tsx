@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { objectsToCsv, downloadCsv } from "@/lib/csv";
 import { StaffActivityReport } from "@/components/StaffActivityReport";
 import { useOrgModules } from "@/hooks/useOrgModules";
+import { daysAgo } from "@/lib/date";
 
 const attendanceByMonth = [
   { month: "Sep", rate: 88 }, { month: "Oct", rate: 91 }, { month: "Nov", rate: 87 },
@@ -35,11 +36,6 @@ const HEALTH_TYPE_LABELS: Record<string, string> = {
 
 // Relative to today so this list doesn't read as "last run Nov 2024" forever
 // — it used to be a fixed date that just got more stale-looking every month.
-const daysAgo = (n: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-};
 
 // `module` marks entries that only make sense with Head Start compliance on
 // (PIR, income eligibility) — filtered out below for core-only orgs.

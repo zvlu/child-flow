@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useOrgModules } from "@/hooks/useOrgModules";
+import { formatDateLong } from "@/lib/date";
 
 export type QueueStatus = "urgent" | "pending" | "completed";
 
@@ -24,9 +25,10 @@ function formatTypeLabel(type: string) {
     .join(" ");
 }
 
+// Same underlying format as the shared formatDateLong, but this queue
+// specifically wants "No due date" rather than "—" when there's nothing set.
 function formatDate(d: Date | string | null | undefined) {
-  if (!d) return "No due date";
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return d ? formatDateLong(d) : "No due date";
 }
 
 const RISK_LABELS: Record<string, string> = {

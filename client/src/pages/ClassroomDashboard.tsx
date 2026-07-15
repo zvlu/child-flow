@@ -291,10 +291,11 @@ export default function ClassroomDashboard() {
           <Button
             variant="ghost"
             size="sm"
-            className="flex-1 rounded-lg font-bold text-xs h-8 gap-1.5 hover:bg-primary/10 hover:text-primary transition-all"
+            className="flex-1 rounded-lg font-bold text-xs h-8 gap-1.5 opacity-60 cursor-not-allowed hover:bg-transparent hover:text-current"
             onClick={() => toast.info("Quick notes coming soon")}
+            title="Coming soon"
           >
-            <MessageSquare className="h-3.5 w-3.5" /> Note
+            <MessageSquare className="h-3.5 w-3.5" /> Note <span className="font-normal opacity-75">(soon)</span>
           </Button>
           <Link href={`/children/${student.id}`}>
             <Button
@@ -334,10 +335,12 @@ export default function ClassroomDashboard() {
           </div>
         </div>
         <Button
-          className="rounded-full gap-2 shadow-md hover:shadow-lg transition-all font-bold"
+          variant="outline"
+          className="rounded-full gap-2 font-bold opacity-70"
           onClick={() => toast.info("New classroom feature coming soon")}
+          title="Coming soon"
         >
-          <Plus className="h-4 w-4" /> New Classroom
+          <Plus className="h-4 w-4" /> New Classroom <span className="font-normal opacity-75">(soon)</span>
         </Button>
       </div>
 

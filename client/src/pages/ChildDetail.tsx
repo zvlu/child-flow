@@ -21,25 +21,9 @@ import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
+import { formatDate, formatAge } from "@/lib/date";
 
 interface ChildDetailProps { id: string; }
-
-function formatDate(x: string | Date | null | undefined): string {
-  if (!x) return "—";
-  const d = new Date(x);
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
-}
-
-function formatAge(dob: string | Date | null | undefined): string {
-  if (!dob) return "—";
-  const d = new Date(dob);
-  if (isNaN(d.getTime())) return "—";
-  const now = new Date();
-  let months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
-  if (now.getDate() < d.getDate()) months--;
-  if (months < 0) months = 0;
-  return `${Math.floor(months / 12)}y ${months % 12}m`;
-}
 
 const capitalize = (s: string | null | undefined) =>
   s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ") : "—";

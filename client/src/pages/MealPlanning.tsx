@@ -177,7 +177,11 @@ export function MealPlanning() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             {allPlans.map((plan) => (
-              <div key={plan.id} onClick={() => setSelectedPlanId(plan.id)} className={`rounded-xl shadow-sm border-2 p-6 cursor-pointer transition-all ${effectivePlanId === plan.id ? "border-[#5E8C6A] bg-[#F1F6F2]" : "border-border bg-card hover:border-[#A7C4AD]"}`}>
+              <div key={plan.id} onClick={() => setSelectedPlanId(plan.id)}
+                role="button" tabIndex={0}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedPlanId(plan.id); } }}
+                aria-pressed={effectivePlanId === plan.id}
+                className={`rounded-xl shadow-sm border-2 p-6 cursor-pointer transition-all ${effectivePlanId === plan.id ? "border-[#5E8C6A] bg-[#F1F6F2]" : "border-border bg-card hover:border-[#A7C4AD]"}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-foreground">{formatWeek(plan.weekStartDate)}</h3>

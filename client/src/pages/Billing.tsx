@@ -5,6 +5,7 @@ import { ORGANIZATION_ID } from "@/const";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { TuitionPlans, ArAgingCards } from "@/components/TuitionPlans";
 import { toast } from "sonner";
+import { formatDate } from "@/lib/date";
 
 const statusColors = {
   paid: "bg-green-100 text-green-700",
@@ -25,12 +26,6 @@ function formatMoney(amount: string | number) {
   const n = typeof amount === "string" ? parseFloat(amount) : amount;
   if (Number.isNaN(n)) return "$0.00";
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function formatDate(d: string | Date | null | undefined) {
-  if (!d) return "—";
-  const date = new Date(d);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString();
 }
 
 export function Billing() {

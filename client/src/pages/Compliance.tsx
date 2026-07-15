@@ -12,16 +12,11 @@ import PirReportView from "@/components/PirReportView";
 import { Glossary } from "@/components/Glossary";
 import { AuditReadiness } from "@/components/AuditReadiness";
 import { ReviewBinderButton } from "@/components/ReviewBinder";
+import { daysAgo } from "@/lib/date";
 
 // Relative to today rather than a fixed date, so this list doesn't read as
 // "reviewed Nov 2024" forever — it used to be hardcoded and would silently
 // drift further stale every time someone opened this page.
-const daysAgo = (n: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-};
-
 const initialMonitoringItems = [
   { area: "Child-to-Staff Ratio", status: "compliant", lastReview: daysAgo(3), notes: "All classrooms within required ratios" },
   { area: "Health & Safety Checks", status: "compliant", lastReview: daysAgo(3), notes: "Monthly safety inspections completed" },
