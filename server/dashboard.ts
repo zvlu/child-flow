@@ -177,13 +177,26 @@ export async function computeDashboard(user: User) {
       .from(conversations)
       .innerJoin(families, eq(conversations.familyId, families.id))
       .where(and(eq(conversations.organizationId, org.id), eq(conversations.isActive, 1)));
+
+    // This used to run one "latest message" query per conversation thread
+    // on every dashboard load — fine with a handful of families, but an
+    // N+1 that scales linearly with conversation count. One query for all
+    // family-sent messages across every thread, ordered so the first row
+    // seen per conversationId is that thread's latest, replaces the loop.
+    const threadIds = threads.map(t => t.id);
+    const familyMessages = threadIds.length === 0 ? [] : await db
+      .select({ conversationId: chatMessages.conversationId, sentAt: chatMessages.sentAt, body: chatMessages.body })
+      .from(chatMessages)
+      .where(and(inArray(chatMessages.conversationId, threadIds), eq(chatMessages.senderRole, "family")))
+      .orderBy(desc(chatMessages.sentAt), desc(chatMessages.id));
+    const latestByConversation = new Map<number, { sentAt: Date; body: string }>();
+    for (const m of familyMessages) {
+      if (!latestByConversation.has(m.conversationId)) {
+        latestByConversation.set(m.conversationId, { sentAt: m.sentAt, body: m.body });
+      }
+    }
     for (const t of threads) {
-      const [latestFromFamily] = await db
-        .select({ sentAt: chatMessages.sentAt, body: chatMessages.body })
-        .from(chatMessages)
-        .where(and(eq(chatMessages.conversationId, t.id), eq(chatMessages.senderRole, "family")))
-        .orderBy(desc(chatMessages.sentAt), desc(chatMessages.id))
-        .limit(1);
+      const latestFromFamily = latestByConversation.get(t.id);
       if (
         latestFromFamily &&
         (t.staffLastReadAt == null || latestFromFamily.sentAt > t.staffLastReadAt)

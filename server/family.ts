@@ -20,6 +20,7 @@ import {
 } from "../drizzle/schema";
 import { clientIpFromReq } from "./_core/audit";
 import { hashPassword, verifyPassword } from "./_core/password";
+import { throttled } from "./_core/rateLimit";
 import { sdk } from "./_core/sdk";
 import { getDb, getHealthFollowUpAlerts, insertAuditLog } from "./db";
 import { getFamilyActivityLogs } from "./moduleDb";
@@ -261,6 +262,11 @@ const DUMMY_HASH = `scrypt$${"0".repeat(32)}$${"0".repeat(128)}`;
 export function registerFamilyRoutes(app: Express) {
   /** Step 1 of onboarding: validate an invitation code. */
   app.post("/api/family/auth/verify-code", async (req: Request, res: Response) => {
+    // Invite codes are short and guessable, and a correct guess here leaks
+    // the invited child's name and program before any DOB check happens —
+    // throttle per-IP the same way login/signup are throttled in auth.ts.
+    if (throttled(req, res, "family-verify-code", 10, 10 * 60 * 1000)) return;
+
     const code =
       typeof req.body?.code === "string" ? req.body.code.trim().toUpperCase() : "";
     if (!code) {
@@ -307,6 +313,10 @@ export function registerFamilyRoutes(app: Express) {
    * code plus the child's date of birth (when one is on file).
    */
   app.post("/api/family/auth/register", async (req: Request, res: Response) => {
+    // Same DOB-guessing concern as verify-code, plus this one creates an
+    // account — throttle a bit tighter, mirroring auth.ts's signup limit.
+    if (throttled(req, res, "family-register", 5, 60 * 60 * 1000)) return;
+
     const code =
       typeof req.body?.code === "string" ? req.body.code.trim().toUpperCase() : "";
     const email =
@@ -794,30 +804,39 @@ export function registerFamilyRoutes(app: Express) {
     const now = new Date();
     const start = new Date(now); start.setHours(0, 0, 0, 0);
     const end = new Date(now); end.setHours(23, 59, 59, 999);
-    const [existing] = await db
-      .select()
-      .from(attendance)
-      .where(and(eq(attendance.childId, child.id), gte(attendance.date, start), lte(attendance.date, end)))
-      .limit(1);
-    if (existing) {
-      await db
-        .update(attendance)
-        .set({
+    // A parent double-tapping "check in" (or a retried request after a slow
+    // network) used to be able to race the select-then-insert below and
+    // create two attendance rows for the same child/day. Do the read and
+    // write in one transaction with a row lock (SELECT ... FOR UPDATE) so a
+    // second concurrent call sees the first call's insert instead of racing
+    // past the same "no existing row" check.
+    await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(attendance)
+        .where(and(eq(attendance.childId, child.id), gte(attendance.date, start), lte(attendance.date, end)))
+        .for("update")
+        .limit(1);
+      if (existing) {
+        await tx
+          .update(attendance)
+          .set({
+            status: "present",
+            checkInTime: patch.checkIn ? existing.checkInTime ?? now : existing.checkInTime,
+            checkOutTime: patch.checkOut ? now : existing.checkOutTime,
+          })
+          .where(eq(attendance.id, existing.id));
+      } else {
+        await tx.insert(attendance).values({
+          organizationId: child.organizationId,
+          childId: child.id,
+          date: now,
           status: "present",
-          checkInTime: patch.checkIn ? existing.checkInTime ?? now : existing.checkInTime,
-          checkOutTime: patch.checkOut ? now : existing.checkOutTime,
-        })
-        .where(eq(attendance.id, existing.id));
-    } else {
-      await db.insert(attendance).values({
-        organizationId: child.organizationId,
-        childId: child.id,
-        date: now,
-        status: "present",
-        checkInTime: patch.checkIn ? now : null,
-        checkOutTime: patch.checkOut ? now : null,
-      });
-    }
+          checkInTime: patch.checkIn ? now : null,
+          checkOutTime: patch.checkOut ? now : null,
+        });
+      }
+    });
   };
 
   app.post("/api/family/check-in", async (req: Request, res: Response) => {

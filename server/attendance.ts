@@ -165,6 +165,19 @@ export function registerAttendanceRoutes(app: Express) {
       return;
     }
 
+    // The childId comes straight from the URL — without this check, any
+    // signed-in staff member could attach a note to any child by guessing
+    // an ID, including one belonging to a different organization entirely.
+    const [child] = await db
+      .select({ id: children.id })
+      .from(children)
+      .where(and(eq(children.id, childId), eq(children.organizationId, org.id)))
+      .limit(1);
+    if (!child) {
+      res.status(404).json({ error: "Child not found" });
+      return;
+    }
+
     await createStudentNote({
       organizationId: org.id,
       childId,

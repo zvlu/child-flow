@@ -7,7 +7,7 @@
  * goals, service follow-ups) — no extra data entry, same philosophy as the
  * Audit Readiness Score.
  */
-import { and, eq, gte, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import {
   families, staff, familyHomeVisits, familyGoals, familyServices, children,
 } from "../drizzle/schema";
@@ -156,7 +156,7 @@ export async function assignAdvocate(
   organizationId: number,
   familyIds: number[],
   advocateId: number | null
-): Promise<{ updated: number }> {
+): Promise<{ updated: number; overCapacityWarning: string | null }> {
   const db = await requireDb();
   if (advocateId != null) {
     const [advocate] = await db
@@ -166,12 +166,37 @@ export async function assignAdvocate(
       .limit(1);
     if (!advocate) throw new Error("That staff member isn't part of this organization.");
   }
-  if (familyIds.length === 0) return { updated: 0 };
+  if (familyIds.length === 0) return { updated: 0, overCapacityWarning: null };
+
+  // suggestAssignments respects CASELOAD_LIMIT, but a supervisor assigning by
+  // hand had no signal at all if the move pushed someone over it — this
+  // doesn't block the assignment (a supervisor may have a good reason, e.g.
+  // temporary coverage), it just surfaces what the overview page already
+  // flags as "overCapacity" so it isn't silently discovered later.
+  let overCapacityWarning: string | null = null;
+  if (advocateId != null) {
+    const [[{ count: currentLoad } = { count: 0 }], toAssign] = await Promise.all([
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(families)
+        .where(and(eq(families.organizationId, organizationId), eq(families.familyAdvocateId, advocateId))),
+      db
+        .select({ id: families.id, familyAdvocateId: families.familyAdvocateId })
+        .from(families)
+        .where(and(eq(families.organizationId, organizationId), inArray(families.id, familyIds))),
+    ]);
+    const newlyAdded = toAssign.filter((f) => f.familyAdvocateId !== advocateId).length;
+    const projectedLoad = Number(currentLoad) + newlyAdded;
+    if (projectedLoad > CASELOAD_LIMIT) {
+      overCapacityWarning = `This assignment brings this advocate to ${projectedLoad} families, above the ${CASELOAD_LIMIT}-family case-load limit.`;
+    }
+  }
+
   await db
     .update(families)
     .set({ familyAdvocateId: advocateId })
     .where(and(eq(families.organizationId, organizationId), inArray(families.id, familyIds)));
-  return { updated: familyIds.length };
+  return { updated: familyIds.length, overCapacityWarning };
 }
 
 export type MyCaseloadFamily = {

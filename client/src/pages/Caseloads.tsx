@@ -72,6 +72,7 @@ export default function Caseloads() {
       invalidate();
       setSelected(new Set());
       toast.success(`${res.updated} famil${res.updated === 1 ? "y" : "ies"} assigned`);
+      if (res.overCapacityWarning) toast.warning(res.overCapacityWarning);
     },
     onError: (e) => toast.error(e.message || "Assignment failed"),
   });

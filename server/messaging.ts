@@ -212,11 +212,21 @@ export function registerMessagingRoutes(app: Express) {
         return;
       }
 
-      const msgs = await db
+      // This had no limit at all — a long-running thread (a family that's
+      // been enrolled for years, or a busy staff/parent conversation) would
+      // load every message ever sent on every open, with no way to page
+      // further back. Cap to the most recent MAX_MESSAGES, fetched newest
+      // first then reversed back to chronological order for rendering.
+      // True infinite-scroll pagination (loading older messages on demand)
+      // is a bigger client+server change; this bounds the worst case for now.
+      const MAX_MESSAGES = 500;
+      const recent = await db
         .select()
         .from(chatMessages)
         .where(eq(chatMessages.conversationId, conversationId))
-        .orderBy(chatMessages.sentAt);
+        .orderBy(desc(chatMessages.sentAt), desc(chatMessages.id))
+        .limit(MAX_MESSAGES);
+      const msgs = recent.reverse();
       const names = await senderNames(Array.from(new Set(msgs.map(m => m.senderUserId))));
 
       // Real-time translation: messages from the other side render in the
