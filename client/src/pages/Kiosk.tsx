@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle2, LogIn, LogOut, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, LogIn, LogOut, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -55,6 +55,12 @@ export default function Kiosk() {
     { organizationId: ORGANIZATION_ID, date: today },
     { refetchInterval: 30_000, enabled: ready }
   );
+  // "Cleared to attend" participation status (server/participationClearance.ts)
+  // — org-wide in one query since Kiosk lists many children at once.
+  const { data: clearanceData } = trpc.health.clearance.useQuery(
+    { organizationId: ORGANIZATION_ID },
+    { refetchInterval: 60_000, enabled: ready }
+  );
 
   const mark = trpc.attendance.mark.useMutation({
     onSuccess: (_res, vars) => {
@@ -78,6 +84,12 @@ export default function Kiosk() {
     (todays ?? []).forEach((a: any) => m.set(a.childId, a));
     return m;
   }, [todays]);
+
+  const clearanceByChild = useMemo(() => {
+    const m = new Map<number, { cleared: boolean; blockers: { code: string; label: string }[] }>();
+    ((clearanceData ?? []) as any[]).forEach((c) => m.set(c.childId, c));
+    return m;
+  }, [clearanceData]);
 
   const roster = useMemo(() => {
     const active = ((children ?? []) as ChildRow[]).filter((c) => c.status === "active");
@@ -157,18 +169,28 @@ export default function Kiosk() {
             {roster.map((c) => {
               const st = stateOf(c);
               const a = attendanceByChild.get(c.id);
+              const clr = clearanceByChild.get(c.id);
+              const blocked = !!clr && !clr.cleared;
               return (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => setPending(c)}
                   className={cn(
-                    "flex min-h-[150px] flex-col items-center justify-center gap-2 rounded-2xl border-2 p-4 transition-all active:scale-95",
+                    "relative flex min-h-[150px] flex-col items-center justify-center gap-2 rounded-2xl border-2 p-4 transition-all active:scale-95",
                     st === "in" && "border-primary bg-primary/10",
                     st === "done" && "border-border bg-muted opacity-60",
                     st === "out" && "border-border bg-card hover:border-primary/40"
                   )}
                 >
+                  {blocked && (
+                    <span
+                      className="absolute -top-2 -right-2 flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-md"
+                      title={`Not cleared to attend: ${clr!.blockers.map((b) => b.label).join(", ")}`}
+                    >
+                      <AlertTriangle className="h-3 w-3" /> Not cleared
+                    </span>
+                  )}
                   <span
                     className={cn(
                       "flex h-16 w-16 items-center justify-center rounded-full text-xl font-bold",
@@ -212,6 +234,27 @@ export default function Kiosk() {
                 </DialogTitle>
               </DialogHeader>
               <div className="flex flex-col gap-3 pt-2">
+                {(() => {
+                  const clr = clearanceByChild.get(pending.id);
+                  if (!clr || clr.cleared) return null;
+                  return (
+                    <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/30">
+                      <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-800 dark:text-amber-300">
+                        <AlertTriangle className="h-4 w-4 shrink-0" /> Not cleared to attend
+                      </p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                        {clr.blockers.map((b) => (
+                          <li key={b.code} className="text-xs text-amber-800/80 dark:text-amber-300/80">
+                            {b.label}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-1 text-[11px] text-amber-700/70 dark:text-amber-400/70">
+                        You can still check them in — please follow up on the missing item(s) above.
+                      </p>
+                    </div>
+                  );
+                })()}
                 {stateOf(pending) !== "in" ? (
                   <Button
                     size="lg"

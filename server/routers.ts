@@ -56,6 +56,7 @@ import { CommunicationService } from "./services/communication";
 import { getChronicAbsenceSummary } from "./chronicAbsence";
 import { listFpas, getFpaDetail, upsertFpa } from "./fpaDb";
 import { getHealthDeadlineSummary } from "./healthDeadlines";
+import { computeClearanceForOrg, computeClearanceForChild } from "./participationClearance";
 import { computePirSuggestions } from "./pirAutoPopulate";
 import { listIncidents, createIncident, updateIncident } from "./suspensionLog";
 import * as pc from "./policyCouncil";
@@ -1950,6 +1951,18 @@ export const appRouter = router({
       .input(z.object({ organizationId: z.number(), dueWithinDays: z.number().min(1).max(365).optional() }))
       .query(async ({ input }) => {
         return getHealthFollowUpAlerts(input.organizationId, input.dueWithinDays ?? 30);
+      }),
+    // "Cleared to attend" participation-blocking status (see
+    // server/participationClearance.ts) — omit childId for the org-wide
+    // map used by Kiosk/roster grids, pass it for a single child's detail.
+    clearance: orgStaffProcedure
+      .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
+      .query(async ({ input }) => {
+        if (input.childId != null) {
+          return computeClearanceForChild(input.childId, input.organizationId);
+        }
+        const map = await computeClearanceForOrg(input.organizationId);
+        return Array.from(map.values());
       }),
   }),
 

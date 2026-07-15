@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
-import { CheckCircle2, XCircle, Clock, AlertCircle, Save, Download, CalendarDays, Loader2, MonitorSmartphone } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, AlertCircle, AlertTriangle, Save, Download, CalendarDays, Loader2, MonitorSmartphone } from "lucide-react";
 import { Link } from "wouter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,9 @@ export default function Attendance() {
   const classroomMapQuery = trpc.children.classroomMap.useQuery(ORGANIZATION_ID);
   const classroomsQuery = trpc.classrooms.list.useQuery(ORGANIZATION_ID);
   const dayQuery = trpc.attendance.getByDate.useQuery({ organizationId: ORGANIZATION_ID, date });
+  // "Cleared to attend" participation status (server/participationClearance.ts)
+  // — org-wide in one query, looked up per-child below.
+  const clearanceQuery = trpc.health.clearance.useQuery({ organizationId: ORGANIZATION_ID });
 
   // Current week (Mon-Fri) for the weekly overview chart
   const { weekStart, weekEnd } = useMemo(() => {
@@ -66,6 +69,12 @@ export default function Attendance() {
     () => new Map((dayQuery.data ?? []).map(r => [r.childId, r])),
     [dayQuery.data]
   );
+
+  const clearanceByChild = useMemo(() => {
+    const m = new Map<number, { cleared: boolean; blockers: { code: string; label: string }[] }>();
+    ((clearanceQuery.data ?? []) as any[]).forEach((c) => m.set(c.childId, c));
+    return m;
+  }, [clearanceQuery.data]);
 
   // Initialize local attendance state from the saved records for the selected day
   useEffect(() => {
@@ -249,14 +258,31 @@ export default function Attendance() {
                   {filtered.map(child => {
                     const currentStatus = statusOf(child.id);
                     const initials = child.name.split(" ").map(n => n[0]).join("");
+                    const clr = clearanceByChild.get(child.id);
+                    const blocked = !!clr && !clr.cleared;
                     return (
                       <div key={child.id} className="flex items-center gap-4 px-6 py-3 hover:bg-muted/20 transition-colors">
                         <Avatar className="h-9 w-9 flex-shrink-0">
                           <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">{initials}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm text-foreground">{child.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm text-foreground">{child.name}</p>
+                            {blocked && (
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700"
+                                title={`Not cleared to attend: ${clr!.blockers.map(b => b.label).join(", ")}`}
+                              >
+                                <AlertTriangle className="h-3 w-3" /> Not cleared
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">{child.classroom}</p>
+                          {blocked && (
+                            <p className="text-[11px] text-amber-700/80 mt-0.5 truncate" title={clr!.blockers.map(b => b.label).join(" · ")}>
+                              {clr!.blockers.map(b => b.label).join(" · ")}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {(Object.entries(statusConfig) as [AttendanceStatus, typeof statusConfig[AttendanceStatus]][]).map(([key, cfg]) => {

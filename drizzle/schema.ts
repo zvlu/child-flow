@@ -163,7 +163,7 @@ export type InsertChild = typeof children.$inferInsert;
 export const childFlags = mysqlTable("child_flags", {
   id: int("id").autoincrement().primaryKey(),
   childId: int("childId").notNull().references(() => children.id),
-  type: mysqlEnum("type", ["allergy", "dietary", "disability", "special"]).notNull(),
+  type: mysqlEnum("type", ["allergy", "dietary", "disability", "special", "medication"]).notNull(),
   /** Short label shown on the chip, e.g. "Peanuts", "Vegetarian", "IEP". */
   label: varchar("label", { length: 100 }).notNull(),
   /** Optional detail for the child's profile (not shown on the chip). */
@@ -428,6 +428,14 @@ export const healthRecords = mysqlTable("health_records", {
   provider: varchar("provider", { length: 255 }),
   notes: text("notes"),
   recordedBy: int("recordedBy").references(() => staff.id),
+  // Only meaningful when status = "exempt" — most state OEC/child-care
+  // licensing rules require an exemption to name a *type* and, for
+  // medical exemptions, an expiry. A bare status:"exempt" with none of
+  // these was a real gap (see participationClearance.ts): it looked
+  // compliant but couldn't be verified as an actual valid exemption.
+  exemptionType: mysqlEnum("exemptionType", ["medical", "religious", "personal"]),
+  exemptionExpiresAt: timestamp("exemptionExpiresAt"),
+  exemptionDocumentId: int("exemptionDocumentId").references(() => documents.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -958,6 +966,15 @@ export const familyContactAddresses = mysqlTable("family_contact_addresses", {
   state: varchar("state", { length: 2 }),
   zipCode: varchar("zipCode", { length: 10 }),
   isPrimary: int("isPrimary").default(0),
+  // Licensing-relevant authorization flags — previously this was one
+  // undifferentiated contact list with no way to tell "may pick this
+  // child up" apart from "may consent to emergency medical treatment"
+  // apart from "just an informational contact." Both default to the
+  // pre-existing implicit behavior (any listed contact was treated as
+  // pickup-authorized; none were treated as medical-consent-authorized)
+  // so existing rows don't silently change meaning.
+  authorizedPickup: int("authorizedPickup").default(1),
+  authorizedEmergencyMedical: int("authorizedEmergencyMedical").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -1123,7 +1140,14 @@ export const digitalDocuments = mysqlTable("digitalDocuments", {
   id: int("id").autoincrement().primaryKey(),
   organizationId: int("organizationId").notNull().references(() => organizations.id),
   familyId: int("familyId").notNull().references(() => families.id),
-  documentType: mysqlEnum("documentType", ["enrollment", "consent", "waiver", "health_form", "iep"]).notNull(),
+  // Nullable: most digital documents (enrollment packets, general waivers)
+  // are family-wide. Emergency medical consent specifically needs to be
+  // tied to one child (a family with multiple enrolled children may
+  // authorize different treatment consents per child), so this lets a
+  // document optionally scope down from family-level to child-level
+  // without needing a second, parallel table.
+  childId: int("childId").references(() => children.id),
+  documentType: mysqlEnum("documentType", ["enrollment", "consent", "waiver", "health_form", "iep", "emergency_medical_consent"]).notNull(),
   documentUrl: varchar("documentUrl", { length: 512 }).notNull(),
   signatureUrl: varchar("signatureUrl", { length: 512 }),
   signedBy: varchar("signedBy", { length: 255 }),

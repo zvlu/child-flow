@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   ArrowLeft, Edit, Heart, Phone, Mail, MapPin,
   CheckCircle2, Users, Baby, ChevronRight, Plus,
-  User, Calendar, Home, FileText, ShieldCheck, MessageSquare, Loader2, AlertCircle, X
+  User, Calendar, Home, FileText, ShieldCheck, MessageSquare, Loader2, AlertCircle, AlertTriangle, X
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
@@ -66,6 +66,11 @@ export default function ChildDetail({ id }: ChildDetailProps) {
     { enabled: !isNaN(childId) }
   );
   const { data: allFlags } = trpc.children.flags.useQuery(ORGANIZATION_ID);
+  // "Cleared to attend" participation-blocking status (server/participationClearance.ts).
+  const { data: clearance } = trpc.health.clearance.useQuery(
+    { organizationId: ORGANIZATION_ID, childId },
+    { enabled: !isNaN(childId) }
+  ) as { data: { childId: number; cleared: boolean; blockers: { code: string; label: string }[] } | undefined };
   const childFlagList = (allFlags ?? []).filter((f: any) => f.childId === childId);
   const [showFlagDialog, setShowFlagDialog] = useState(false);
   const [flagType, setFlagType] = useState<"allergy" | "dietary" | "disability" | "special">("allergy");
@@ -350,6 +355,37 @@ export default function ChildDetail({ id }: ChildDetailProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* "Cleared to attend" participation status — informational-turned-actionable:
+          flags gaps (immunizations, exemptions, emergency contact/consent) that would
+          block participation, without blocking anything in this UI itself. */}
+      {clearance && (
+        clearance.cleared ? (
+          <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50/60 px-5 py-3 shadow-sm dark:bg-green-950/20">
+            <ShieldCheck className="h-5 w-5 shrink-0 text-green-600" />
+            <p className="text-sm font-semibold text-foreground">Cleared to attend — no participation-blocking items on file.</p>
+          </div>
+        ) : (
+          <div className="rounded-xl border-l-4 border-l-amber-500 bg-amber-50/60 px-5 py-4 shadow-sm dark:bg-amber-950/20">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground">Not cleared to attend</p>
+                <ul className="mt-2 space-y-1">
+                  {clearance.blockers.map((b) => (
+                    <li key={b.code} className="flex items-center gap-1.5 text-sm text-amber-900/80 dark:text-amber-200/80">
+                      <span className="h-1 w-1 shrink-0 rounded-full bg-amber-600" /> {b.label}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-amber-700/70 dark:text-amber-400/70">
+                  This does not block check-in or attendance — staff can still act in an emergency — but the gap(s) above should be resolved.
+                </p>
+              </div>
+            </div>
+          </div>
+        )
       )}
 
       {/* Edit Profile Dialog */}

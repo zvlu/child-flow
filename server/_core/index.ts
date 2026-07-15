@@ -28,6 +28,7 @@ import { registerPolicyCouncilRoutes } from "../policyCouncilRest";
 import { registerClassroomQualityRoutes } from "../classroomQualityRest";
 import { registerInKindRoutes } from "../inKindRest";
 import { registerBulkActionsRoutes } from "../bulkActionsRest";
+import { registerParticipationClearanceRoutes } from "../participationClearanceRest";
 import { UPLOADS_ROOT } from "../fileStorage";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -123,6 +124,8 @@ async function startServer() {
   registerInKindRoutes(app);
   // Bulk Action Center (iOS) under /api/bulk-actions/* — generic, not Head Start-gated
   registerBulkActionsRoutes(app);
+  // "Cleared to attend" participation-blocking status under /api/children/clearance, /api/children/:id/clearance
+  registerParticipationClearanceRoutes(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API

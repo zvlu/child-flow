@@ -125,7 +125,7 @@ struct ChildrenView: View {
     @ViewBuilder
     private func childRow(_ child: Child) -> some View {
         NavigationLink(destination: ChildDetailView(child: child)) {
-            ChildRow(child: child, showRoom: viewModel.grouping == .all)
+            ChildRow(child: child, showRoom: viewModel.grouping == .all, clearance: viewModel.clearanceMap[child.id])
         }
         .contextMenu {
             Menu {
@@ -224,6 +224,9 @@ struct FlagChipRow: View {
 struct ChildRow: View {
     let child: Child
     var showRoom: Bool = true
+    /// nil while clearance hasn't loaded, or if the org has no clearance
+    /// record for this child. Non-blocking — purely a visible warning.
+    var clearance: ChildClearanceStatus? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -250,6 +253,9 @@ struct ChildRow: View {
                 FlagChipRow(flags: child.flags).padding(.top, 1)
             }
             Spacer()
+            if let clearance, !clearance.cleared {
+                ClearanceWarningBadge(childName: child.fullName, blockers: clearance.blockers)
+            }
             HealthStatusBadge(status: child.healthStatus)
         }
         .padding(.vertical, 4)
@@ -488,6 +494,9 @@ class ChildrenViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var statusFilter: String? = nil
     @Published var isLoading = false
+    /// "Cleared to attend" status keyed by childId, org-wide — one request
+    /// instead of one per child. See ios/Sources/Networking/ParticipationClearance.swift.
+    @Published var clearanceMap: [String: ChildClearanceStatus] = [:]
 
     var isSearching: Bool { !searchText.isEmpty }
 
@@ -568,6 +577,10 @@ class ChildrenViewModel: ObservableObject {
             rebuildMockClassroomCounts()
             #endif
         }
+        // Supplementary, non-blocking data — a failure here shouldn't stop
+        // the roster from loading, so it's fetched independently and
+        // swallowed on error (the warning badges just won't show).
+        clearanceMap = (try? await APIClient.shared.getClearanceMap()) ?? clearanceMap
         isLoading = false
     }
 
