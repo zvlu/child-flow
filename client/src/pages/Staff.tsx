@@ -15,6 +15,7 @@ import { ORGANIZATION_ID } from "@/const";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/date";
+import { objectsToCsv, downloadCsv } from "@/lib/csv";
 
 /** §1302.91 staffing taxonomy — grouped roughly by service area. */
 const roleLabels: Record<string, string> = {
@@ -169,6 +170,19 @@ export default function Staff() {
 
   const certAlerts = (certifications ?? []).filter((c) => c.status !== "active").length;
 
+  const exportCsv = () => {
+    if (!filtered.length) { toast.message("No staff to export yet."); return; }
+    const rows = filtered.map((s) => ({
+      name: `${s.firstName} ${s.lastName}`,
+      role: roleLabels[s.role ?? "teacher"] ?? s.role ?? "",
+      email: s.email ?? "",
+      phone: s.phone ?? "",
+      classroom: classroomByStaffName.get(`${s.firstName} ${s.lastName}`) ?? "",
+    }));
+    downloadCsv(`staff-${new Date().toISOString().slice(0, 10)}.csv`, objectsToCsv(rows));
+    toast.success(`Exported ${rows.length} staff member${rows.length === 1 ? "" : "s"} to CSV`);
+  };
+
   const openEdit = (member: (typeof staffList)[number]) => {
     setForm({
       firstName: member.firstName ?? "",
@@ -253,7 +267,7 @@ export default function Staff() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />Export</Button>
+          <Button variant="outline" size="sm" className="gap-2" onClick={exportCsv}><Download className="h-4 w-4" />Export</Button>
           {isAdmin && (
             <Button size="sm" className="gap-2" onClick={() => { setForm(emptyForm); setAddOpen(true); }}>
               <Plus className="h-4 w-4" />Add Staff

@@ -1737,3 +1737,103 @@ export const familyEngagementEvents = mysqlTable("family_engagement_events", {
 
 export type FamilyEngagementEventRow = typeof familyEngagementEvents.$inferSelect;
 export type InsertFamilyEngagementEvent = typeof familyEngagementEvents.$inferInsert;
+
+/**
+ * Per-session staff training-hour logs — backs the iOS Staff screen's "Log
+ * Training Hours" action, which previously only mutated local state (no
+ * concept of tracked training existed anywhere; `staff.trainingHours` was a
+ * hardcoded 0 placeholder, see server/staffDirectory.ts).
+ */
+export const staffTrainingLogs = mysqlTable("staff_training_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  staffId: int("staffId").notNull().references(() => staff.id),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  trainingName: varchar("trainingName", { length: 255 }).notNull(),
+  hours: decimal("hours", { precision: 5, scale: 2 }).notNull(),
+  trainingDate: timestamp("trainingDate").notNull(),
+  notes: text("notes"),
+  recordedBy: int("recordedBy").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type StaffTrainingLog = typeof staffTrainingLogs.$inferSelect;
+export type InsertStaffTrainingLog = typeof staffTrainingLogs.$inferInsert;
+
+/**
+ * Generic program-monitoring checklist — shared backing for both the web
+ * Compliance page's "Program Monitoring Checklist" (client/src/pages/
+ * Compliance.tsx, previously local-state-only per its own code comment) and
+ * the iOS Compliance screen's MonitoringChecklistView (previously hardcoded
+ * @State, no persistence at all). `itemKey` is a stable slug for a
+ * well-known checklist item (e.g. "fire_drill_log") so both platforms can
+ * upsert by (organizationId, itemKey) rather than needing a shared ID
+ * scheme; label/category travel with the row so the item is
+ * self-describing without a second lookup table.
+ */
+export const complianceChecklistItems = mysqlTable("compliance_checklist_items", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  itemKey: varchar("itemKey", { length: 100 }).notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  category: varchar("category", { length: 100 }),
+  isCompliant: int("isCompliant").default(0),
+  note: text("note"),
+  reviewedBy: int("reviewedBy").references(() => staff.id),
+  reviewedAt: timestamp("reviewedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  orgItem: unique("compliance_checklist_items_org_item").on(t.organizationId, t.itemKey),
+}));
+
+export type ComplianceChecklistItem = typeof complianceChecklistItems.$inferSelect;
+export type InsertComplianceChecklistItem = typeof complianceChecklistItems.$inferInsert;
+
+/**
+ * Program "Story" feed (iOS Sources/Story/ProgramStoryView.swift) — a
+ * classroom-facing update/photo feed for families. Previously entirely
+ * mocked client-side (four hardcoded fixtures reloaded on every launch,
+ * "Post"/"Like"/"Comment" all local-array-only). Minimal real schema: one
+ * post table plus two child tables for likes/comments, org- and
+ * (optionally) classroom-scoped.
+ */
+export const storyPosts = mysqlTable("story_posts", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  classroomId: int("classroomId").references(() => classrooms.id),
+  authorStaffId: int("authorStaffId").references(() => staff.id),
+  content: text("content").notNull(),
+  photoUrl: varchar("photoUrl", { length: 512 }),
+  /** Who can see the post — the iOS composer's audience picker. */
+  audience: mysqlEnum("audience", ["all_families", "my_families", "staff_only"]).default("all_families"),
+  /** Child ids tagged in the post, if any (the composer's "tag children" step). */
+  taggedChildIds: json("taggedChildIds").$type<number[]>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type StoryPost = typeof storyPosts.$inferSelect;
+export type InsertStoryPost = typeof storyPosts.$inferInsert;
+
+export const storyPostLikes = mysqlTable("story_post_likes", {
+  id: int("id").autoincrement().primaryKey(),
+  postId: int("postId").notNull().references(() => storyPosts.id),
+  familyId: int("familyId").references(() => families.id),
+  staffId: int("staffId").references(() => staff.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type StoryPostLike = typeof storyPostLikes.$inferSelect;
+export type InsertStoryPostLike = typeof storyPostLikes.$inferInsert;
+
+export const storyPostComments = mysqlTable("story_post_comments", {
+  id: int("id").autoincrement().primaryKey(),
+  postId: int("postId").notNull().references(() => storyPosts.id),
+  authorName: varchar("authorName", { length: 255 }).notNull(),
+  familyId: int("familyId").references(() => families.id),
+  staffId: int("staffId").references(() => staff.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type StoryPostComment = typeof storyPostComments.$inferSelect;
+export type InsertStoryPostComment = typeof storyPostComments.$inferInsert;

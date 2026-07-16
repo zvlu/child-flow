@@ -1002,38 +1002,137 @@ private struct ConfidenceLegendChip: View {
     }
 }
 
-// MARK: - Program monitoring checklist (program-level compliance, mock parity with web)
+// MARK: - Program monitoring checklist
+//
+// Backed by server/complianceChecklistRest.ts (GET /api/compliance/checklist,
+// POST /api/compliance/checklist/:itemKey/reviewed) — the same backend the
+// web Compliance page's "Program Monitoring Checklist" tab uses. Items start
+// unreviewed; there's no server-side way to un-review an item, so once an
+// item is marked compliant its toggle locks on.
+
+@MainActor
+final class MonitoringChecklistViewModel: ObservableObject {
+    @Published var items: [ComplianceChecklistEntry] = []
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    @Published var savingKeys: Set<String> = []
+    @Published var noteDrafts: [String: String] = [:]
+
+    func load() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            items = try await APIClient.shared.getComplianceChecklist()
+            errorMessage = nil
+        } catch {
+            errorMessage = (error as? APIError)?.errorDescription ?? "Couldn't load the monitoring checklist."
+        }
+    }
+
+    func noteBinding(for item: ComplianceChecklistEntry) -> Binding<String> {
+        Binding(
+            get: { self.noteDrafts[item.itemKey] ?? item.note ?? "" },
+            set: { self.noteDrafts[item.itemKey] = $0 }
+        )
+    }
+
+    func markReviewed(_ item: ComplianceChecklistEntry) async {
+        guard !item.isCompliant, !savingKeys.contains(item.itemKey) else { return }
+        savingKeys.insert(item.itemKey)
+        defer { savingKeys.remove(item.itemKey) }
+        let trimmedNote = (noteDrafts[item.itemKey] ?? item.note ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            try await APIClient.shared.markComplianceChecklistItemReviewed(
+                itemKey: item.itemKey,
+                note: trimmedNote.isEmpty ? nil : trimmedNote
+            )
+            await load()
+        } catch {
+            errorMessage = (error as? APIError)?.errorDescription ?? "Couldn't mark that item as reviewed."
+        }
+    }
+}
 
 struct MonitoringChecklistView: View {
-    @State private var items: [ComplianceChecklistItem] = [
-        ComplianceChecklistItem(id: "c1", title: "Child-to-staff ratios maintained", isCompliant: true, note: "All classrooms within required ratios"),
-        ComplianceChecklistItem(id: "c2", title: "Health & safety checks", isCompliant: true, note: "Monthly safety inspections completed"),
-        ComplianceChecklistItem(id: "c3", title: "Fiscal management", isCompliant: true, note: "Budget on track, no findings"),
-        ComplianceChecklistItem(id: "c4", title: "Program governance", isCompliant: true, note: "Policy council meetings held monthly"),
-        ComplianceChecklistItem(id: "c5", title: "Transportation safety", isCompliant: false, note: "2 buses due for safety inspection"),
-        ComplianceChecklistItem(id: "c6", title: "Food service (CACFP)", isCompliant: true, note: "Records up to date"),
-    ]
+    @StateObject private var vm = MonitoringChecklistViewModel()
 
     var body: some View {
         List {
-            Section("Program Monitoring") {
-                ForEach($items) { $item in
-                    HStack(spacing: 12) {
-                        Image(systemName: item.isCompliant ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                            .foregroundColor(item.isCompliant ? .cfAttendance : .cfHealth)
-                            .font(.system(size: 18))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.title).font(.cfSubheadline).foregroundColor(.cfTextPrimary)
-                            if let note = item.note {
-                                Text(note).font(.cfCaption).foregroundColor(.cfTextSecondary)
-                            }
-                        }
-                        Spacer()
-                        Toggle("", isOn: $item.isCompliant).labelsHidden().tint(.cfPrimary)
+            if let errorMessage = vm.errorMessage {
+                Section {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.cfError)
+                        Text(errorMessage)
+                            .font(.cfSubheadline)
+                            .foregroundColor(.cfTextPrimary)
                     }
-                    .padding(.vertical, 2)
+                    .padding(.vertical, 4)
+                }
+            }
+            Section("Program Monitoring") {
+                if vm.isLoading && vm.items.isEmpty {
+                    ProgressView()
+                } else if vm.items.isEmpty {
+                    Text("No checklist items found.")
+                        .font(.cfCaption)
+                        .foregroundColor(.cfTextSecondary)
+                } else {
+                    ForEach(vm.items) { item in
+                        MonitoringChecklistRow(
+                            item: item,
+                            noteBinding: vm.noteBinding(for: item),
+                            isSaving: vm.savingKeys.contains(item.itemKey),
+                            onMarkReviewed: { Task { await vm.markReviewed(item) } }
+                        )
+                    }
                 }
             }
         }
+        .task { await vm.load() }
+        .refreshable { await vm.load() }
+    }
+}
+
+private struct MonitoringChecklistRow: View {
+    let item: ComplianceChecklistEntry
+    var noteBinding: Binding<String>
+    let isSaving: Bool
+    let onMarkReviewed: () -> Void
+
+    private var reviewedText: String {
+        guard let reviewedAt = item.reviewedAt else { return "Never reviewed" }
+        return "Reviewed \(reviewedAt.formatted(date: .abbreviated, time: .shortened))"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 12) {
+                Image(systemName: item.isCompliant ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                    .foregroundColor(item.isCompliant ? .cfAttendance : .cfHealth)
+                    .font(.system(size: 18))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.label).font(.cfSubheadline).foregroundColor(.cfTextPrimary)
+                    Text(reviewedText).font(.cfCaption).foregroundColor(.cfTextSecondary)
+                }
+                Spacer()
+                if isSaving {
+                    ProgressView().scaleEffect(0.8)
+                } else {
+                    Toggle("", isOn: Binding(
+                        get: { item.isCompliant },
+                        set: { newValue in if newValue { onMarkReviewed() } }
+                    ))
+                    .labelsHidden()
+                    .tint(.cfPrimary)
+                    .disabled(item.isCompliant)
+                }
+            }
+            TextField("Add a note (optional)", text: noteBinding, axis: .vertical)
+                .font(.cfCaption)
+                .foregroundColor(.cfTextPrimary)
+                .disabled(item.isCompliant || isSaving)
+        }
+        .padding(.vertical, 4)
     }
 }

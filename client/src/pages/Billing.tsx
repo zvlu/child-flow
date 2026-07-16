@@ -6,6 +6,7 @@ import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { TuitionPlans, ArAgingCards } from "@/components/TuitionPlans";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/date";
+import { objectsToCsv, downloadCsv } from "@/lib/csv";
 
 const statusColors = {
   paid: "bg-green-100 text-green-700",
@@ -120,6 +121,30 @@ export function Billing() {
   const invoiceNumberById = (id: number) =>
     allInvoices.find((i) => i.id === id)?.invoiceNumber || `#${id}`;
 
+  // View / Download per-invoice — everything here comes from the invoices +
+  // payments queries already loaded on this page; no new data is invented.
+  const [viewInvoiceId, setViewInvoiceId] = useState<number | null>(null);
+  const viewInvoice = allInvoices.find((i) => i.id === viewInvoiceId) ?? null;
+  const viewInvoicePayments = (payments ?? []).filter((p) => p.invoiceId === viewInvoiceId);
+
+  const downloadInvoice = (invoice: (typeof allInvoices)[number]) => {
+    const relatedPayments = (payments ?? []).filter((p) => p.invoiceId === invoice.id);
+    const rows = [
+      {
+        invoiceNumber: invoice.invoiceNumber,
+        family: invoice.familyName || "",
+        amount: formatMoney(invoice.amount),
+        dueDate: formatDate(invoice.dueDate),
+        status: invoice.status,
+        description: invoice.description || "",
+        paymentsRecorded: relatedPayments.length,
+        totalPaid: formatMoney(relatedPayments.reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0)),
+      },
+    ];
+    downloadCsv(`invoice-${invoice.invoiceNumber}-${new Date().toISOString().slice(0, 10)}.csv`, objectsToCsv(rows));
+    toast.success(`Downloaded ${invoice.invoiceNumber}`);
+  };
+
   return (
     <div className="p-6">
       <div className="max-w-6xl mx-auto">
@@ -221,7 +246,11 @@ export function Billing() {
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex items-center gap-2">
-                        <button title={invoice.description || "View invoice"} className="p-2 hover:bg-muted rounded-lg transition-colors"><Eye className="w-4 h-4 text-muted-foreground" /></button>
+                        <button
+                          title={invoice.description || "View invoice"}
+                          onClick={() => setViewInvoiceId(invoice.id)}
+                          className="p-2 hover:bg-muted rounded-lg transition-colors"
+                        ><Eye className="w-4 h-4 text-muted-foreground" /></button>
                         {isAdmin && invoice.status !== "paid" && invoice.status !== "cancelled" && (
                           <button
                             title="Record payment"
@@ -231,7 +260,11 @@ export function Billing() {
                             <CreditCard className="w-4 h-4 text-primary" />
                           </button>
                         )}
-                        <button title="Download" className="p-2 hover:bg-muted rounded-lg transition-colors"><Download className="w-4 h-4 text-muted-foreground" /></button>
+                        <button
+                          title="Download"
+                          onClick={() => downloadInvoice(invoice)}
+                          className="p-2 hover:bg-muted rounded-lg transition-colors"
+                        ><Download className="w-4 h-4 text-muted-foreground" /></button>
                       </div>
                     </td>
                   </tr>
@@ -326,6 +359,52 @@ export function Billing() {
                     {createInvoice.isPending ? "Creating..." : "Create Invoice"}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* View Invoice Modal */}
+        {viewInvoice && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-card rounded-xl shadow-lg max-w-lg w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-foreground">{viewInvoice.invoiceNumber}</h2>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColors[viewInvoice.status as keyof typeof statusColors] || "bg-gray-100 text-gray-700"}`}>
+                  {viewInvoice.status.charAt(0).toUpperCase() + viewInvoice.status.slice(1)}
+                </span>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Family</span><span className="font-medium text-foreground">{viewInvoice.familyName || "—"}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Amount</span><span className="font-semibold text-foreground">{formatMoney(viewInvoice.amount)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Due Date</span><span className="text-foreground">{formatDate(viewInvoice.dueDate)}</span></div>
+                {viewInvoice.description && (
+                  <div>
+                    <p className="text-muted-foreground mb-1">Line item</p>
+                    <p className="text-foreground bg-muted rounded-lg px-3 py-2">{viewInvoice.description}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-muted-foreground mb-1">Payments recorded</p>
+                  {viewInvoicePayments.length === 0 ? (
+                    <p className="text-muted-foreground text-xs">No payments recorded against this invoice yet.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {viewInvoicePayments.map((p) => (
+                        <div key={p.id} className="flex justify-between bg-muted rounded-lg px-3 py-2">
+                          <span>{paymentMethodLabels[p.paymentMethod] || p.paymentMethod} &bull; {formatDate(p.transactionDate)}</span>
+                          <span className="font-medium">{formatMoney(p.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-3 pt-6">
+                <button onClick={() => downloadInvoice(viewInvoice)} className="flex-1 bg-muted hover:bg-muted text-muted-foreground px-4 py-2 rounded-xl transition-colors font-medium flex items-center justify-center gap-2">
+                  <Download className="w-4 h-4" /> Download
+                </button>
+                <button onClick={() => setViewInvoiceId(null)} className="flex-1 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl transition-colors font-medium">Close</button>
               </div>
             </div>
           </div>

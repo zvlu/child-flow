@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,9 +17,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
+
+/** Recent PIR-style program years, current first (year starts in the fall).
+ * Same convention as PirReportEditor's recentProgramYears — kept local here
+ * since this panel's year selector is purely a display label, not a query
+ * param (none of this panel's data is year-scoped). */
+function recentProgramYears(): string[] {
+  const now = new Date();
+  const startYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  return [0, 1, 2, 3].map((o) => {
+    const y = startYear - o;
+    return `${y}-${y + 1}`;
+  });
+}
 
 const donutData = (completed: number, total: number, color: string) => [
   { name: "Completed", value: completed, color: color },
@@ -105,9 +122,12 @@ const DonutChart = ({ completed, total, color, label, subLabel }: { completed: n
 };
 
 export default function PerformancePanel() {
-  const handleAction = (action: string) => {
-    toast.success(`${action} initiated`);
-  };
+  const [programYear, setProgramYear] = useState(() => recentProgramYears()[0]);
+  const [yearDialogOpen, setYearDialogOpen] = useState(false);
+  const [pendingYear, setPendingYear] = useState(programYear);
+  const [refreshedAt, setRefreshedAt] = useState(() =>
+    new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+  );
 
   // Stable 30-day window so query keys do not churn on re-render.
   const { rangeStart, rangeEnd } = useMemo(() => {
@@ -119,16 +139,50 @@ export default function PerformancePanel() {
     return { rangeStart: start, rangeEnd: end };
   }, []);
 
-  const { data: classrooms, isLoading: classroomsLoading } = trpc.classrooms.list.useQuery(ORGANIZATION_ID);
-  const { data: children, isLoading: childrenLoading } = trpc.children.list.useQuery(ORGANIZATION_ID);
-  const { data: attendanceRows, isLoading: attendanceLoading } = trpc.attendance.getRange.useQuery({
+  const {
+    data: classrooms, isLoading: classroomsLoading, refetch: refetchClassrooms,
+  } = trpc.classrooms.list.useQuery(ORGANIZATION_ID);
+  const {
+    data: children, isLoading: childrenLoading, refetch: refetchChildren,
+  } = trpc.children.list.useQuery(ORGANIZATION_ID);
+  const {
+    data: attendanceRows, isLoading: attendanceLoading, refetch: refetchAttendance,
+  } = trpc.attendance.getRange.useQuery({
     organizationId: ORGANIZATION_ID,
     start: rangeStart,
     end: rangeEnd,
   });
-  const { data: healthRecords, isLoading: healthLoading } = trpc.health.list.useQuery({
+  const {
+    data: healthRecords, isLoading: healthLoading, refetch: refetchHealth,
+  } = trpc.health.list.useQuery({
     organizationId: ORGANIZATION_ID,
   });
+
+  const handleRefresh = async () => {
+    try {
+      await Promise.all([
+        refetchClassrooms(),
+        refetchChildren(),
+        refetchAttendance(),
+        refetchHealth(),
+      ]);
+      setRefreshedAt(new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
+      toast.success("Panel data refreshed");
+    } catch {
+      toast.error("Refresh failed — please try again");
+    }
+  };
+
+  const openYearDialog = () => {
+    setPendingYear(programYear);
+    setYearDialogOpen(true);
+  };
+
+  const applyProgramYear = () => {
+    setProgramYear(pendingYear);
+    setYearDialogOpen(false);
+    toast.success(`Switched to program year ${pendingYear}`);
+  };
 
   // ---- Enrollment ----
   const totalCapacity = useMemo(
@@ -210,11 +264,6 @@ export default function PerformancePanel() {
       .map(([type, { total, ok }]) => ({ type, label: formatTypeLabel(type), total, ok }));
   }, [healthRecords]);
 
-  const refreshedAt = useMemo(
-    () => new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-    []
-  );
-
   return (
     <div className="h-full flex flex-col bg-[#FBF6EE] overflow-hidden">
       {/* Header */}
@@ -232,7 +281,7 @@ export default function PerformancePanel() {
         </div>
         <div className="flex items-center gap-6 text-[11px] text-muted-foreground">
           <div className="text-right">
-            <p className="font-bold text-foreground">2025 - 2026</p>
+            <p className="font-bold text-foreground">{programYear.replace("-", " - ")}</p>
             <p className="font-medium text-muted-foreground">Refreshed Today • {refreshedAt}</p>
           </div>
 
@@ -245,24 +294,60 @@ export default function PerformancePanel() {
             <DropdownMenuContent align="end" className="w-56 rounded-xl">
               <DropdownMenuLabel>Panel Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleAction("Refresh Data")}>
+              <DropdownMenuItem onClick={handleRefresh}>
                 <RefreshCw className="mr-2 h-4 w-4" /> Refresh Data
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAction("Change Program Year")}>
+              <DropdownMenuItem onClick={openYearDialog}>
                 <CalendarDays className="mr-2 h-4 w-4" /> Change Program Year
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuLabel>Export Options</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleAction("Export to PDF")}>
-                <FileText className="mr-2 h-4 w-4" /> Export as PDF
+              <DropdownMenuItem
+                disabled
+                className="opacity-60 cursor-not-allowed"
+                title="Coming soon"
+                onClick={() => toast.info("PDF export coming soon")}
+              >
+                <FileText className="mr-2 h-4 w-4" /> Export as PDF <span className="font-normal opacity-75">(soon)</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAction("Export to Excel")}>
-                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as Excel
+              <DropdownMenuItem
+                disabled
+                className="opacity-60 cursor-not-allowed"
+                title="Coming soon"
+                onClick={() => toast.info("Excel export coming soon")}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as Excel <span className="font-normal opacity-75">(soon)</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Change Program Year dialog */}
+      <Dialog open={yearDialogOpen} onOpenChange={setYearDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Change Program Year</DialogTitle>
+            <DialogDescription>
+              Choose which program year this panel's header reflects.
+            </DialogDescription>
+          </DialogHeader>
+          <Select value={pendingYear} onValueChange={setPendingYear}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {recentProgramYears().map((y) => (
+                <SelectItem key={y} value={y}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setYearDialogOpen(false)}>Cancel</Button>
+            <Button onClick={applyProgramYear}>Apply</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Main Grid */}
       <div className="flex-1 overflow-y-auto p-6">

@@ -352,12 +352,11 @@ class VerificationViewModel: ObservableObject {
             do {
                 _ = try await APIClient.shared.saveVerification(verification: verification)
             } catch {
-                // NOTE: there is currently no backend route for
-                // /api/enrollment/verifications — this call always fails.
-                // Surfacing the error (instead of swallowing it) at least stops
-                // the checklist from silently lying about being saved; the
-                // underlying feature still needs a real server-side endpoint.
-                errorMessage = "This checklist isn't connected to the server yet — changes aren't saved."
+                // POST /api/enrollment/verifications/:id is implemented and working
+                // (see server/enrollmentVerificationsRest.ts) — a failure here is a
+                // genuine network/auth/server error, not a missing route. Surface it
+                // instead of silently pretending the checklist saved.
+                errorMessage = "Couldn't save checklist changes: \((error as? LocalizedError)?.errorDescription ?? "please try again.")"
             }
         }
     }

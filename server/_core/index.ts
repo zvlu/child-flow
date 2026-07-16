@@ -29,6 +29,8 @@ import { registerClassroomQualityRoutes } from "../classroomQualityRest";
 import { registerInKindRoutes } from "../inKindRest";
 import { registerBulkActionsRoutes } from "../bulkActionsRest";
 import { registerParticipationClearanceRoutes } from "../participationClearanceRest";
+import { registerComplianceChecklistRoutes } from "../complianceChecklistRest";
+import { registerStoryRoutes } from "../storyRest";
 import { UPLOADS_ROOT } from "../fileStorage";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -126,6 +128,10 @@ async function startServer() {
   registerBulkActionsRoutes(app);
   // "Cleared to attend" participation-blocking status under /api/children/clearance, /api/children/:id/clearance
   registerParticipationClearanceRoutes(app);
+  // Program-monitoring checklist (iOS Compliance screen) under /api/compliance/checklist
+  registerComplianceChecklistRoutes(app);
+  // Program "Story" feed (iOS) under /api/story/*
+  registerStoryRoutes(app);
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API

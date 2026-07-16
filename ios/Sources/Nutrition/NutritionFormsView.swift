@@ -154,10 +154,13 @@ struct NutritionalPreferenceFormSheet: View {
     let onSave: (NutritionalPreferenceForm) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @State private var childName = ""
+    @State private var children: [Child] = []
+    @State private var childId = ""
     @State private var classroom = ""
     @State private var parentName = ""
     @State private var notes = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
     @State private var preferences: [(group: String, item: String, preference: FoodPreferenceEntry.FoodPreference)] = {
         let foods: [(String, String)] = [
             ("Fruits", "Apples"), ("Fruits", "Bananas"), ("Fruits", "Oranges"),
@@ -169,11 +172,20 @@ struct NutritionalPreferenceFormSheet: View {
         return foods.map { (group: $0.0, item: $0.1, preference: .likes) }
     }()
 
+    private var selectedChildName: String {
+        children.first { $0.id == childId }.map { "\($0.firstName) \($0.lastName)" } ?? ""
+    }
+
     var body: some View {
         NavigationStack {
             Form {
                 Section("Child Information") {
-                    TextField("Child Name", text: $childName)
+                    Picker("Child", selection: $childId) {
+                        Text("Select a child…").tag("")
+                        ForEach(children) { c in
+                            Text("\(c.firstName) \(c.lastName)").tag(c.id)
+                        }
+                    }
                     TextField("Classroom", text: $classroom)
                     TextField("Parent/Guardian Name", text: $parentName)
                 }
@@ -201,9 +213,19 @@ struct NutritionalPreferenceFormSheet: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
-                        .disabled(childName.isEmpty)
+                    Button("Save") { Task { await save() } }
+                        .disabled(childId.isEmpty || isSaving)
                 }
+            }
+            .task { await loadChildren() }
+            .overlay { if isSaving { ProgressView() } }
+            .alert("Couldn't Save Form", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("OK") { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "")
             }
         }
     }
@@ -224,21 +246,41 @@ struct NutritionalPreferenceFormSheet: View {
         }
     }
 
-    private func save() {
-        let form = NutritionalPreferenceForm(
-            id: UUID().uuidString,
-            childId: UUID().uuidString,
-            childName: childName,
-            classroom: classroom,
-            completedDate: Date(),
-            parentName: parentName,
-            preferences: preferences.map { p in
-                FoodPreferenceEntry(id: UUID().uuidString, foodGroup: p.group, item: p.item, preference: p.preference)
-            },
-            notes: notes
-        )
-        onSave(form)
-        dismiss()
+    private func loadChildren() async {
+        children = (try? await APIClient.shared.getChildren()) ?? []
+    }
+
+    private func save() async {
+        isSaving = true
+        defer { isSaving = false }
+        let completedDate = Date()
+        let entries = preferences.map { p in
+            FoodPreferenceEntry(id: UUID().uuidString, foodGroup: p.group, item: p.item, preference: p.preference)
+        }
+        do {
+            try await APIClient.shared.createNutritionPreferenceForm(
+                childId: childId,
+                classroom: classroom.isEmpty ? nil : classroom,
+                completedDate: completedDate,
+                parentName: parentName.isEmpty ? nil : parentName,
+                preferences: entries,
+                notes: notes.isEmpty ? nil : notes
+            )
+            let form = NutritionalPreferenceForm(
+                id: UUID().uuidString,
+                childId: childId,
+                childName: selectedChildName,
+                classroom: classroom,
+                completedDate: completedDate,
+                parentName: parentName,
+                preferences: entries,
+                notes: notes
+            )
+            onSave(form)
+            dismiss()
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Couldn't save this form. Check your connection and try again."
+        }
     }
 }
 
@@ -348,7 +390,8 @@ struct InfantFormulaFormSheet: View {
     let onSave: (CACFPInfantFormulaForm) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @State private var childName = ""
+    @State private var children: [Child] = []
+    @State private var childId = ""
     @State private var classroom = ""
     @State private var parentName = ""
     @State private var formulaBrand = ""
@@ -356,12 +399,23 @@ struct InfantFormulaFormSheet: View {
     @State private var preparationInstructions = ""
     @State private var feedingSchedule = ""
     @State private var notes = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private var selectedChildName: String {
+        children.first { $0.id == childId }.map { "\($0.firstName) \($0.lastName)" } ?? ""
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Child Information") {
-                    TextField("Child Name", text: $childName)
+                    Picker("Child", selection: $childId) {
+                        Text("Select a child…").tag("")
+                        ForEach(children) { c in
+                            Text("\(c.firstName) \(c.lastName)").tag(c.id)
+                        }
+                    }
                     TextField("Classroom", text: $classroom)
                     TextField("Parent/Guardian Name", text: $parentName)
                 }
@@ -402,23 +456,56 @@ struct InfantFormulaFormSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }.disabled(childName.isEmpty || formulaBrand.isEmpty)
+                    Button("Save") { Task { await save() } }
+                        .disabled(childId.isEmpty || formulaBrand.isEmpty || isSaving)
                 }
+            }
+            .task { await loadChildren() }
+            .overlay { if isSaving { ProgressView() } }
+            .alert("Couldn't Save Form", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("OK") { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "")
             }
         }
     }
 
-    private func save() {
-        let form = CACFPInfantFormulaForm(
-            id: UUID().uuidString, childId: UUID().uuidString,
-            childName: childName, classroom: classroom,
-            completedDate: Date(), parentName: parentName,
-            formulaBrand: formulaBrand, formulaType: formulaType,
-            preparationInstructions: preparationInstructions,
-            feedingSchedule: feedingSchedule, notes: notes
-        )
-        onSave(form)
-        dismiss()
+    private func loadChildren() async {
+        children = (try? await APIClient.shared.getChildren()) ?? []
+    }
+
+    private func save() async {
+        isSaving = true
+        defer { isSaving = false }
+        let completedDate = Date()
+        do {
+            try await APIClient.shared.createInfantFormulaForm(
+                childId: childId,
+                classroom: classroom.isEmpty ? nil : classroom,
+                completedDate: completedDate,
+                parentName: parentName.isEmpty ? nil : parentName,
+                formulaBrand: formulaBrand.isEmpty ? nil : formulaBrand,
+                formulaType: formulaType.isEmpty ? nil : formulaType,
+                preparationInstructions: preparationInstructions.isEmpty ? nil : preparationInstructions,
+                feedingSchedule: feedingSchedule.isEmpty ? nil : feedingSchedule,
+                notes: notes.isEmpty ? nil : notes
+            )
+            let form = CACFPInfantFormulaForm(
+                id: UUID().uuidString, childId: childId,
+                childName: selectedChildName, classroom: classroom,
+                completedDate: completedDate, parentName: parentName,
+                formulaBrand: formulaBrand, formulaType: formulaType,
+                preparationInstructions: preparationInstructions,
+                feedingSchedule: feedingSchedule, notes: notes
+            )
+            onSave(form)
+            dismiss()
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Couldn't save this form. Check your connection and try again."
+        }
     }
 }
 
@@ -539,7 +626,8 @@ struct MedicalStatementFormSheet: View {
     let onSave: (MedicalStatementCACFP) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @State private var childName = ""
+    @State private var children: [Child] = []
+    @State private var childId = ""
     @State private var classroom = ""
     @State private var physicianName = ""
     @State private var physicianPhone = ""
@@ -548,12 +636,23 @@ struct MedicalStatementFormSheet: View {
     @State private var substitutions = ""
     @State private var signedDate = Date()
     @State private var notes = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private var selectedChildName: String {
+        children.first { $0.id == childId }.map { "\($0.firstName) \($0.lastName)" } ?? ""
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Child Information") {
-                    TextField("Child Name", text: $childName)
+                    Picker("Child", selection: $childId) {
+                        Text("Select a child…").tag("")
+                        ForEach(children) { c in
+                            Text("\(c.firstName) \(c.lastName)").tag(c.id)
+                        }
+                    }
                     TextField("Classroom", text: $classroom)
                 }
                 Section("Physician") {
@@ -591,25 +690,57 @@ struct MedicalStatementFormSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
-                        .disabled(childName.isEmpty || physicianName.isEmpty || diagnosis.isEmpty)
+                    Button("Save") { Task { await save() } }
+                        .disabled(childId.isEmpty || physicianName.isEmpty || diagnosis.isEmpty || isSaving)
                 }
+            }
+            .task { await loadChildren() }
+            .overlay { if isSaving { ProgressView() } }
+            .alert("Couldn't Save Statement", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("OK") { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "")
             }
         }
     }
 
-    private func save() {
-        let form = MedicalStatementCACFP(
-            id: UUID().uuidString, childId: UUID().uuidString,
-            childName: childName, classroom: classroom,
-            physicianName: physicianName, physicianPhone: physicianPhone,
-            diagnosis: diagnosis,
-            foodsToAvoid: foodsToAvoid.filter { !$0.isEmpty },
-            substitutions: substitutions,
-            signedDate: signedDate, notes: notes
-        )
-        onSave(form)
-        dismiss()
+    private func loadChildren() async {
+        children = (try? await APIClient.shared.getChildren()) ?? []
+    }
+
+    private func save() async {
+        isSaving = true
+        defer { isSaving = false }
+        let foodsList = foodsToAvoid.filter { !$0.isEmpty }
+        do {
+            try await APIClient.shared.createMedicalStatement(
+                childId: childId,
+                classroom: classroom.isEmpty ? nil : classroom,
+                physicianName: physicianName.isEmpty ? nil : physicianName,
+                physicianPhone: physicianPhone.isEmpty ? nil : physicianPhone,
+                diagnosis: diagnosis.isEmpty ? nil : diagnosis,
+                foodsToAvoid: foodsList,
+                substitutions: substitutions.isEmpty ? nil : substitutions,
+                signedDate: signedDate,
+                notes: notes.isEmpty ? nil : notes
+            )
+            let form = MedicalStatementCACFP(
+                id: UUID().uuidString, childId: childId,
+                childName: selectedChildName, classroom: classroom,
+                physicianName: physicianName, physicianPhone: physicianPhone,
+                diagnosis: diagnosis,
+                foodsToAvoid: foodsList,
+                substitutions: substitutions,
+                signedDate: signedDate, notes: notes
+            )
+            onSave(form)
+            dismiss()
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Couldn't save this statement. Check your connection and try again."
+        }
     }
 }
 

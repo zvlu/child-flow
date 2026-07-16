@@ -63,6 +63,13 @@ export default function Health() {
     const s = new URLSearchParams(search0).get("status") ?? "all";
     return VALID_HEALTH_FILTERS.includes(s) ? s : "all";
   })();
+  // Deep-link support: /health?child=<id> (from HealthDeadlines' "Records"
+  // button) pre-selects that one child instead of showing everyone.
+  const childParam = (() => {
+    const raw = new URLSearchParams(search0).get("child");
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) ? n : null;
+  })();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState(initialFilter);
   const [addOpen, setAddOpen] = useState(false);
@@ -170,6 +177,7 @@ export default function Health() {
   const hasDueSoon = (r: (typeof rows)[number]) => rowStatuses(r).includes("due_soon");
 
   const filtered = rows.filter(r => {
+    if (childParam != null) return r.id === childParam;
     const matchSearch = r.name.toLowerCase().includes(search.toLowerCase());
     const matchFilter = filter === "all" ||
       (filter === "overdue" && hasOverdue(r)) ||

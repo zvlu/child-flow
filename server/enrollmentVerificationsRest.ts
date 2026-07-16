@@ -2,8 +2,9 @@ import { and, desc, eq } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
 import { applicationVerifications } from "../drizzle/schema";
 import { sdk } from "./_core/sdk";
-import { getDb } from "./db";
-import { getEnrollmentApplications } from "./moduleDb";
+import { clientIpFromReq } from "./_core/audit";
+import { getDb, getOrganizationUsage, insertAuditLog } from "./db";
+import { getEnrollmentApplications, updateEnrollmentApplication, enrollApplication } from "./moduleDb";
 
 // Real DB enum values -> the display strings the iOS EnrollmentApplication
 // model expects (used for filtering/badges). "reviewing" maps to "Under
@@ -83,6 +84,75 @@ export function registerEnrollmentVerificationRoutes(app: Express) {
         classroom: null,
       }))
     );
+  });
+
+  /**
+   * Approve/deny/set-priority for an enrollment application — previously
+   * EnrollmentView.swift's status-change actions only mutated a local
+   * array; the real mutations (enrollment.setStatus/.enroll) existed as
+   * tRPC only, unreachable from the REST-only iOS client.
+   */
+  app.post("/api/enrollment/:id/status", async (req: Request, res: Response) => {
+    const user = await requireStaff(req);
+    if (!user || user.organizationId == null) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: "Invalid application id" });
+      return;
+    }
+    const data: { status?: "pending" | "reviewing" | "approved" | "denied"; priority?: "high" | "medium" | "low" } = {};
+    if (["pending", "reviewing", "approved", "denied"].includes(req.body?.status)) data.status = req.body.status;
+    if (["high", "medium", "low"].includes(req.body?.priority)) data.priority = req.body.priority;
+    await updateEnrollmentApplication(id, user.organizationId, data);
+    await insertAuditLog({
+      userId: user.id,
+      actorOpenId: user.openId,
+      action: "update",
+      resourceType: "enrollment_application",
+      resourceId: String(id),
+      ipAddress: clientIpFromReq(req),
+      detail: JSON.stringify(data),
+    });
+    res.json({ success: true });
+  });
+
+  /** Approve & enroll: materialize an application into family + child records. */
+  app.post("/api/enrollment/:id/enroll", async (req: Request, res: Response) => {
+    const user = await requireStaff(req);
+    if (!user || user.organizationId == null) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: "Invalid application id" });
+      return;
+    }
+    const usage = await getOrganizationUsage(user.organizationId);
+    if (usage?.maxChildren != null && usage.children + 1 > usage.maxChildren) {
+      res.status(403).json({
+        error: `Enrollment limit reached — your ${usage.subscriptionTier} plan allows ${usage.maxChildren} children (currently ${usage.children}).`,
+      });
+      return;
+    }
+    try {
+      const result = await enrollApplication(id, user.organizationId);
+      await insertAuditLog({
+        userId: user.id,
+        actorOpenId: user.openId,
+        action: "create",
+        resourceType: "child",
+        resourceId: String(result.childId),
+        ipAddress: clientIpFromReq(req),
+        detail: `enrolled_from_application:${id}`,
+      });
+      res.json(result);
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : "Failed to enroll" });
+    }
   });
 
   app.get("/api/enrollment/verifications", async (req: Request, res: Response) => {

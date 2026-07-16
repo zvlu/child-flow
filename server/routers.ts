@@ -57,6 +57,7 @@ import { getChronicAbsenceSummary } from "./chronicAbsence";
 import { listFpas, getFpaDetail, upsertFpa } from "./fpaDb";
 import { getHealthDeadlineSummary } from "./healthDeadlines";
 import { computeClearanceForOrg, computeClearanceForChild } from "./participationClearance";
+import { listChecklistItems, markChecklistItemReviewed } from "./complianceChecklist";
 import { computePirSuggestions } from "./pirAutoPopulate";
 import { listIncidents, createIncident, updateIncident } from "./suspensionLog";
 import * as pc from "./policyCouncil";
@@ -1911,6 +1912,12 @@ export const appRouter = router({
         await assertRecordInOrg(ctx.user, "report", reportId);
         return mod.runCustomReport(reportId);
       }),
+    delete: staffProcedure
+      .input(z.number())
+      .mutation(async ({ input: reportId, ctx }) => {
+        await assertRecordInOrg(ctx.user, "report", reportId);
+        return mod.deleteCustomReport(reportId);
+      }),
   }),
 
   health: router({
@@ -1963,6 +1970,21 @@ export const appRouter = router({
         }
         const map = await computeClearanceForOrg(input.organizationId);
         return Array.from(map.values());
+      }),
+  }),
+
+  // Generic program-monitoring checklist (see server/complianceChecklist.ts)
+  // — previously the web Compliance page's "Program Monitoring Checklist"
+  // tab was local-state-only ("Mark Reviewed" did nothing server-side).
+  complianceChecklist: router({
+    list: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => listChecklistItems(input.organizationId)),
+    markReviewed: orgStaffProcedure
+      .input(z.object({ organizationId: z.number(), itemKey: z.string(), note: z.string().optional() }))
+      .mutation(async ({ input, ctx }) => {
+        const staffId = await mod.resolveStaffId(input.organizationId, ctx.user.id);
+        return markChecklistItemReviewed(input.organizationId, input.itemKey, staffId, input.note ?? null);
       }),
   }),
 

@@ -12,24 +12,14 @@ import PirReportView from "@/components/PirReportView";
 import { Glossary } from "@/components/Glossary";
 import { AuditReadiness } from "@/components/AuditReadiness";
 import { ReviewBinderButton } from "@/components/ReviewBinder";
-import { daysAgo } from "@/lib/date";
+import { formatDateLong } from "@/lib/date";
 
-// Relative to today rather than a fixed date, so this list doesn't read as
-// "reviewed Nov 2024" forever — it used to be hardcoded and would silently
-// drift further stale every time someone opened this page.
-const initialMonitoringItems = [
-  { area: "Child-to-Staff Ratio", status: "compliant", lastReview: daysAgo(3), notes: "All classrooms within required ratios" },
-  { area: "Health & Safety Checks", status: "compliant", lastReview: daysAgo(3), notes: "Monthly safety inspections completed" },
-  { area: "Fiscal Management", status: "compliant", lastReview: daysAgo(18), notes: "Budget on track, no findings" },
-  { area: "Program Governance", status: "compliant", lastReview: daysAgo(25), notes: "Policy council meetings held monthly" },
-  { area: "Transportation Safety", status: "needs_attention", lastReview: daysAgo(20), notes: "2 buses due for safety inspection" },
-  { area: "Food Service", status: "compliant", lastReview: daysAgo(3), notes: "CACFP records up to date" },
-];
-
-const monitoringBadge = (status: string) => {
-  if (status === "compliant") return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100 text-xs">Compliant</Badge>;
-  if (status === "needs_attention") return <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100 text-xs">Needs Attention</Badge>;
-  return <Badge variant="secondary" className="text-xs">Pending</Badge>;
+/** Badge for a single checklist item — unreviewed items read "Never Reviewed"
+ * rather than fabricating a compliant/pending status before anyone's looked. */
+const monitoringBadge = (item: { isCompliant: boolean; reviewedAt: string | null }) => {
+  if (!item.reviewedAt) return <Badge variant="secondary" className="text-xs">Never Reviewed</Badge>;
+  if (item.isCompliant) return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100 text-xs">Compliant</Badge>;
+  return <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100 text-xs">Needs Attention</Badge>;
 };
 
 const reportBadge = (status: string) => {
@@ -98,17 +88,22 @@ function ComplianceHistory() {
 }
 
 export default function Compliance() {
-  // The "Update" button below used to have no onClick at all — clicking it
-  // did nothing, silently. This at least lets a reviewer mark an area
-  // resolved; still local-only (no server model for this checklist yet).
-  const [monitoringItems, setMonitoringItems] = useState(initialMonitoringItems);
-  const markReviewed = (area: string) => {
-    setMonitoringItems((items) =>
-      items.map((item) =>
-        item.area === area ? { ...item, status: "compliant", lastReview: "Today" } : item
-      )
+  // Previously local-state-only ("Mark Reviewed" did nothing server-side, and
+  // items were seeded with a fake pre-filled "compliant" history). Now backed
+  // by the complianceChecklist router — items start unreviewed for real.
+  const utils = trpc.useUtils();
+  const checklistQuery = trpc.complianceChecklist.list.useQuery({ organizationId: ORGANIZATION_ID });
+  const markReviewedMutation = trpc.complianceChecklist.markReviewed.useMutation({
+    onSuccess: () => {
+      utils.complianceChecklist.list.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const markReviewed = (item: { itemKey: string; label: string }) => {
+    markReviewedMutation.mutate(
+      { organizationId: ORGANIZATION_ID, itemKey: item.itemKey },
+      { onSuccess: () => toast.success(`${item.label} marked reviewed`) }
     );
-    toast.success(`${area} marked reviewed`);
   };
 
   return (
@@ -142,34 +137,51 @@ export default function Compliance() {
               <CardDescription>Ongoing compliance monitoring across program areas</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {monitoringItems.map((item, i) => (
-                <div key={i} className={`flex items-start gap-4 p-4 rounded-lg border ${item.status === "needs_attention" ? "border-amber-200 bg-amber-50" : "border-border"}`}>
-                  <div className="flex-shrink-0 mt-0.5">
-                    {item.status === "compliant" ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <AlertTriangle className="h-5 w-5 text-amber-500" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium text-sm text-foreground">{item.area}</p>
-                      {monitoringBadge(item.status)}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">{item.notes}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Last reviewed: {item.lastReview}</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs flex-shrink-0"
-                    disabled={item.status === "compliant"}
-                    onClick={() => markReviewed(item.area)}
-                  >
-                    {item.status === "compliant" ? "Reviewed" : "Mark Reviewed"}
-                  </Button>
+              {checklistQuery.isLoading && (
+                <div className="flex items-center justify-center py-10 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />Loading checklist…
                 </div>
-              ))}
+              )}
+              {!checklistQuery.isLoading && (checklistQuery.data ?? []).map((item) => {
+                const isReviewed = !!item.reviewedAt;
+                const needsAttention = !isReviewed || !item.isCompliant;
+                const isPending =
+                  markReviewedMutation.isPending && markReviewedMutation.variables?.itemKey === item.itemKey;
+                return (
+                  <div
+                    key={item.itemKey}
+                    className={`flex items-start gap-4 p-4 rounded-lg border ${needsAttention ? "border-amber-200 bg-amber-50" : "border-border"}`}
+                  >
+                    <div className="flex-shrink-0 mt-0.5">
+                      {needsAttention ? (
+                        <AlertTriangle className="h-5 w-5 text-amber-500" />
+                      ) : (
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-sm text-foreground">{item.label}</p>
+                        {monitoringBadge(item)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{item.category}</p>
+                      {item.note && <p className="text-xs text-muted-foreground mt-0.5">{item.note}</p>}
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Last reviewed: {item.reviewedAt ? formatDateLong(item.reviewedAt) : "Never reviewed"}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs flex-shrink-0"
+                      disabled={isReviewed || isPending}
+                      onClick={() => markReviewed(item)}
+                    >
+                      {isPending ? "Reviewing…" : isReviewed ? "Reviewed" : "Mark Reviewed"}
+                    </Button>
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
         </TabsContent>

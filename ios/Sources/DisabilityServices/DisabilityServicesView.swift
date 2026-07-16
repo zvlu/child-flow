@@ -10,6 +10,7 @@ import SwiftUI
 final class DisabilityServicesViewModel: ObservableObject {
     @Published var summary: DisabilityServiceSummary?
     @Published var isLoading = false
+    @Published var errorMessage: String?
 
     func load() async {
         isLoading = true
@@ -23,20 +24,28 @@ final class DisabilityServicesViewModel: ObservableObject {
         }
     }
 
-    func markParentRights(id: String, language: String) async {
-        guard var s = summary, let i = s.records.firstIndex(where: { $0.id == id }) else { return }
+    /// Returns `true` only when the notification was actually recorded (either
+    /// via the API, or via the DEBUG-only local demo fallback). The caller
+    /// (ParentRightsSheet) uses this to decide whether it's safe to dismiss —
+    /// previously it dismissed unconditionally, so a failed save looked
+    /// identical to a real one.
+    @discardableResult
+    func markParentRights(id: String, language: String) async -> Bool {
+        guard var s = summary, let i = s.records.firstIndex(where: { $0.id == id }) else { return false }
         do {
             try await APIClient.shared.markDisabilityParentRights(id: id, language: language)
         } catch {
             #if DEBUG
             // Demo mode: no server — record locally so the flow is testable.
             #else
-            return
+            errorMessage = "This notification wasn't saved. Check your connection and try again."
+            return false
             #endif
         }
         s.records[i].parentRightsNotifiedAt = ISO8601DateFormatter().string(from: Date())
         s.records[i].parentRightsLanguage = language
         summary = s
+        return true
     }
 
     func setTransitionChecklist(id: String, steps: [String]) async {
@@ -272,10 +281,7 @@ struct DisabilityRecordDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showParentRightsSheet) {
             ParentRightsSheet(language: $language) {
-                Task {
-                    await viewModel.markParentRights(id: record.id, language: language)
-                    showParentRightsSheet = false
-                }
+                await viewModel.markParentRights(id: record.id, language: language)
             }
         }
     }
@@ -283,8 +289,10 @@ struct DisabilityRecordDetailView: View {
 
 private struct ParentRightsSheet: View {
     @Binding var language: String
-    let onConfirm: () -> Void
+    let onConfirm: () async -> Bool
     @Environment(\.dismiss) private var dismiss
+    @State private var isSaving = false
+    @State private var errorMessage: String?
 
     let languages = ["English", "Spanish", "Vietnamese", "Chinese (Simplified)", "Arabic", "Haitian Creole"]
 
@@ -296,7 +304,19 @@ private struct ParentRightsSheet: View {
                         ForEach(languages, id: \.self) { Text($0) }
                     }
                 }
-                Button("Confirm Notification Given", action: onConfirm)
+                Button(isSaving ? "Saving…" : "Confirm Notification Given") {
+                    isSaving = true
+                    Task {
+                        let success = await onConfirm()
+                        isSaving = false
+                        if success {
+                            dismiss()
+                        } else {
+                            errorMessage = "This notification wasn't saved. Check your connection and try again."
+                        }
+                    }
+                }
+                .disabled(isSaving)
             }
             .navigationTitle("Parent Rights")
             .navigationBarTitleDisplayMode(.inline)
@@ -305,6 +325,9 @@ private struct ParentRightsSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .alert("Couldn't Save", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 }

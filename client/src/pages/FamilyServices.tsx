@@ -45,6 +45,7 @@ export default function FamilyServices() {
   const [tab, setTab] = useState("families");
   const searchParams = useSearch();
   const [logOpen, setLogOpen] = useState(false);
+  const [resourceDetail, setResourceDetail] = useState<{ category: string; resources: string[] } | null>(null);
   const [logFamilyId, setLogFamilyId] = useState<string>("");
   const [logType, setLogType] = useState<string>("");
   const [logDescription, setLogDescription] = useState("");
@@ -469,7 +470,7 @@ export default function FamilyServices() {
                         </li>
                       ))}
                     </ul>
-                    <Button variant="outline" size="sm" className="w-full mt-3 text-xs">View Resources</Button>
+                    <Button variant="outline" size="sm" className="w-full mt-3 text-xs" onClick={() => setResourceDetail(cat)}>View Resources</Button>
                   </CardContent>
                 </Card>
               );
@@ -477,6 +478,29 @@ export default function FamilyServices() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Resource Detail Dialog — these categories don't carry a URL/phone in
+          this catalog yet, so the honest fix is to surface what's actually on
+          the card (category + its resource list) in a focused view. */}
+      <Dialog open={resourceDetail != null} onOpenChange={(o) => { if (!o) setResourceDetail(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{resourceDetail?.category}</DialogTitle>
+            <DialogDescription>Resources available to families in this category.</DialogDescription>
+          </DialogHeader>
+          <ul className="space-y-2 py-2">
+            {(resourceDetail?.resources ?? []).map(r => (
+              <li key={r} className="flex items-center gap-2 text-sm rounded-lg border border-border px-3 py-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                {r}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground">
+            Contact your Family Advocate to make a referral for any of these resources.
+          </p>
+        </DialogContent>
+      </Dialog>
 
       {/* Log Contact Dialog */}
       <Dialog open={logOpen} onOpenChange={setLogOpen}>

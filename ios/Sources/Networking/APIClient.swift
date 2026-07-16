@@ -182,6 +182,19 @@ actor APIClient {
         try await get("enrollment")
     }
 
+    /// Approve/deny/set-priority for an application. Pass only the fields that changed.
+    struct EnrollmentStatusUpdateRequest: Encodable { var status: String?; var priority: String? }
+    func updateEnrollmentStatus(id: String, status: String? = nil, priority: String? = nil) async throws {
+        let _: SuccessResponse = try await post("enrollment/\(id)/status", body: EnrollmentStatusUpdateRequest(status: status, priority: priority))
+    }
+
+    /// Approve & enroll: materializes an application into real family + child records.
+    /// Throws `APIError.serverMessage` with a human-readable reason (e.g. capacity limit reached) on failure.
+    struct EnrollApplicationResponse: Decodable { let childId: Int; let familyId: Int?; let alreadyEnrolled: Bool? }
+    func enrollApplication(id: String) async throws -> EnrollApplicationResponse {
+        try await post("enrollment/\(id)/enroll", body: EmptyBody())
+    }
+
     // MARK: - ERSEA
     func getEligibilityRecords() async throws -> [EligibilityRecord] {
         try await get("ersea/eligibility")
@@ -506,6 +519,22 @@ actor APIClient {
         let _: EmptyResponse = try await post("attendance/plans", body: plan)
     }
 
+    /// Patch a plan — pass only the fields you're changing. `strategies` should be
+    /// the full updated array (the server replaces it wholesale, it doesn't merge).
+    struct UpdateAttendancePlanRequest: Encodable {
+        var strategies: [AttendancePlanStrategy]?
+        var barriers: [String]?
+        var status: String?
+        var reviewDate: Date?
+        var notes: String?
+    }
+    func updateAttendancePlan(id: String, strategies: [AttendancePlanStrategy]? = nil, barriers: [String]? = nil,
+                              status: String? = nil, reviewDate: Date? = nil, notes: String? = nil) async throws {
+        let _: SuccessResponse = try await post("attendance/plans/\(id)",
+                                                 body: UpdateAttendancePlanRequest(strategies: strategies, barriers: barriers,
+                                                                                   status: status, reviewDate: reviewDate, notes: notes))
+    }
+
     // MARK: - Chronic Absence Alerts
     func getChronicAbsenceAlerts() async throws -> [ChronicAbsenceAlert] {
         try await get("attendance/chronic-absence")
@@ -730,7 +759,7 @@ actor APIClient {
         request.httpMethod = "GET"
         addAuthHeader(&request)
         let (data, response) = try await URLSession.shared.data(for: request)
-        try validate(response)
+        try validate(response, data: data)
         return try decoder.decode(T.self, from: data)
     }
 
@@ -742,7 +771,7 @@ actor APIClient {
         addAuthHeader(&request)
         request.httpBody = try encoder.encode(body)
         let (data, response) = try await URLSession.shared.data(for: request)
-        try validate(response)
+        try validate(response, data: data)
         return try decoder.decode(T.self, from: data)
     }
 
@@ -752,7 +781,11 @@ actor APIClient {
         }
     }
 
-    private func validate(_ response: URLResponse) throws {
+    /// Struct matching the `{ error: string }` shape nearly every REST route
+    /// returns on failure (e.g. the enrollment-capacity-limit message).
+    private struct ServerErrorBody: Decodable { let error: String }
+
+    private func validate(_ response: URLResponse, data: Data) throws {
         guard let http = response as? HTTPURLResponse else { return }
         guard (200..<300).contains(http.statusCode) else {
             if http.statusCode == 401 {
@@ -760,6 +793,12 @@ actor APIClient {
                 // clear the dead session and return to sign-in.
                 NotificationCenter.default.post(name: .cfSessionExpired, object: nil)
                 throw APIError.unauthorized
+            }
+            // Surface the server's actual error message when present (e.g. "Enrollment
+            // limit reached — your Growth plan allows 40 children") instead of a bare
+            // status code, so callers can show something a user can act on.
+            if let body = try? JSONDecoder().decode(ServerErrorBody.self, from: data) {
+                throw APIError.serverMessage(body.error)
             }
             throw APIError.httpError(http.statusCode)
         }
@@ -777,12 +816,15 @@ struct SuccessResponse: Decodable { let success: Bool }
 
 enum APIError: LocalizedError {
     case httpError(Int)
+    /// A server-provided human-readable failure reason (from a `{ error: string }` body).
+    case serverMessage(String)
     case unauthorized
     case decodingFailed
 
     var errorDescription: String? {
         switch self {
         case .httpError(let code): return "Server error (\(code))"
+        case .serverMessage(let message): return message
         case .unauthorized: return "Please sign in again"
         case .decodingFailed: return "Unexpected server response"
         }

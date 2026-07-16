@@ -545,6 +545,38 @@ export function registerFamilyCaseManagementRoutes(app: Express) {
     res.json({ success: true });
   });
 
+  /**
+   * Update a plan — previously AttendancePlansView.swift's strategy
+   * "implemented" checkbox only toggled a local @State copy with no
+   * binding back; ap.updateAttendancePlan already supports patching
+   * `strategies` (the tRPC procedure's zod input just doesn't expose it),
+   * so this REST mirror accepts it directly.
+   */
+  app.post("/api/attendance/plans/:id", async (req: Request, res: Response) => {
+    const user = await requireStaff(req); if (!user) return reject(res, 401, "Please sign in again");
+    const orgId = orgOf(user); if (orgId == null) return reject(res, 400, "No organization");
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return reject(res, 400, "Invalid plan id");
+
+    const patch: Record<string, unknown> = {};
+    if (Array.isArray(req.body?.strategies)) {
+      patch.strategies = req.body.strategies.map((s: any) => ({
+        id: String(s?.id ?? `${Date.now()}`),
+        description: String(s?.description ?? ""),
+        isImplemented: !!s?.isImplemented,
+        targetDate: s?.targetDate ?? null,
+      }));
+    }
+    if (Array.isArray(req.body?.barriers)) patch.barriers = req.body.barriers.map(String);
+    if (["active", "resolved", "closed"].includes(req.body?.status)) patch.status = req.body.status;
+    if (req.body?.reviewDate !== undefined) patch.reviewDate = req.body.reviewDate ? new Date(req.body.reviewDate) : null;
+    if (typeof req.body?.notes === "string") patch.notes = req.body.notes;
+
+    await ap.updateAttendancePlan(id, orgId, patch as any);
+    await insertAuditLog({ userId: user.id, actorOpenId: user.openId, action: "update", resourceType: "attendance_plan", resourceId: String(id), ipAddress: clientIpFromReq(req) });
+    res.json({ success: true });
+  });
+
   // ---- Chronic Absence Alerts ----
   app.get("/api/attendance/chronic-absence", async (req: Request, res: Response) => {
     const user = await requireStaff(req); if (!user) return reject(res, 401, "Please sign in again");

@@ -206,53 +206,34 @@ struct LoginView: View {
 }
 
 // MARK: - Forgot Password Sheet
+//
+// There is no password-reset endpoint anywhere in this client or on the
+// server — this used to fake a network call and show a "check your email"
+// success screen even though no email was ever sent. Rather than build a
+// full email-based reset flow (out of scope here), this is now honest about
+// what's actually available: self-service reset isn't implemented yet, so
+// direct the user to their program administrator instead of pretending to
+// have sent something.
 struct ForgotPasswordSheet: View {
     @Environment(\.dismiss) var dismiss
-    @State private var email = ""
-    @State private var isSent = false
-    @State private var isLoading = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
-                if isSent {
-                    VStack(spacing: 16) {
-                        Image(systemName: "envelope.badge.checkmark")
-                            .font(.system(size: 52))
-                            .foregroundColor(.green)
-                        Text("Check your email")
-                            .font(.title2.bold())
-                        Text("We sent a password reset link to \(email)")
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.secondary)
-                        Button("Done") { dismiss() }
-                            .buttonStyle(.borderedProminent)
-                    }
-                    .padding()
-                } else {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Enter your work email and we'll send you a reset link.")
-                            .foregroundColor(.secondary)
-                        TextField("Email", text: $email)
-                            .textFieldStyle(.roundedBorder)
-                            .keyboardType(.emailAddress)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                        Button(action: sendReset) {
-                            Group {
-                                if isLoading { ProgressView().tint(.white) }
-                                else { Text("Send Reset Link").fontWeight(.semibold) }
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(email.isEmpty ? Color.accentColor.opacity(0.4) : Color.accentColor)
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                        .disabled(email.isEmpty || isLoading)
-                    }
-                    .padding()
+                VStack(spacing: 16) {
+                    Image(systemName: "person.crop.circle.badge.questionmark")
+                        .font(.system(size: 52))
+                        .foregroundColor(.secondary)
+                    Text("Password Reset Isn't Available Yet")
+                        .font(.title2.bold())
+                        .multilineTextAlignment(.center)
+                    Text("Self-service password reset isn't set up for this app yet. Contact your program administrator and they can reset your password for you.")
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.secondary)
+                    Button("Done") { dismiss() }
+                        .buttonStyle(.borderedProminent)
                 }
+                .padding()
                 Spacer()
             }
             .navigationTitle("Reset Password")
@@ -262,15 +243,6 @@ struct ForgotPasswordSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
-        }
-    }
-
-    private func sendReset() {
-        isLoading = true
-        // Simulate network call
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            isSent = true
-            isLoading = false
         }
     }
 }

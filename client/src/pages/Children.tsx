@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import { Link, useSearch } from "wouter";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,15 @@ export default function Children() {
   const [classroomFilter, setClassroomFilter] = useState(searchParams.get("classroom") ?? "all");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "all");
   const [viewMode, setViewMode] = useState<"list" | "family">("list");
+  const [, navigate] = useLocation();
+
+  // Command palette's "Enroll New Child" deep-links here with ?action=new.
+  // There's no inline "add child" dialog on this page — enrollment happens on
+  // /enrollment — so honor the intent by forwarding there instead of no-oping.
+  useEffect(() => {
+    if (searchParams.get("action") === "new") navigate("/enrollment");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const utils = trpc.useUtils();
 
@@ -512,16 +521,16 @@ export default function Children() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <Link href={`/children/${child.id}`}>
+                              <Link href={`/children/${child.id}?tab=profile`}>
                                 <DropdownMenuItem>Edit Profile</DropdownMenuItem>
                               </Link>
-                              <Link href={`/children/${child.id}`}>
+                              <Link href={`/children/${child.id}?tab=health`}>
                                 <DropdownMenuItem>Health Records</DropdownMenuItem>
                               </Link>
-                              <Link href={`/children/${child.id}`}>
+                              <Link href={`/children/${child.id}?tab=attendance`}>
                                 <DropdownMenuItem>Attendance History</DropdownMenuItem>
                               </Link>
-                              <Link href={`/children/${child.id}`}>
+                              <Link href={`/children/${child.id}?tab=family`}>
                                 <DropdownMenuItem>Family Info</DropdownMenuItem>
                               </Link>
                               <DropdownMenuItem

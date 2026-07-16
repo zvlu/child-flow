@@ -8,8 +8,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import { Download, FileText, BarChart3, TrendingUp, Users, Heart, ClipboardCheck, ShieldCheck, Loader2 } from "lucide-react";
-import { useState, useMemo } from "react";
-import { useLocation } from "wouter";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { toast } from "sonner";
@@ -25,6 +25,25 @@ const attendanceByMonth = [
 ];
 
 const COLORS = ["#4ade80", "#60a5fa", "#f59e0b", "#a78bfa", "#f87171"];
+
+/** Recent PIR program years, current first — same convention as PirReportEditor. */
+function recentProgramYears(): string[] {
+  const now = new Date();
+  const startYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  return [0, 1, 2, 3].map((o) => {
+    const y = startYear - o;
+    return `${y}-${y + 1}`;
+  });
+}
+
+/** Sept 1 – Aug 31 date span for a "YYYY-YYYY" program year, capped at today. */
+function programYearRange(year: string) {
+  const [startYear] = year.split("-").map(Number);
+  const start = new Date(startYear, 8, 1);
+  const augEnd = new Date(startYear + 1, 7, 31, 23, 59, 59);
+  const end = augEnd < new Date() ? augEnd : new Date();
+  return { start, end };
+}
 
 const HEALTH_TYPE_LABELS: Record<string, string> = {
   physical: "Physical Exams",
@@ -62,9 +81,27 @@ export default function Reports() {
   const orgId = ORGANIZATION_ID;
   const utils = trpc.useUtils();
   const [, navigate] = useLocation();
+  const search = useSearch();
   const [busy, setBusy] = useState<string | null>(null);
   // Staff Activity (family-advocate workload) is a Head Start module feature.
   const hasHeadStart = useOrgModules().has("head_start");
+
+  // Program-year selector — drives the date range behind the Attendance
+  // Report export and which year's PIR data the Compliance row exports.
+  const programYears = useMemo(() => recentProgramYears(), []);
+  const [programYear, setProgramYear] = useState(programYears[0]);
+
+  // Command palette's "Generate PIR Report" deep-links here with
+  // ?action=generate. This page has no PIR composer of its own — that lives
+  // on the Compliance page (PirReportEditor) — so forward there instead of
+  // pretending to open something that isn't here.
+  useEffect(() => {
+    if (new URLSearchParams(search).get("action") === "generate") {
+      if (hasHeadStart) navigate("/compliance");
+      else toast.message("PIR reporting is a Head Start program feature.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Live data behind the analytics charts (the attendance-trend line below is
   // still illustrative — true monthly rates need a heavier aggregation).
@@ -123,11 +160,21 @@ export default function Reports() {
   };
 
   // Each export pulls live data on demand via the query cache's imperative fetch.
+  // Attendance is scoped to the selected program year (not a fixed trailing
+  // window), so the year selector actually changes what gets exported.
   const fetchAttendance = () => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(start.getDate() - 30);
+    const { start, end } = programYearRange(programYear);
     return utils.attendance.getRange.fetch({ organizationId: orgId, start, end });
+  };
+  const fetchPirExtract = async () => {
+    const data = await utils.compliance.getReport.fetch({ organizationId: orgId, year: programYear });
+    return (data?.questions ?? []).map((q: any) => ({
+      section: q.section,
+      subsection: q.subsection ?? "",
+      code: q.code,
+      label: q.label,
+      value: q.value ?? "",
+    }));
   };
   const exporters: Record<string, { file: string; fetch: () => Promise<any[]> }> = {
     "Attendance Report": { file: "attendance-30d", fetch: fetchAttendance },
@@ -164,7 +211,9 @@ export default function Reports() {
       Health: exporters["Health Screening Report"],
       "Family Services": exporters["Family Services Report"],
       Staff: exporters["Staff Training Report"],
-      Compliance: { file: "children-roster", fetch: () => utils.children.list.fetch(orgId) },
+      // PIR Data Extract — pulls the selected program year's actual PIR
+      // question/answer catalog, not a generic children roster.
+      Compliance: { file: `pir-data-extract-${programYear}`, fetch: fetchPirExtract },
     };
     const ex = byType[type] ?? { file: "children-roster", fetch: () => utils.children.list.fetch(orgId) };
     runExport(`saved-${type}`, ex.file, ex.fetch);
@@ -178,14 +227,14 @@ export default function Reports() {
           <p className="text-muted-foreground text-sm mt-0.5">Generate reports, view analytics, and export data</p>
         </div>
         <div className="flex items-center gap-2">
-          <Select defaultValue="2024-2025">
+          <Select value={programYear} onValueChange={setProgramYear}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="2024-2025">2024-2025</SelectItem>
-              <SelectItem value="2023-2024">2023-2024</SelectItem>
-              <SelectItem value="2022-2023">2022-2023</SelectItem>
+              {programYears.map((y) => (
+                <SelectItem key={y} value={y}>{y}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button variant="outline" size="sm" className="gap-2" disabled={busy === "all"} onClick={() => runExport("all", "children-roster", () => utils.children.list.fetch(orgId))}>
@@ -215,7 +264,7 @@ export default function Reports() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base">Attendance Rate Trend</CardTitle>
-                  <CardDescription>Monthly average attendance rate — 2024-2025 program year</CardDescription>
+                  <CardDescription>Monthly average attendance rate — {programYear} program year</CardDescription>
                 </div>
                 <Button variant="outline" size="sm" className="gap-2 text-xs" disabled={busy === "Attendance Report"} onClick={() => onTemplate("Attendance Report")}>
                   {busy === "Attendance Report" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}Export

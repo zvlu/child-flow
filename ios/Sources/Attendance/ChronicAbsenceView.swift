@@ -448,6 +448,8 @@ struct OutreachMessageSheet: View {
     let alert: ChronicAbsenceAlert
     @State private var message: String = ""
     @State private var showCopied = false
+    @State private var isSending = false
+    @State private var errorMessage: String?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -479,11 +481,30 @@ struct OutreachMessageSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(showCopied ? "Copied!" : "Copy & Send") {
+                    Button(showCopied ? "Sent!" : (isSending ? "Sending…" : "Copy & Send")) {
+                        // Always copy to clipboard first — that part always works and
+                        // is a useful fallback regardless of whether the in-app send
+                        // succeeds.
                         UIPasteboard.general.string = message
-                        showCopied = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { dismiss() }
+                        isSending = true
+                        Task {
+                            do {
+                                _ = try await APIClient.shared.newConversation(familyId: alert.familyId, body: message)
+                                await MainActor.run {
+                                    isSending = false
+                                    showCopied = true
+                                }
+                                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                                await MainActor.run { dismiss() }
+                            } catch {
+                                await MainActor.run {
+                                    isSending = false
+                                    errorMessage = "The message was copied to your clipboard, but wasn't sent in-app. Check your connection and try again, or paste it into a text/email instead."
+                                }
+                            }
+                        }
                     }
+                    .disabled(isSending)
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Reset") {
@@ -494,6 +515,9 @@ struct OutreachMessageSheet: View {
             .onAppear {
                 message = alert.outreachMessage(advocateName: alert.familyAdvocate)
             }
+            .alert("Couldn't Send", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 }

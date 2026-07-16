@@ -1358,6 +1358,16 @@ export async function runCustomReport(reportId: number) {
   return { reportName: report.reportName, reportType: report.reportType, columns: report.columns, rows, generatedAt: new Date() };
 }
 
+/**
+ * Was missing — ReportBuilder.tsx's per-row Delete button had no backing
+ * mutation at all (list/create/run existed, delete didn't).
+ */
+export async function deleteCustomReport(reportId: number) {
+  const db = await requireDb();
+  await db.delete(customReports).where(eq(customReports.id, reportId));
+  return { success: true };
+}
+
 // ==================== DASHBOARD ====================
 
 export async function getDashboardStats(organizationId: number) {

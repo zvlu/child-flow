@@ -1,6 +1,17 @@
 import SwiftUI
 
 // MARK: - Program Story View (staff-facing)
+//
+// Backed by GET/POST /api/story/posts, POST /api/story/posts/:id/like, and
+// POST /api/story/posts/:id/comments (see ios/Sources/Networking/StoryAPI.swift
+// for the networking layer). There is no GET-comments-list endpoint yet, so
+// "Comment" posts a real comment and bumps the visible count rather than
+// opening a full thread view — see the note on ProgramStoryViewModel.addComment.
+//
+// The server does not implement real photo upload (no field populates
+// `photoUrl` today), so this view never fakes a photo-picking experience:
+// the compose sheet has no "Add Photo" control, and the feed only shows a
+// generic placeholder icon on posts that do carry a `photoUrl`.
 
 struct ProgramStoryView: View {
     @StateObject private var viewModel = ProgramStoryViewModel()
@@ -19,10 +30,26 @@ struct ProgramStoryView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {
-                            ForEach(viewModel.posts) { post in
-                                StoryPostCard(post: post) {
-                                    viewModel.toggleLike(post)
+                            if let errorMessage = viewModel.errorMessage {
+                                HStack(alignment: .top, spacing: 10) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(.cfError)
+                                    Text(errorMessage)
+                                        .font(.cfSubheadline)
+                                        .foregroundColor(.cfTextPrimary)
                                 }
+                                .padding(12)
+                                .background(Color.cfHealthBg)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+
+                            ForEach(viewModel.posts) { post in
+                                StoryPostCard(
+                                    post: post,
+                                    childName: viewModel.childName(for:),
+                                    onLike: { viewModel.toggleLike(post) },
+                                    onComment: { text in await viewModel.addComment(to: post, content: text) }
+                                )
                             }
                         }
                         .padding(.horizontal, 16)
@@ -45,12 +72,17 @@ struct ProgramStoryView: View {
                 }
             }
             .sheet(isPresented: $viewModel.showCompose) {
-                ComposeStoryPostSheet { post in
-                    viewModel.add(post)
+                ComposeStoryPostSheet { caption, audience in
+                    await viewModel.createPost(caption: caption, audience: audience)
                 }
             }
             .task { await viewModel.load() }
             .refreshable { await viewModel.load() }
+            .overlay {
+                if viewModel.isLoading && viewModel.posts.isEmpty {
+                    ProgressView()
+                }
+            }
         }
     }
 }
@@ -59,7 +91,11 @@ struct ProgramStoryView: View {
 
 struct StoryPostCard: View {
     let post: StoryPost
+    let childName: (Int) -> String
     let onLike: () -> Void
+    let onComment: (String) async -> Void
+
+    @State private var showCommentSheet = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -99,25 +135,22 @@ struct StoryPostCard: View {
             .padding(.top, 14)
             .padding(.bottom, 12)
 
-            // Photo placeholder
-            if post.hasPhoto {
+            // Photo placeholder — the server doesn't implement real photo
+            // upload yet, so this is a generic "there's a photo" indicator,
+            // not an attempt to render (or fake) the actual image.
+            if post.photoUrl != nil {
                 ZStack {
                     Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [post.photoColor.opacity(0.3), post.photoColor.opacity(0.15)],
-                                startPoint: .topLeading, endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(Color.cfPrimary.opacity(0.12))
                         .frame(maxWidth: .infinity)
                         .frame(height: 220)
                     VStack(spacing: 8) {
-                        Image(systemName: post.photoIcon)
+                        Image(systemName: "photo.fill")
                             .font(.system(size: 40))
-                            .foregroundColor(post.photoColor.opacity(0.6))
-                        Text("Photo · \(post.photoLabel)")
+                            .foregroundColor(.cfPrimary.opacity(0.6))
+                        Text("Photo attached")
                             .font(.cfCaption)
-                            .foregroundColor(post.photoColor.opacity(0.8))
+                            .foregroundColor(.cfPrimary.opacity(0.8))
                     }
                 }
             }
@@ -128,7 +161,7 @@ struct StoryPostCard: View {
                     .font(.cfBody)
                     .foregroundColor(.cfTextPrimary)
                     .padding(.horizontal, 16)
-                    .padding(.top, post.hasPhoto ? 12 : 0)
+                    .padding(.top, post.photoUrl != nil ? 12 : 0)
                     .padding(.bottom, 4)
             }
 
@@ -136,11 +169,11 @@ struct StoryPostCard: View {
             if !post.taggedChildren.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
-                        ForEach(post.taggedChildren, id: \.self) { name in
+                        ForEach(post.taggedChildren, id: \.self) { childId in
                             HStack(spacing: 4) {
                                 Image(systemName: "person.fill")
                                     .font(.system(size: 10))
-                                Text(name)
+                                Text(childName(childId))
                                     .font(.cfCaption2)
                             }
                             .foregroundColor(.cfChildren)
@@ -174,7 +207,7 @@ struct StoryPostCard: View {
                 }
 
                 Button {
-                    // comment action
+                    showCommentSheet = true
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "bubble.left")
@@ -187,9 +220,7 @@ struct StoryPostCard: View {
                     .padding(.vertical, 12)
                 }
 
-                Button {
-                    // share action
-                } label: {
+                ShareLink(item: post.caption.isEmpty ? "Check out this update from \(post.authorName)." : post.caption) {
                     HStack(spacing: 6) {
                         Image(systemName: "paperplane")
                             .foregroundColor(.cfTextSecondary)
@@ -206,24 +237,95 @@ struct StoryPostCard: View {
         .background(Color.cfSurface)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .cfCardShadow()
+        .sheet(isPresented: $showCommentSheet) {
+            AddCommentSheet { text in
+                await onComment(text)
+            }
+        }
+    }
+}
+
+// MARK: - Add Comment Sheet
+//
+// The server has no GET-comments-list endpoint (POST /api/story/posts/:id/comments
+// only increments the post's commentCount), so this is intentionally a
+// one-shot "post a comment" flow rather than a full comment thread view.
+
+struct AddCommentSheet: View {
+    let onSubmit: (String) async -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var isSaving = false
+
+    private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Comment") {
+                    TextEditor(text: $text)
+                        .font(.cfBody)
+                        .frame(minHeight: 100)
+                }
+            }
+            .navigationTitle("Add Comment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        isSaving = true
+                        Task {
+                            await onSubmit(trimmed)
+                            isSaving = false
+                            dismiss()
+                        }
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                        } else {
+                            Text("Post")
+                        }
+                    }
+                    .disabled(trimmed.isEmpty || isSaving)
+                }
+            }
+        }
     }
 }
 
 // MARK: - Compose Sheet
 
 struct ComposeStoryPostSheet: View {
-    let onPost: (StoryPost) -> Void
+    /// Returns `true` on success; the sheet stays open and shows an error on failure.
+    let onPost: (String, StoryPost.Audience) async -> Bool
     @Environment(\.dismiss) private var dismiss
     @State private var caption = ""
     @State private var audience: StoryPost.Audience = .allFamilies
-    @State private var hasPhoto = false
     @State private var isPosting = false
+    @State private var errorMessage: String?
 
-    var canPost: Bool { !caption.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || hasPhoto }
+    var canPost: Bool { !caption.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
         NavigationStack {
             Form {
+                if let errorMessage {
+                    Section {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.cfError)
+                            Text(errorMessage)
+                                .font(.cfSubheadline)
+                                .foregroundColor(.cfTextPrimary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .listRowBackground(Color.cfHealthBg)
+                }
+
                 Section {
                     ZStack(alignment: .topLeading) {
                         if caption.isEmpty {
@@ -236,26 +338,6 @@ struct ComposeStoryPostSheet: View {
                         TextEditor(text: $caption)
                             .font(.cfBody)
                             .frame(minHeight: 120)
-                    }
-                }
-
-                Section("Add to Post") {
-                    Button {
-                        hasPhoto.toggle()
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: hasPhoto ? "checkmark.circle.fill" : "photo.badge.plus")
-                                .foregroundColor(hasPhoto ? .cfAttendance : .cfPrimary)
-                                .font(.system(size: 22))
-                            Text("Add Photo")
-                                .foregroundColor(.cfTextPrimary)
-                            Spacer()
-                            if hasPhoto {
-                                Text("Added")
-                                    .font(.cfCaption)
-                                    .foregroundColor(.cfAttendance)
-                            }
-                        }
                     }
                 }
 
@@ -302,42 +384,34 @@ struct ComposeStoryPostSheet: View {
 
     private func post() {
         isPosting = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            let newPost = StoryPost(
-                id: UUID().uuidString,
-                authorName: "You",
-                authorRole: "Staff",
-                caption: caption,
-                hasPhoto: hasPhoto,
-                photoColor: .cfPrimary,
-                photoIcon: "photo.fill",
-                photoLabel: "Program Activity",
-                audience: audience,
-                taggedChildren: [],
-                postedAt: Date(),
-                likeCount: 0,
-                commentCount: 0,
-                likedByMe: false
-            )
-            onPost(newPost)
-            dismiss()
+        errorMessage = nil
+        Task {
+            let success = await onPost(caption, audience)
+            isPosting = false
+            if success {
+                dismiss()
+            } else {
+                errorMessage = "Couldn't post that update. Check your connection and try again."
+            }
         }
     }
 }
 
 // MARK: - Models
 
-struct StoryPost: Identifiable {
-    let id: String
+struct StoryPost: Identifiable, Decodable {
+    let id: Int
     let authorName: String
     let authorRole: String
     var caption: String
-    var hasPhoto: Bool
-    var photoColor: Color
-    var photoIcon: String
-    var photoLabel: String
+    /// Nil until the server implements real photo upload — currently
+    /// nothing populates this. When present, the feed shows a generic
+    /// placeholder rather than fetching/rendering an actual image.
+    var photoUrl: String?
     var audience: Audience
-    var taggedChildren: [String]
+    /// Child ids (not names) tagged on the post; resolved to display names
+    /// via ProgramStoryViewModel.childName(for:).
+    var taggedChildren: [Int]
     let postedAt: Date
     var likeCount: Int
     var commentCount: Int
@@ -358,7 +432,7 @@ struct StoryPost: Identifiable {
         return postedAt.formatted(.dateTime.month(.abbreviated).day())
     }
 
-    enum Audience: String, CaseIterable {
+    enum Audience: String, CaseIterable, Codable {
         case allFamilies   = "All Families"
         case myFamilies    = "My Caseload Families"
         case staffOnly     = "Staff Only"
@@ -386,91 +460,88 @@ struct StoryPost: Identifiable {
 // MARK: - ViewModel
 
 @MainActor
-class ProgramStoryViewModel: ObservableObject {
+final class ProgramStoryViewModel: ObservableObject {
     @Published var posts: [StoryPost] = []
     @Published var isLoading = false
     @Published var showCompose = false
+    @Published var errorMessage: String?
+    @Published private var childNamesById: [Int: String] = [:]
+
+    func childName(for id: Int) -> String {
+        childNamesById[id] ?? "Child #\(id)"
+    }
 
     func load() async {
         isLoading = true
         defer { isLoading = false }
-
-        posts = [
-            StoryPost(
-                id: "p1",
-                authorName: "Ms. Rivera",
-                authorRole: "Lead Teacher",
-                caption: "The children did an amazing job with our garden activity today 🌱 Sofia and Marcus were so excited to plant their seeds! Great sensory learning opportunity.",
-                hasPhoto: true,
-                photoColor: .cfAttendance,
-                photoIcon: "leaf.fill",
-                photoLabel: "Garden Activity",
-                audience: .allFamilies,
-                taggedChildren: ["Sofia Martinez", "Marcus Williams"],
-                postedAt: Date().addingTimeInterval(-3600 * 2),
-                likeCount: 8,
-                commentCount: 3,
-                likedByMe: false
-            ),
-            StoryPost(
-                id: "p2",
-                authorName: "Ms. Thompson",
-                authorRole: "Family Services",
-                caption: "Reminder: Monthly parent meeting this Thursday at 6pm. We'll be reviewing the spring family engagement goals and showing developmental updates. Snacks provided! 🍎",
-                hasPhoto: false,
-                photoColor: .cfGoals,
-                photoIcon: "calendar",
-                photoLabel: "",
-                audience: .allFamilies,
-                taggedChildren: [],
-                postedAt: Date().addingTimeInterval(-86400),
-                likeCount: 12,
-                commentCount: 5,
-                likedByMe: true
-            ),
-            StoryPost(
-                id: "p3",
-                authorName: "Ms. Rivera",
-                authorRole: "Lead Teacher",
-                caption: "Story time with 'The Very Hungry Caterpillar' — we counted fruits, practiced colors, and talked about how caterpillars grow. Aaliyah couldn't stop laughing at the silly caterpillar 🐛",
-                hasPhoto: true,
-                photoColor: .cfFamily,
-                photoIcon: "book.fill",
-                photoLabel: "Story Time",
-                audience: .allFamilies,
-                taggedChildren: ["Aaliyah Johnson"],
-                postedAt: Date().addingTimeInterval(-86400 * 2),
-                likeCount: 15,
-                commentCount: 7,
-                likedByMe: false
-            ),
-            StoryPost(
-                id: "p4",
-                authorName: "Admin",
-                authorRole: "Program Director",
-                caption: "Staff note: PIR documentation deadline is June 20th. Please make sure all attendance and developmental screening records are up to date by EOD June 18th.",
-                hasPhoto: false,
-                photoColor: .cfCompliance,
-                photoIcon: "doc.text.fill",
-                photoLabel: "",
-                audience: .staffOnly,
-                taggedChildren: [],
-                postedAt: Date().addingTimeInterval(-86400 * 3),
-                likeCount: 2,
-                commentCount: 1,
-                likedByMe: false
-            ),
-        ]
+        do {
+            async let postsTask = APIClient.shared.getStoryPosts()
+            async let childrenTask = APIClient.shared.getChildren()
+            let (fetchedPosts, children) = try await (postsTask, childrenTask)
+            posts = fetchedPosts.sorted { $0.postedAt > $1.postedAt }
+            childNamesById = Dictionary(uniqueKeysWithValues: children.compactMap { child -> (Int, String)? in
+                guard let id = Int(child.id) else { return nil }
+                return (id, child.fullName)
+            })
+            errorMessage = nil
+        } catch {
+            errorMessage = (error as? APIError)?.errorDescription ?? "Couldn't load the program story. Check your connection and try again."
+        }
     }
 
-    func add(_ post: StoryPost) {
-        posts.insert(post, at: 0)
+    @discardableResult
+    func createPost(caption: String, audience: StoryPost.Audience) async -> Bool {
+        do {
+            _ = try await APIClient.shared.createStoryPost(caption: caption, audience: audience.rawValue, taggedChildren: nil)
+            await load()
+            return true
+        } catch {
+            errorMessage = (error as? APIError)?.errorDescription ?? "Couldn't post that update. Check your connection and try again."
+            return false
+        }
     }
 
+    /// Optimistic like toggle: flips immediately, then reconciles with the
+    /// server's definitive `liked` state (correcting the optimistic guess
+    /// if it was wrong, or reverting entirely if the request fails).
     func toggleLike(_ post: StoryPost) {
-        if let i = posts.firstIndex(where: { $0.id == post.id }) {
-            posts[i].likedByMe.toggle()
-            posts[i].likeCount += posts[i].likedByMe ? 1 : -1
+        guard let i = posts.firstIndex(where: { $0.id == post.id }) else { return }
+        applyLikeToggle(at: i)
+
+        Task {
+            do {
+                let liked = try await APIClient.shared.toggleStoryPostLike(postId: post.id)
+                if let idx = posts.firstIndex(where: { $0.id == post.id }), posts[idx].likedByMe != liked {
+                    applyLikeToggle(at: idx)
+                }
+            } catch {
+                if let idx = posts.firstIndex(where: { $0.id == post.id }) {
+                    applyLikeToggle(at: idx)
+                }
+                errorMessage = (error as? APIError)?.errorDescription ?? "Couldn't update your like. Check your connection and try again."
+            }
+        }
+    }
+
+    private func applyLikeToggle(at index: Int) {
+        posts[index].likedByMe.toggle()
+        posts[index].likeCount += posts[index].likedByMe ? 1 : -1
+    }
+
+    /// Posts a real comment and bumps the visible count. There's no
+    /// GET-comments-list endpoint yet, so individual comment bodies aren't
+    /// fetched back — this can't build a full comment thread view, only
+    /// record that a comment was made.
+    func addComment(to post: StoryPost, content: String) async {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        do {
+            _ = try await APIClient.shared.addStoryPostComment(postId: post.id, content: trimmed)
+            if let idx = posts.firstIndex(where: { $0.id == post.id }) {
+                posts[idx].commentCount += 1
+            }
+        } catch {
+            errorMessage = (error as? APIError)?.errorDescription ?? "Couldn't post that comment. Check your connection and try again."
         }
     }
 }

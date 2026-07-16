@@ -358,6 +358,140 @@ export function registerRosterRoutes(app: Express) {
     );
   });
 
+  const reverseCategoryMap: Record<string, string> = { immunizations: "immunization" };
+  const reverseStatusMap: Record<string, "up_to_date" | "due_soon" | "overdue"> = {
+    current: "up_to_date",
+    "due soon": "due_soon",
+    overdue: "overdue",
+  };
+
+  async function loadHealthRow(id: number) {
+    const db = await getDb();
+    if (!db) return null;
+    const rows = await db
+      .select({ record: healthRecords, child: children })
+      .from(healthRecords)
+      .innerJoin(children, eq(healthRecords.childId, children.id))
+      .where(eq(healthRecords.id, id));
+    if (!rows.length) return null;
+    const { record, child } = rows[0];
+    const categoryMap: Record<string, string> = { immunization: "immunizations" };
+    const statusMap: Record<string, string> = {
+      up_to_date: "Current",
+      due_soon: "Due Soon",
+      overdue: "Overdue",
+      exempt: "Current",
+      not_required: "Current",
+    };
+    return {
+      id: String(record.id),
+      childId: String(child.id),
+      childName: `${child.firstName} ${child.lastName}`,
+      category: categoryMap[record.type] ?? record.type,
+      status: statusMap[record.status ?? "up_to_date"] ?? "Current",
+      dueDate: record.expiryDate?.toISOString() ?? null,
+      completedDate: record.recordDate.toISOString(),
+      organizationId: record.organizationId,
+    };
+  }
+
+  /**
+   * Create a health record — previously HealthView.swift's "Add Health
+   * Record" sheet only appended to a local array; there was no create
+   * endpoint reachable from the REST-only iOS client (health.create existed
+   * as tRPC only). Body mirrors the GET /api/health row shape.
+   */
+  app.post("/api/health", async (req: Request, res: Response) => {
+    const user = await requireStaff(req);
+    if (!user) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db || user.organizationId == null) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const childId = Number(req.body?.childId);
+    const category = String(req.body?.category ?? "");
+    if (!childId || !category) {
+      res.status(400).json({ error: "childId and category are required" });
+      return;
+    }
+    const type = reverseCategoryMap[category] ?? category;
+    const completedDate = req.body?.completedDate ? new Date(req.body.completedDate) : new Date();
+    const dueDate = req.body?.dueDate ? new Date(req.body.dueDate) : null;
+
+    const [result] = await db.insert(healthRecords).values({
+      childId,
+      organizationId: user.organizationId,
+      type: type as typeof healthRecords.$inferInsert.type,
+      status: "up_to_date",
+      recordDate: completedDate,
+      expiryDate: dueDate,
+      notes: req.body?.notes ?? null,
+    });
+
+    await insertAuditLog({
+      userId: user.id,
+      actorOpenId: user.openId,
+      action: "create",
+      resourceType: "health_record",
+      resourceId: String(result.insertId),
+      ipAddress: clientIpFromReq(req),
+    });
+
+    const row = await loadHealthRow(result.insertId);
+    res.json(row);
+  });
+
+  /**
+   * Update a health record — backs "Mark as Completed" (sets completedDate
+   * to now, status to Current) and "Reschedule Next Visit" (sets a new
+   * dueDate) in HealthView.swift, neither of which had any endpoint to call.
+   */
+  app.post("/api/health/:id", async (req: Request, res: Response) => {
+    const user = await requireStaff(req);
+    if (!user) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    const id = Number(req.params.id);
+    if (!db || !Number.isFinite(id) || user.organizationId == null) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
+    const existing = await loadHealthRow(id);
+    if (!existing || existing.organizationId !== user.organizationId) {
+      res.status(404).json({ error: "Health record not found" });
+      return;
+    }
+
+    const patch: Partial<typeof healthRecords.$inferInsert> = {};
+    if (req.body?.completedDate) patch.recordDate = new Date(req.body.completedDate);
+    if (req.body?.dueDate) patch.expiryDate = new Date(req.body.dueDate);
+    if (typeof req.body?.status === "string") {
+      const mapped = reverseStatusMap[req.body.status.toLowerCase()];
+      if (mapped) patch.status = mapped;
+    }
+    if (req.body?.completedDate && !req.body?.status) patch.status = "up_to_date";
+
+    await db.update(healthRecords).set(patch).where(eq(healthRecords.id, id));
+
+    await insertAuditLog({
+      userId: user.id,
+      actorOpenId: user.openId,
+      action: "update",
+      resourceType: "health_record",
+      resourceId: String(id),
+      ipAddress: clientIpFromReq(req),
+    });
+
+    const row = await loadHealthRow(id);
+    res.json(row);
+  });
+
   app.post("/api/children/:id/assign", async (req: Request, res: Response) => {
     const user = await requireStaff(req);
     if (!user) {

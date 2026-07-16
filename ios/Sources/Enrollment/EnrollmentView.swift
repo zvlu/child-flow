@@ -79,6 +79,9 @@ struct EnrollmentView: View {
         }
         .task { await viewModel.load() }
         .refreshable { await viewModel.load() }
+        .alert("Action Failed", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") { viewModel.errorMessage = nil }
+        } message: { Text(viewModel.errorMessage ?? "") }
     }
 }
 
@@ -87,15 +90,7 @@ struct EnrollmentView: View {
 struct ApplicationRow: View {
     let application: EnrollmentApplication
 
-    var statusColor: Color {
-        switch application.status {
-        case "Approved":     return .cfAttendance
-        case "Under Review": return .cfPrimary
-        case "Pending":      return .orange
-        case "Denied":       return .cfHealth
-        default:             return .secondary
-        }
-    }
+    var statusColor: Color { EnrollmentStatus.color(for: application.status) }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -185,20 +180,21 @@ struct ApplicationDetailView: View {
 
             Section("Update Status") {
                 ForEach(EnrollmentStatus.allCases, id: \.self) { status in
+                    let isCurrent = status.matches(live.status)
                     Button {
-                        viewModel.updateStatus(live, to: status.displayName)
+                        Task { await viewModel.updateStatus(live, to: status) }
                     } label: {
                         HStack {
                             Label(status.actionLabel, systemImage: status.icon)
-                                .foregroundColor(live.status == status.displayName ? .secondary : status.color)
+                                .foregroundColor(isCurrent ? .secondary : status.color)
                             Spacer()
-                            if live.status == status.displayName {
+                            if isCurrent {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(status.color)
                             }
                         }
                     }
-                    .disabled(live.status == status.displayName)
+                    .disabled(isCurrent || viewModel.isUpdating(live.id))
                 }
             }
 
@@ -216,11 +212,61 @@ struct ApplicationDetailView: View {
         .navigationTitle(live.childName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showAssignClassroom) {
-            AssignClassroomSheet(
-                member: StaffMember(id:"", fullName:"", role:"", roleKey:"", email:"", phone:"",
-                                    trainingHours:0, classroom: live.classroom)
-            ) { classroom in
-                viewModel.assignClassroom(live, to: classroom)
+            EnrollmentClassroomPickerSheet(currentClassroomName: live.classroom) { room in
+                Task { await viewModel.assignClassroom(live, classroomId: room.id, classroomName: room.name) }
+            }
+        }
+    }
+}
+
+// MARK: - Classroom Picker (real classrooms, for assigning a newly-enrolled child)
+
+struct EnrollmentClassroomPickerSheet: View {
+    let currentClassroomName: String?
+    let onSave: (ClassroomSummary) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var classrooms: [ClassroomSummary] = []
+    @State private var isLoading = false
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading {
+                    ProgressView()
+                } else if classrooms.isEmpty {
+                    ContentUnavailableView("No Classrooms", systemImage: "door.left.hand.closed",
+                                           description: Text("Add classrooms first from the Children tab."))
+                } else {
+                    List(classrooms) { room in
+                        Button {
+                            onSave(room)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(room.name).foregroundColor(.cfTextPrimary)
+                                    Text("\(room.enrolledCount)/\(room.capacity) enrolled")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if currentClassroomName == room.name {
+                                    Image(systemName: "checkmark").foregroundColor(.cfPrimary)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Assign Classroom")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            }
+            .task {
+                isLoading = true
+                classrooms = (try? await APIClient.shared.getClassrooms()) ?? []
+                isLoading = false
             }
         }
     }
@@ -278,15 +324,7 @@ struct AddApplicationSheet: View {
 
 struct ApplicationStatusBadge: View {
     let status: String
-    var color: Color {
-        switch status {
-        case "Approved":     return .cfAttendance
-        case "Pending":      return .orange
-        case "Under Review": return .cfPrimary
-        case "Denied":       return .cfHealth
-        default:             return .secondary
-        }
-    }
+    var color: Color { EnrollmentStatus.color(for: status) }
     var body: some View {
         Text(status)
             .font(.caption2.weight(.semibold))
@@ -361,6 +399,28 @@ enum EnrollmentStatus: String, CaseIterable {
         case .denied:      return .cfHealth
         }
     }
+
+    /// Whether a raw status string from the server matches this case. The server's
+    /// enrollment-application status enum also has an "enrolled" state (surfaced as
+    /// "Enrolled") once approve-and-enroll runs — that's the same real-world outcome
+    /// as `.approved`, just a later stage of the same record, so treat it as a match.
+    func matches(_ rawStatus: String) -> Bool {
+        if rawStatus == displayName { return true }
+        if self == .approved && rawStatus == "Enrolled" { return true }
+        return false
+    }
+
+    /// Shared status -> color mapping for badges/rows, including the "Enrolled" state
+    /// (see `matches(_:)`) which has no corresponding `EnrollmentStatus` case of its own.
+    static func color(for rawStatus: String) -> Color {
+        switch rawStatus {
+        case "Approved", "Enrolled": return .cfAttendance
+        case "Under Review":         return .cfPrimary
+        case "Pending":              return .orange
+        case "Denied":               return .cfHealth
+        default:                     return .secondary
+        }
+    }
 }
 
 // MARK: - ViewModel
@@ -371,39 +431,99 @@ class EnrollmentViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var selectedStatus: EnrollmentStatus? = nil
     @Published var isLoading = false
+    @Published var errorMessage: String?
+
+    /// Application id -> in-flight status/enroll request, so buttons for that
+    /// row can disable themselves and avoid duplicate taps mid-request.
+    @Published private var updatingIds: Set<String> = []
+
+    /// Application id -> real DB child id, known once approve-and-enroll succeeds
+    /// this session. GET /api/enrollment doesn't return the enrolled child id, so
+    /// this is the only way "Assign Classroom" can know which real child to target.
+    private var enrolledChildIds: [String: String] = [:]
+
+    /// Application id -> classroom name assigned this session. GET /api/enrollment
+    /// always returns `classroom: null` (not tracked there yet), so this local cache
+    /// is reapplied after every reload to avoid the UI losing the assignment the
+    /// user just made.
+    private var assignedClassrooms: [String: String] = [:]
 
     var filteredApplications: [EnrollmentApplication] {
         applications.filter { app in
             let matchesSearch = searchText.isEmpty || app.childName.localizedCaseInsensitiveContains(searchText)
-            let matchesStatus = selectedStatus == nil || app.status == selectedStatus?.displayName
+            let matchesStatus = selectedStatus == nil || selectedStatus!.matches(app.status)
             return matchesSearch && matchesStatus
         }
     }
 
     func count(for status: EnrollmentStatus) -> Int {
-        applications.filter { $0.status == status.displayName }.count
+        applications.filter { status.matches($0.status) }.count
     }
+
+    func isUpdating(_ id: String) -> Bool { updatingIds.contains(id) }
 
     func add(_ app: EnrollmentApplication) { applications.insert(app, at: 0) }
 
-    func updateStatus(_ app: EnrollmentApplication, to status: String) {
-        guard let i = applications.firstIndex(where: { $0.id == app.id }) else { return }
-        applications[i] = EnrollmentApplication(id: app.id, childName: app.childName, status: status,
-                                                 applicationDate: app.applicationDate,
-                                                 priority: app.priority, classroom: app.classroom)
+    /// Approve => approve-and-enroll (materializes a real family + child record);
+    /// pending/under-review/denied => a plain status change. Both are real server
+    /// calls now — this used to just mutate the local `applications` array.
+    func updateStatus(_ app: EnrollmentApplication, to status: EnrollmentStatus) async {
+        errorMessage = nil
+        updatingIds.insert(app.id)
+        defer { updatingIds.remove(app.id) }
+        do {
+            if status == .approved {
+                let result = try await APIClient.shared.enrollApplication(id: app.id)
+                enrolledChildIds[app.id] = String(result.childId)
+            } else {
+                let serverStatus: String
+                switch status {
+                case .pending:     serverStatus = "pending"
+                case .underReview: serverStatus = "reviewing"
+                case .denied:      serverStatus = "denied"
+                case .approved:    serverStatus = "approved" // unreachable, handled above
+                }
+                try await APIClient.shared.updateEnrollmentStatus(id: app.id, status: serverStatus)
+            }
+            await load()
+        } catch {
+            // Surface real server errors (e.g. "Enrollment limit reached…") instead
+            // of silently updating local state.
+            errorMessage = Self.message(for: error)
+        }
     }
 
-    func assignClassroom(_ app: EnrollmentApplication, to classroom: String) {
-        guard let i = applications.firstIndex(where: { $0.id == app.id }) else { return }
-        applications[i] = EnrollmentApplication(id: app.id, childName: app.childName, status: app.status,
-                                                 applicationDate: app.applicationDate,
-                                                 priority: app.priority, classroom: classroom)
+    /// Assign a real classroom to a child that's already been approved & enrolled
+    /// this session — reuses the existing `POST /api/children/:id/assign` endpoint
+    /// rather than a new one, since this is really "assign the newly-enrolled child
+    /// to a classroom," not an enrollment-specific action.
+    func assignClassroom(_ app: EnrollmentApplication, classroomId: String, classroomName: String) async {
+        errorMessage = nil
+        guard let childId = enrolledChildIds[app.id] else {
+            errorMessage = "Approve this application before assigning a classroom."
+            return
+        }
+        do {
+            try await APIClient.shared.assignChild(childId: childId, classroomId: classroomId)
+            assignedClassrooms[app.id] = classroomName
+            await load()
+        } catch {
+            errorMessage = Self.message(for: error)
+        }
     }
 
     func load() async {
         isLoading = true
         do {
-            applications = try await APIClient.shared.getEnrollmentApplications()
+            let fetched = try await APIClient.shared.getEnrollmentApplications()
+            // Reapply this session's classroom assignments — the server doesn't
+            // return `classroom` for enrollment applications yet.
+            applications = fetched.map { app in
+                guard app.classroom == nil, let override = assignedClassrooms[app.id] else { return app }
+                return EnrollmentApplication(id: app.id, childName: app.childName, status: app.status,
+                                             applicationDate: app.applicationDate, priority: app.priority,
+                                             classroom: override)
+            }
         } catch {
             #if DEBUG
             let now = Date()
@@ -419,5 +539,9 @@ class EnrollmentViewModel: ObservableObject {
             #endif
         }
         isLoading = false
+    }
+
+    private static func message(for error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? "Something went wrong. Please try again."
     }
 }

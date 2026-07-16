@@ -12,9 +12,19 @@ struct DashboardView: View {
             ZStack(alignment: .top) {
                 Color.cfBackground.ignoresSafeArea()
 
+                ScrollViewReader { scrollProxy in
                 ScrollView {
                     VStack(spacing: 0) {
-                        DashboardHeader(userName: appState.currentUser?.fullName ?? "", onMenuTap: { showMenu = true }, onSearchTap: { showSearch = true })
+                        DashboardHeader(
+                            userName: appState.currentUser?.fullName ?? "",
+                            hasAlerts: !viewModel.alerts.isEmpty,
+                            onMenuTap: { showMenu = true },
+                            onSearchTap: { showSearch = true },
+                            onBellTap: {
+                                guard !viewModel.alerts.isEmpty else { return }
+                                withAnimation { scrollProxy.scrollTo("dashboard-alerts-section", anchor: .top) }
+                            }
+                        )
 
                         VStack(spacing: 20) {
                             // Clock Widget
@@ -83,12 +93,14 @@ struct DashboardView: View {
                                             .padding(.horizontal)
                                     }
                                 }
+                                .id("dashboard-alerts-section")
                             }
 
                             Spacer(minLength: 32)
                         }
                         .padding(.top, 24)
                     }
+                }
                 }
             }
             .navigationBarHidden(true)
@@ -450,8 +462,14 @@ struct AgendaEventRow: View {
 
 struct DashboardHeader: View {
     let userName: String
+    var hasAlerts: Bool = false
     var onMenuTap: (() -> Void)? = nil
     var onSearchTap: (() -> Void)? = nil
+    /// Scrolls the dashboard down to its own "Alerts & Reminders" section.
+    /// There's no separate notification-center screen in this app — the
+    /// dashboard's alert feed *is* where a staff member's alerts live, so the
+    /// bell just jumps there instead of pretending to open something new.
+    var onBellTap: (() -> Void)? = nil
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -503,15 +521,20 @@ struct DashboardHeader: View {
                                 .foregroundColor(.white.opacity(0.85))
                         }
                         .accessibilityLabel("Search children and families")
-                        ZStack(alignment: .topTrailing) {
-                            Image(systemName: "bell.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(.white.opacity(0.85))
-                            Circle()
-                                .fill(Color.cfAccent)
-                                .frame(width: 8, height: 8)
-                                .offset(x: 2, y: -2)
+                        Button(action: { onBellTap?() }) {
+                            ZStack(alignment: .topTrailing) {
+                                Image(systemName: "bell.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.white.opacity(0.85))
+                                if hasAlerts {
+                                    Circle()
+                                        .fill(Color.cfAccent)
+                                        .frame(width: 8, height: 8)
+                                        .offset(x: 2, y: -2)
+                                }
+                            }
                         }
+                        .accessibilityLabel(hasAlerts ? "Alerts and reminders, unread" : "Alerts and reminders")
                         Button(action: { onMenuTap?() }) {
                             Image(systemName: "line.3.horizontal")
                                 .font(.system(size: 20, weight: .medium))

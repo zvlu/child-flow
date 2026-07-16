@@ -50,7 +50,6 @@ import {
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
 import { CommandPalette } from "./CommandPalette";
 import {
   TOP_NAV_PRIMARY_COUNT,
@@ -96,10 +95,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const effectiveSideSections = applySideNav(navPrefs, navRole, orgModules);
   const topNavPrimaryItems = effectiveTopNav.slice(0, TOP_NAV_PRIMARY_COUNT);
   const topNavOverflowItems = effectiveTopNav.slice(TOP_NAV_PRIMARY_COUNT);
-
-  const handleTopNavAction = (label: string) => {
-    toast.info(`${label} module selected`);
-  };
 
   const isTopNavActive = (path: string) => location === path || location.startsWith(`${path}/`);
   const isNavItemActive = (path: string) => location === path || (path !== "/dashboard" && location.startsWith(path));
@@ -232,7 +227,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <div className="hidden xl:block">
             <CommandPalette />
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-card/10" onClick={() => handleTopNavAction("Print")}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-card/10" onClick={() => window.print()}>
             <Printer className="h-4 w-4" />
           </Button>
           {/* Account menu — identity, settings, theme, sign out. */}

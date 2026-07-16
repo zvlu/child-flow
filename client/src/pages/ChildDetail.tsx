@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -165,8 +165,11 @@ export default function ChildDetail({ id }: ChildDetailProps) {
   const [editStatus, setEditStatus] = useState<"active" | "inactive" | "graduated" | "withdrawn">("active");
   const [editNotes, setEditNotes] = useState("");
 
-  // Stat cards jump to their tab, so Tabs must be controlled.
-  const [activeTab, setActiveTab] = useState("profile");
+  // Stat cards jump to their tab, so Tabs must be controlled. Row actions from
+  // the Children list deep-link here with ?tab=health|attendance|family etc.
+  const VALID_TABS = new Set(["profile", "health", "attendance", "assessments", "documents", "family"]);
+  const tabParam = new URLSearchParams(useSearch()).get("tab");
+  const [activeTab, setActiveTab] = useState(tabParam && VALID_TABS.has(tabParam) ? tabParam : "profile");
 
   // Sibling linking: pick another child and merge them into this family.
   const [showSiblingDialog, setShowSiblingDialog] = useState(false);

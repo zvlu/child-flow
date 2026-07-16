@@ -97,7 +97,9 @@ struct ERSEAView: View {
             IncomeEligibilityCalculator()
         }
         .sheet(isPresented: $showSuspensionLog) {
-            SuspensionLogView(logs: vm.suspensionLogs)
+            SuspensionLogView(logs: vm.suspensionLogs) { log in
+                vm.suspensionLogs.insert(log, at: 0)
+            }
         }
         .task { await vm.load() }
         .refreshable { await vm.load() }
@@ -391,6 +393,49 @@ struct EligibilityDetailView: View {
                 Task { try? await APIClient.shared.updateEligibilityRecord(record); onUpdate() }
             }
         }
+        .sheet(isPresented: $showDeny) {
+            DenyApplicantSheet(childName: record.childName) { reason in
+                record.status = .denied
+                record.waitlistPosition = nil
+                if !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    record.notes = record.notes.isEmpty ? reason : "\(record.notes)\n\(reason)"
+                }
+                Task { try? await APIClient.shared.updateEligibilityRecord(record); onUpdate() }
+            }
+        }
+    }
+}
+
+// MARK: - Deny Applicant Sheet
+
+private struct DenyApplicantSheet: View {
+    let childName: String
+    let onDeny: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var reason = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Mark \(childName) as Ineligible") {
+                    Text("This moves the applicant out of the waitlist/pending queues into the Denied list.")
+                        .font(.caption)
+                        .foregroundColor(.cfTextSecondary)
+                    TextField("Reason (optional)", text: $reason)
+                }
+            }
+            .navigationTitle("Mark Ineligible")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Confirm", role: .destructive) {
+                        onDeny(reason.trimmingCharacters(in: .whitespacesAndNewlines))
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -625,9 +670,15 @@ struct AddApplicantSheet: View {
 // MARK: - Suspension Log View
 
 struct SuspensionLogView: View {
-    let logs: [SuspensionExpulsionLog]
+    let onLogAdded: ((SuspensionExpulsionLog) -> Void)?
+    @State private var logs: [SuspensionExpulsionLog]
     @State private var showAddLog = false
     @Environment(\.dismiss) private var dismiss
+
+    init(logs: [SuspensionExpulsionLog], onLogAdded: ((SuspensionExpulsionLog) -> Void)? = nil) {
+        _logs = State(initialValue: logs)
+        self.onLogAdded = onLogAdded
+    }
 
     var body: some View {
         NavigationStack {
@@ -668,7 +719,10 @@ struct SuspensionLogView: View {
                 }
             }
             .sheet(isPresented: $showAddLog) {
-                AddSuspensionLogSheet { _ in }
+                AddSuspensionLogSheet { log in
+                    logs.insert(log, at: 0)
+                    onLogAdded?(log)
+                }
             }
         }
     }
@@ -781,6 +835,8 @@ struct AddSuspensionLogSheet: View {
     @State private var familyMeeting = false
     @State private var bsp = false
     @State private var stateNotified = false
+    @State private var isSaving = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -809,7 +865,7 @@ struct AddSuspensionLogSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button(isSaving ? "Saving…" : "Save") {
                         let log = SuspensionExpulsionLog(
                             id: UUID().uuidString, childId: UUID().uuidString,
                             childName: childName, incidentDate: incidentDate,
@@ -820,12 +876,29 @@ struct AddSuspensionLogSheet: View {
                             stateAgencyNotified: stateNotified, stateNotificationDate: stateNotified ? Date() : nil,
                             outcome: .pending, resolutionDate: nil, notes: ""
                         )
-                        onSave(log)
-                        dismiss()
+                        isSaving = true
+                        Task {
+                            do {
+                                try await APIClient.shared.createSuspensionLog(log)
+                                await MainActor.run {
+                                    isSaving = false
+                                    onSave(log)
+                                    dismiss()
+                                }
+                            } catch {
+                                await MainActor.run {
+                                    isSaving = false
+                                    errorMessage = "This incident log wasn't saved. Check your connection and try again."
+                                }
+                            }
+                        }
                     }
-                    .disabled(childName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(childName.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
                 }
             }
+            .alert("Couldn't Save", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 }

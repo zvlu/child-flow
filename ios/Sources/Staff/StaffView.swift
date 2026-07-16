@@ -45,14 +45,22 @@ struct StaffView: View {
             }
         }
         .sheet(isPresented: $showAddStaff) {
-            AddStaffSheet { newMember in
-                viewModel.add(newMember)
+            AddStaffSheet { firstName, lastName, email, phone, role in
+                Task { await viewModel.createStaff(firstName: firstName, lastName: lastName, email: email, phone: phone, role: role) }
             }
         }
         .task { await viewModel.load() }
         .refreshable { await viewModel.load() }
         .overlay {
             if viewModel.isLoading { ProgressView() }
+        }
+        .alert("Notice", isPresented: Binding(
+            get: { viewModel.alertMessage != nil },
+            set: { if !$0 { viewModel.alertMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.alertMessage ?? "")
         }
     }
 }
@@ -199,19 +207,25 @@ struct StaffDetailView: View {
                 }
             }
 
+            // Classroom (re)assignment is admin-only (the server enforces
+            // this on assign-staff too).
             Section("Assignment") {
                 if let classroom = liveMember.classroom {
                     LabeledContent("Classroom", value: classroom)
-                    Button("Change Assignment") { showEditClassroom = true }
-                        .foregroundColor(.cfPrimary)
+                    if appState.isAdmin {
+                        Button("Change Assignment") { showEditClassroom = true }
+                            .foregroundColor(.cfPrimary)
+                    }
                 } else {
                     HStack {
                         Text("No classroom assigned")
                             .foregroundColor(.secondary)
                         Spacer()
-                        Button("Assign") { showEditClassroom = true }
-                            .font(.cfCaption.bold())
-                            .foregroundColor(.cfPrimary)
+                        if appState.isAdmin {
+                            Button("Assign") { showEditClassroom = true }
+                                .font(.cfCaption.bold())
+                                .foregroundColor(.cfPrimary)
+                        }
                     }
                 }
             }
@@ -233,13 +247,13 @@ struct StaffDetailView: View {
         .navigationTitle(liveMember.fullName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showLogTraining) {
-            LogTrainingSheet(member: liveMember) { hours in
-                viewModel.addTrainingHours(to: liveMember, hours: hours)
+            LogTrainingSheet(member: liveMember) { hours, trainingType, date, notes in
+                Task { await viewModel.logTraining(member: liveMember, trainingName: trainingType, hours: hours, date: date, notes: notes) }
             }
         }
         .sheet(isPresented: $showEditClassroom) {
-            AssignClassroomSheet(member: liveMember) { classroom in
-                viewModel.assignClassroom(to: liveMember, classroom: classroom)
+            AssignClassroomSheet(member: liveMember, classrooms: viewModel.classrooms) { newClassroom in
+                Task { await viewModel.assignClassroom(member: liveMember, to: newClassroom) }
             }
         }
     }
@@ -249,7 +263,8 @@ struct StaffDetailView: View {
 
 struct LogTrainingSheet: View {
     let member: StaffMember
-    let onSave: (Int) -> Void
+    /// hours, trainingType, date, notes
+    let onSave: (Int, String, Date, String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var hours = 1
     @State private var trainingType = "Professional Development"
@@ -276,7 +291,7 @@ struct LogTrainingSheet: View {
                 }
                 Section {
                     Button("Save") {
-                        onSave(hours)
+                        onSave(hours, trainingType, date, notes.trimmingCharacters(in: .whitespacesAndNewlines))
                         dismiss()
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -297,23 +312,45 @@ struct LogTrainingSheet: View {
 
 struct AssignClassroomSheet: View {
     let member: StaffMember
-    let onSave: (String) -> Void
+    /// Real classrooms loaded from the server (GET /api/classrooms) — this
+    /// used to be a hardcoded, made-up room list disconnected from any real
+    /// classroom record, so "assigning" a room here couldn't possibly persist.
+    let classrooms: [ClassroomSummary]
+    /// nil means "unassign".
+    let onSave: (ClassroomSummary?) -> Void
     @Environment(\.dismiss) private var dismiss
-
-    let classrooms = ["Room 1A", "Room 1B", "Room 2A", "Room 2B", "Room 3", "Float"]
 
     var body: some View {
         NavigationStack {
-            List(classrooms, id: \.self) { room in
-                Button {
-                    onSave(room)
-                    dismiss()
-                } label: {
-                    HStack {
-                        Text(room).foregroundColor(.cfTextPrimary)
-                        Spacer()
-                        if member.classroom == room {
-                            Image(systemName: "checkmark").foregroundColor(.cfPrimary)
+            List {
+                if member.classroom != nil {
+                    Section {
+                        Button(role: .destructive) {
+                            onSave(nil)
+                            dismiss()
+                        } label: {
+                            Label("Unassign from \(member.classroom ?? "current classroom")", systemImage: "xmark.circle")
+                        }
+                    }
+                }
+                Section {
+                    if classrooms.isEmpty {
+                        Text("No classrooms available.")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(classrooms) { room in
+                            Button {
+                                onSave(room)
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    Text(room.name).foregroundColor(.cfTextPrimary)
+                                    Spacer()
+                                    if member.classroom == room.name {
+                                        Image(systemName: "checkmark").foregroundColor(.cfPrimary)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -330,23 +367,27 @@ struct AssignClassroomSheet: View {
 // MARK: - Add Staff Sheet
 
 struct AddStaffSheet: View {
-    let onSave: (StaffMember) -> Void
+    /// firstName, lastName, email, phone, role — the server (POST /api/staff)
+    /// only requires firstName/lastName; email/phone are optional.
+    let onSave: (String, String, String, String, StaffRole) -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var fullName = ""
+    @State private var firstName = ""
+    @State private var lastName = ""
     @State private var email = ""
     @State private var phone = ""
     @State private var selectedRole: StaffRole = .teacher
 
     var canSave: Bool {
-        !fullName.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !email.trimmingCharacters(in: .whitespaces).isEmpty
+        !firstName.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !lastName.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Personal Info") {
-                    TextField("Full Name", text: $fullName)
+                    TextField("First Name", text: $firstName)
+                    TextField("Last Name", text: $lastName)
                     TextField("Email", text: $email)
                         .keyboardType(.emailAddress)
                         .autocapitalization(.none)
@@ -363,17 +404,13 @@ struct AddStaffSheet: View {
                 }
                 Section {
                     Button("Add Staff Member") {
-                        let m = StaffMember(
-                            id: UUID().uuidString,
-                            fullName: fullName.trimmingCharacters(in: .whitespaces),
-                            role: selectedRole.singleName,
-                            roleKey: selectedRole.rawValue,
-                            email: email.trimmingCharacters(in: .whitespaces),
-                            phone: phone,
-                            trainingHours: 0,
-                            classroom: nil
+                        onSave(
+                            firstName.trimmingCharacters(in: .whitespaces),
+                            lastName.trimmingCharacters(in: .whitespaces),
+                            email.trimmingCharacters(in: .whitespaces),
+                            phone.trimmingCharacters(in: .whitespaces),
+                            selectedRole
                         )
-                        onSave(m)
                         dismiss()
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -486,8 +523,11 @@ enum StaffRole: String, CaseIterable {
 @MainActor
 class StaffViewModel: ObservableObject {
     @Published var allStaff: [StaffMember] = []
+    @Published var classrooms: [ClassroomSummary] = []
     @Published var searchText = ""
     @Published var isLoading = false
+    /// Set when a save fails (including admin-only 403s); shown as an alert.
+    @Published var alertMessage: String?
 
     func filtered(for role: StaffRole) -> [StaffMember] {
         let byRole = allStaff.filter { $0.roleKey == role.rawValue }
@@ -504,30 +544,98 @@ class StaffViewModel: ObservableObject {
         return rest.filter { $0.fullName.localizedCaseInsensitiveContains(searchText) }
     }
 
-    func add(_ member: StaffMember) { allStaff.append(member) }
-
-    func addTrainingHours(to member: StaffMember, hours: Int) {
-        guard let i = allStaff.firstIndex(where: { $0.id == member.id }) else { return }
-        allStaff[i] = StaffMember(id: member.id, fullName: member.fullName,
-                                  role: member.role, roleKey: member.roleKey,
-                                  email: member.email, phone: member.phone,
-                                  trainingHours: member.trainingHours + hours,
-                                  classroom: member.classroom)
+    /// Creates the staff member server-side (admin-only) and reloads from
+    /// the server so the directory reflects the real, persisted record.
+    @discardableResult
+    func createStaff(firstName: String, lastName: String, email: String, phone: String, role: StaffRole) async -> Bool {
+        do {
+            try await APIClient.shared.createStaffMember(
+                firstName: firstName,
+                lastName: lastName,
+                email: email.isEmpty ? nil : email,
+                phone: phone.isEmpty ? nil : phone,
+                position: nil,
+                role: role.rawValue
+            )
+            await load()
+            return true
+        } catch {
+            alertMessage = friendlyMessage(for: error, action: "add that staff member")
+            return false
+        }
     }
 
-    func assignClassroom(to member: StaffMember, classroom: String) {
-        guard let i = allStaff.firstIndex(where: { $0.id == member.id }) else { return }
-        allStaff[i] = StaffMember(id: member.id, fullName: member.fullName,
-                                  role: member.role, roleKey: member.roleKey,
-                                  email: member.email, phone: member.phone,
-                                  trainingHours: member.trainingHours,
-                                  classroom: classroom)
+    /// Logs training hours server-side and reloads so the running total
+    /// (summed server-side from all logged training) stays accurate.
+    @discardableResult
+    func logTraining(member: StaffMember, trainingName: String, hours: Int, date: Date, notes: String) async -> Bool {
+        guard let staffId = Int(member.id) else {
+            alertMessage = "Couldn't identify that staff member."
+            return false
+        }
+        do {
+            try await APIClient.shared.logTrainingHours(
+                staffId: staffId,
+                trainingName: trainingName,
+                hours: Double(hours),
+                trainingDate: date,
+                notes: notes.isEmpty ? nil : notes
+            )
+            await load()
+            return true
+        } catch {
+            alertMessage = friendlyMessage(for: error, action: "log those training hours")
+            return false
+        }
+    }
+
+    /// Reassigns (or unassigns, if `newClassroom` is nil) a staff member's
+    /// classroom (admin-only). If they're currently assigned elsewhere, that
+    /// slot is cleared first so they never appear in two rooms at once.
+    /// Classrooms only track a single teacherId/assistantId, so the role
+    /// written is inferred from the member's own role (assistant vs. teacher).
+    @discardableResult
+    func assignClassroom(member: StaffMember, to newClassroom: ClassroomSummary?) async -> Bool {
+        guard let staffId = Int(member.id) else {
+            alertMessage = "Couldn't identify that staff member."
+            return false
+        }
+        let role = member.roleKey == "assistant" ? "assistant" : "teacher"
+        do {
+            if let currentName = member.classroom,
+               currentName != newClassroom?.name,
+               let previous = classrooms.first(where: { $0.name == currentName }),
+               let previousId = Int(previous.id) {
+                try await APIClient.shared.assignClassroomStaff(classroomId: previousId, role: role, staffId: nil)
+            }
+            if let newClassroom, let newId = Int(newClassroom.id) {
+                try await APIClient.shared.assignClassroomStaff(classroomId: newId, role: role, staffId: staffId)
+            }
+            await load()
+            return true
+        } catch {
+            alertMessage = friendlyMessage(for: error, action: "update that classroom assignment")
+            return false
+        }
+    }
+
+    private func friendlyMessage(for error: Error, action: String) -> String {
+        if case APIError.httpError(403) = error {
+            return "Admin access required."
+        }
+        if let apiError = error as? APIError {
+            return apiError.errorDescription ?? "Couldn't \(action). Check your connection and try again."
+        }
+        return "Couldn't \(action). Check your connection and try again."
     }
 
     func load() async {
         isLoading = true
+        defer { isLoading = false }
+        async let staffTask = APIClient.shared.getStaff()
+        async let classroomsTask = APIClient.shared.getClassrooms()
         do {
-            allStaff = try await APIClient.shared.getStaff()
+            allStaff = try await staffTask
         } catch {
             #if DEBUG
             allStaff = [
@@ -542,6 +650,10 @@ class StaffViewModel: ObservableObject {
             ]
             #endif
         }
-        isLoading = false
+        do {
+            classrooms = try await classroomsTask
+        } catch {
+            // Non-fatal: the assign-classroom sheet just shows no rooms.
+        }
     }
 }
