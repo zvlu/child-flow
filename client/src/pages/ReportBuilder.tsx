@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, Plus, Edit2, Trash2, Download, Eye, Loader2, Copy } from "lucide-react";
+import { BarChart3, Plus, Edit2, Trash2, Download, Eye, Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -44,7 +44,7 @@ export function ReportBuilder() {
   const allReports = reports ?? [];
 
   const [showBuilder, setShowBuilder] = useState(false);
-  const [duplicating, setDuplicating] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState(emptyDraft);
 
   const [viewResult, setViewResult] = useState<RunResult | null>(null);
@@ -54,12 +54,22 @@ export function ReportBuilder() {
   const createReport = trpc.reportBuilder.create.useMutation({
     onSuccess: async () => {
       await utils.reportBuilder.list.invalidate(orgId);
-      toast.success(duplicating ? "Report duplicated" : "Report created");
+      toast.success("Report created");
       setShowBuilder(false);
       setDraft(emptyDraft);
-      setDuplicating(false);
     },
     onError: (e) => toast.error(e.message || "Could not save report"),
+  });
+
+  const updateReport = trpc.reportBuilder.update.useMutation({
+    onSuccess: async () => {
+      await utils.reportBuilder.list.invalidate(orgId);
+      toast.success("Report updated");
+      setShowBuilder(false);
+      setDraft(emptyDraft);
+      setEditingId(null);
+    },
+    onError: (e) => toast.error(e.message || "Could not update report"),
   });
 
   const runReport = trpc.reportBuilder.run.useMutation({
@@ -74,32 +84,38 @@ export function ReportBuilder() {
     onError: (e) => toast.error(e.message || "Could not delete report"),
   });
 
-  const handleCreateReport = () => {
+  const handleSaveReport = () => {
     if (!draft.reportName.trim()) {
       toast.error("Give the report a name.");
       return;
     }
-    createReport.mutate({
-      organizationId: orgId,
-      reportName: draft.reportName.trim(),
-      reportType: draft.reportType,
-      columns: draft.columns,
-    });
+    if (editingId != null) {
+      updateReport.mutate({
+        id: editingId,
+        reportName: draft.reportName.trim(),
+        reportType: draft.reportType,
+        columns: draft.columns,
+      });
+    } else {
+      createReport.mutate({
+        organizationId: orgId,
+        reportName: draft.reportName.trim(),
+        reportType: draft.reportType,
+        columns: draft.columns,
+      });
+    }
   };
 
   const openNewReport = () => {
-    setDuplicating(false);
+    setEditingId(null);
     setDraft(emptyDraft);
     setShowBuilder(true);
   };
 
-  // "Edit" has no backing update endpoint on the server — being honest about
-  // that, this duplicates the report as a new one pre-filled with its settings
-  // rather than pretending to edit it in place.
-  const openDuplicate = (report: (typeof allReports)[number]) => {
-    setDuplicating(true);
+  const openEdit = (report: (typeof allReports)[number]) => {
+    setEditingId(report.id);
     setDraft({
-      reportName: `Copy of ${report.reportName}`,
+      reportName: report.reportName,
       reportType: (report.reportType as ReportType) ?? "custom",
       columns: (report.columns as string[] | null) ?? [...COLUMN_OPTIONS],
     });
@@ -189,7 +205,7 @@ export function ReportBuilder() {
           {reportTypes.map((type) => (
             <button
               key={type.id}
-              onClick={() => { setDuplicating(false); setDraft({ ...emptyDraft, reportType: type.id }); setShowBuilder(true); }}
+              onClick={() => { setEditingId(null); setDraft({ ...emptyDraft, reportType: type.id }); setShowBuilder(true); }}
               className="bg-card rounded-xl shadow-sm border border-border p-6 hover:shadow-md hover:border-[#A7C4AD] transition-all text-left"
             >
               <h3 className="font-semibold text-foreground mb-1">{type.label}</h3>
@@ -259,8 +275,8 @@ export function ReportBuilder() {
                           >
                             {busy && pendingAction === "download" ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : <Download className="w-4 h-4 text-muted-foreground" />}
                           </button>
-                          <button title="Duplicate (there's no in-place edit yet)" onClick={() => openDuplicate(report)} className="p-2 hover:bg-muted rounded-lg transition-colors">
-                            <Copy className="w-4 h-4 text-muted-foreground" />
+                          <button title="Edit" onClick={() => openEdit(report)} className="p-2 hover:bg-muted rounded-lg transition-colors">
+                            <Edit2 className="w-4 h-4 text-muted-foreground" />
                           </button>
                           <button title="Delete" onClick={() => handleDelete(report)} disabled={deleteReport.isPending} className="p-2 hover:bg-muted rounded-lg transition-colors disabled:opacity-50">
                             <Trash2 className="w-4 h-4 text-red-600" />
@@ -275,11 +291,11 @@ export function ReportBuilder() {
           </div>
         </div>
 
-        {/* Report Builder Modal (create, or duplicate-as-new) */}
+        {/* Report Builder Modal (create or edit in place) */}
         {showBuilder && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-card rounded-xl shadow-lg max-w-2xl w-full p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-6">{duplicating ? "Duplicate Report" : "Create New Report"}</h2>
+              <h2 className="text-2xl font-bold text-foreground mb-6">{editingId != null ? "Edit Report" : "Create New Report"}</h2>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">Report Name</label>
@@ -326,14 +342,14 @@ export function ReportBuilder() {
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <button onClick={() => { setShowBuilder(false); setDuplicating(false); }} className="flex-1 bg-muted hover:bg-muted text-muted-foreground px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
+                  <button onClick={() => { setShowBuilder(false); setEditingId(null); }} className="flex-1 bg-muted hover:bg-muted text-muted-foreground px-4 py-2 rounded-xl transition-colors font-medium">Cancel</button>
                   <button
-                    onClick={handleCreateReport}
-                    disabled={createReport.isPending}
+                    onClick={handleSaveReport}
+                    disabled={createReport.isPending || updateReport.isPending}
                     className="flex-1 bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground px-4 py-2 rounded-xl transition-colors font-medium flex items-center justify-center gap-2"
                   >
-                    {createReport.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {duplicating ? "Save Copy" : "Create Report"}
+                    {(createReport.isPending || updateReport.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {editingId != null ? "Save Changes" : "Create Report"}
                   </button>
                 </div>
               </div>

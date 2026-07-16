@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
+import { objectsToCsv, downloadCsv } from "@/lib/csv";
 
 /** Recent PIR-style program years, current first (year starts in the fall).
  * Same convention as PirReportEditor's recentProgramYears — kept local here
@@ -184,6 +185,50 @@ export default function PerformancePanel() {
     toast.success(`Switched to program year ${pendingYear}`);
   };
 
+  // "Export as PDF" previously just toasted "coming soon." Building a real
+  // PDF renderer would mean adding a new dependency for what the browser
+  // already does natively: printing this page (with `.panel-print-hidden`
+  // elements — the header controls — hidden via @media print, see the
+  // stylesheet block below) and choosing "Save as PDF" is a real, honest
+  // PDF export with no new library.
+  const handleExportPdf = () => {
+    // Let the dropdown menu finish closing before the print snapshot is
+    // taken so it doesn't show up over the report (it's also hidden via
+    // `print:hidden` below as a second safeguard).
+    setTimeout(() => window.print(), 150);
+  };
+
+  // "Export as Excel" previously just toasted "coming soon." A true .xlsx
+  // workbook would need a new dependency; a CSV (which Excel opens natively)
+  // is the same honest-export pattern already used elsewhere in this app
+  // (Staff export, ReportBuilder, Billing) and needs no new library.
+  const handleExportExcel = () => {
+    const rows: Record<string, string | number>[] = [
+      { Section: "Enrollment", Metric: "Active Children", Value: activeChildren },
+      { Section: "Enrollment", Metric: "Enrolled (by classroom)", Value: totalEnrolledInClassrooms },
+      { Section: "Enrollment", Metric: "Total Capacity", Value: totalCapacity },
+      {
+        Section: "Attendance",
+        Metric: "Present (last 30 days)",
+        Value: `${attendanceTotals.present} of ${attendanceTotals.total}`,
+      },
+      { Section: "Health", Metric: "Records Tracked", Value: healthTotal },
+      ...healthStatusData.map((s) => ({ Section: "Health — Status", Metric: s.name, Value: s.value })),
+      ...enrollmentByClassroom.map((c) => ({
+        Section: "Enrollment — By Classroom",
+        Metric: c.name,
+        Value: `${c.enrolled} of ${c.capacity}`,
+      })),
+      ...healthByType.map((t) => ({
+        Section: "Health — By Type",
+        Metric: t.label,
+        Value: `${t.ok} of ${t.total} compliant`,
+      })),
+    ];
+    downloadCsv(`performance-panel-${programYear}-${new Date().toISOString().slice(0, 10)}.csv`, objectsToCsv(rows));
+    toast.success("Exported panel data");
+  };
+
   // ---- Enrollment ----
   const totalCapacity = useMemo(
     () => (classrooms ?? []).reduce((sum, c) => sum + (c.capacity ?? 0), 0),
@@ -287,7 +332,7 @@ export default function PerformancePanel() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="h-10 w-10 border-border bg-card shadow-sm rounded-xl hover:bg-muted">
+              <Button variant="outline" size="icon" className="h-10 w-10 border-border bg-card shadow-sm rounded-xl hover:bg-muted print:hidden">
                 <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
@@ -302,21 +347,11 @@ export default function PerformancePanel() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuLabel>Export Options</DropdownMenuLabel>
-              <DropdownMenuItem
-                disabled
-                className="opacity-60 cursor-not-allowed"
-                title="Coming soon"
-                onClick={() => toast.info("PDF export coming soon")}
-              >
-                <FileText className="mr-2 h-4 w-4" /> Export as PDF <span className="font-normal opacity-75">(soon)</span>
+              <DropdownMenuItem onClick={handleExportPdf}>
+                <FileText className="mr-2 h-4 w-4" /> Export as PDF
               </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled
-                className="opacity-60 cursor-not-allowed"
-                title="Coming soon"
-                onClick={() => toast.info("Excel export coming soon")}
-              >
-                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as Excel <span className="font-normal opacity-75">(soon)</span>
+              <DropdownMenuItem onClick={handleExportExcel}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as Excel
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

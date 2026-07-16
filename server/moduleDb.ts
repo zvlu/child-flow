@@ -1292,6 +1292,21 @@ export async function createCustomReport(data: InsertCustomReport) {
   return { id: result.insertId };
 }
 
+/**
+ * Was missing — ReportBuilder.tsx's "Edit" only worked by creating a
+ * duplicate (there was no way to update a saved report's own definition
+ * in place).
+ */
+export async function updateCustomReport(
+  id: number,
+  data: Partial<Pick<InsertCustomReport, "reportName" | "reportType" | "filters" | "columns">>
+) {
+  if (isEmptyPatch(data)) return { success: true };
+  const db = await requireDb();
+  await db.update(customReports).set(data).where(eq(customReports.id, id));
+  return { success: true };
+}
+
 /** Run a saved report against live data and return row data by report type. */
 export async function runCustomReport(reportId: number) {
   const db = await requireDb();

@@ -277,9 +277,18 @@ struct ReportAbsenceSheet: View {
         NavigationStack {
             Form {
                 Section(L(.whoStayingHome)) {
-                    Picker(L(.childLabel), selection: $selectedChildId) {
-                        ForEach(children) { child in
-                            Text(child.fullName).tag(child.id)
+                    if children.isEmpty {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text(L(.loadingChildren))
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        Picker(L(.childLabel), selection: $selectedChildId) {
+                            ForEach(children) { child in
+                                Text(child.fullName).tag(child.id)
+                            }
                         }
                     }
                 }
@@ -326,6 +335,17 @@ struct ReportAbsenceSheet: View {
             }
             .onAppear {
                 if selectedChildId.isEmpty { selectedChildId = children.first?.id ?? "" }
+            }
+            // The sheet can open before the family's children list has
+            // finished loading (right after login, or on a slow connection),
+            // in which case `.onAppear` ran with an empty `children` array
+            // and never re-fired once the real list arrived — leaving the
+            // submit button permanently disabled with no explanation. Watch
+            // for the list actually populating and pick a default then too.
+            .onChange(of: children.count) { _, newCount in
+                if selectedChildId.isEmpty && newCount > 0 {
+                    selectedChildId = children.first?.id ?? ""
+                }
             }
         }
     }

@@ -86,7 +86,7 @@ enum L10nKey: String {
     // Progress
     case noProgressData, progressWillAppear, attendanceChartFmt, thisWeekFmt
     case noAttendanceRecorded, dashedLine85, familyGoals, done
-    case somethingWentWrong, pullToRefreshRetry
+    case somethingWentWrong, pullToRefreshRetry, loadingChildren
     // Profile
     case myChildren, support, contactSupport, aboutSprout
     case signOut, signOutConfirm, about, appWord, forWord, versionWord, headStartFamilies
@@ -289,6 +289,7 @@ extension FamilyL10n {
         .noProgressData: "No progress data yet",
         .progressWillAppear: "Attendance and goal progress will appear here.",
         .somethingWentWrong: "Couldn't load this right now",
+        .loadingChildren: "Loading your children…",
         .pullToRefreshRetry: "Pull down to try again.",
         .attendanceChartFmt: "%@ — Attendance", .thisWeekFmt: "%d%% this week",
         .noAttendanceRecorded: "No attendance recorded yet.",
@@ -371,6 +372,7 @@ extension FamilyL10n {
         .noProgressData: "Aún no hay datos de progreso",
         .progressWillAppear: "La asistencia y el progreso de metas aparecerán aquí.",
         .somethingWentWrong: "No se pudo cargar esto ahora",
+        .loadingChildren: "Cargando a tus hijos…",
         .pullToRefreshRetry: "Desliza hacia abajo para volver a intentarlo.",
         .attendanceChartFmt: "%@ — Asistencia", .thisWeekFmt: "%d%% esta semana",
         .noAttendanceRecorded: "Aún no hay asistencia registrada.",
@@ -453,6 +455,7 @@ extension FamilyL10n {
         .noProgressData: "Poko gen done pwogrè",
         .progressWillAppear: "Prezans ak pwogrè objektif yo ap parèt isit la.",
         .somethingWentWrong: "Pa t kapab chaje sa a kounye a",
+        .loadingChildren: "N ap chaje pitit ou yo…",
         .pullToRefreshRetry: "Rale desann pou eseye ankò.",
         .attendanceChartFmt: "%@ — Prezans", .thisWeekFmt: "%d%% semèn sa a",
         .noAttendanceRecorded: "Poko gen prezans anrejistre.",
@@ -535,6 +538,7 @@ extension FamilyL10n {
         .noProgressData: "暂无进展数据",
         .progressWillAppear: "出勤和目标进展将显示在这里。",
         .somethingWentWrong: "暂时无法加载",
+        .loadingChildren: "正在加载您的孩子信息…",
         .pullToRefreshRetry: "下拉以重试。",
         .attendanceChartFmt: "%@ — 出勤", .thisWeekFmt: "本周 %d%%",
         .noAttendanceRecorded: "尚无出勤记录。",
@@ -617,6 +621,7 @@ extension FamilyL10n {
         .noProgressData: "Chưa có dữ liệu tiến độ",
         .progressWillAppear: "Chuyên cần và tiến độ mục tiêu sẽ hiển thị tại đây.",
         .somethingWentWrong: "Không thể tải lúc này",
+        .loadingChildren: "Đang tải thông tin con của bạn…",
         .pullToRefreshRetry: "Kéo xuống để thử lại.",
         .attendanceChartFmt: "%@ — Chuyên cần", .thisWeekFmt: "%d%% tuần này",
         .noAttendanceRecorded: "Chưa có dữ liệu chuyên cần.",
@@ -699,6 +704,7 @@ extension FamilyL10n {
         .noProgressData: "لا توجد بيانات تقدّم بعد",
         .progressWillAppear: "سيظهر الحضور وتقدّم الأهداف هنا.",
         .somethingWentWrong: "تعذّر تحميل هذا الآن",
+        .loadingChildren: "جارٍ تحميل بيانات أطفالك…",
         .pullToRefreshRetry: "اسحب للأسفل للمحاولة مرة أخرى.",
         .attendanceChartFmt: "%@ — الحضور", .thisWeekFmt: "%d%% هذا الأسبوع",
         .noAttendanceRecorded: "لم يُسجَّل حضور بعد.",

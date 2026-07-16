@@ -1918,6 +1918,21 @@ export const appRouter = router({
         await assertRecordInOrg(ctx.user, "report", reportId);
         return mod.deleteCustomReport(reportId);
       }),
+    update: staffProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          reportName: z.string().min(1).optional(),
+          reportType: z.enum(["enrollment", "attendance", "health", "compliance", "financial", "custom"]).optional(),
+          filters: z.record(z.string(), z.unknown()).optional(),
+          columns: z.array(z.string()).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        await assertRecordInOrg(ctx.user, "report", id);
+        return mod.updateCustomReport(id, data);
+      }),
   }),
 
   health: router({
