@@ -14,12 +14,30 @@ import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
+import { formatDate } from "@/lib/date";
+import { objectsToCsv, downloadCsv } from "@/lib/csv";
 
+/** §1302.91 staffing taxonomy — grouped roughly by service area. */
 const roleLabels: Record<string, string> = {
+  director: "Head Start Director",
   admin: "Administrator",
+  fiscal_officer: "Fiscal Officer",
+  education_coordinator: "Education Coordinator",
+  coach: "Coach",
   teacher: "Teacher",
-  assistant: "Assistant",
-  coordinator: "Coordinator",
+  assistant: "Assistant Teacher",
+  health_coordinator: "Health Coordinator",
+  nurse: "Nurse",
+  nutritionist: "Nutritionist / RD",
+  mental_health_consultant: "Mental Health Consultant",
+  disabilities_coordinator: "Disabilities Coordinator",
+  family_services_manager: "Family Services Manager",
+  family_advocate: "Family Advocate",
+  home_visitor: "Home Visitor",
+  ersea_coordinator: "ERSEA Coordinator",
+  cook: "Cook / Food Service",
+  bus_driver: "Bus Driver",
+  coordinator: "Coordinator (legacy)",
 };
 
 const roleColors: Record<string, string> = {
@@ -49,13 +67,26 @@ const trainingEvents = [
   { title: "CPR/First Aid Renewal", date: "Jan 15, 2027", hours: 4, required: true },
 ];
 
+const STAFF_ROLES = [
+  "admin", "director", "fiscal_officer",
+  "education_coordinator", "coach",
+  "health_coordinator", "nurse", "nutritionist", "mental_health_consultant",
+  "disabilities_coordinator",
+  "family_services_manager", "family_advocate", "home_visitor",
+  "ersea_coordinator",
+  "teacher", "assistant",
+  "cook", "bus_driver",
+  "coordinator",
+] as const;
+type StaffRole = (typeof STAFF_ROLES)[number];
+
 type StaffFormState = {
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
   position: string;
-  role: "admin" | "teacher" | "assistant" | "coordinator";
+  role: StaffRole;
 };
 
 const emptyForm: StaffFormState = {
@@ -69,12 +100,6 @@ const emptyForm: StaffFormState = {
 
 function initials(first: string, last: string) {
   return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
-}
-
-function formatDate(value: string | Date | null | undefined) {
-  if (!value) return "—";
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
 }
 
 export default function Staff() {
@@ -138,12 +163,25 @@ export default function Staff() {
     const matchesSearch =
       name.includes(q) ||
       (s.position ?? "").toLowerCase().includes(q) ||
-      (roleLabels[s.role] ?? s.role).toLowerCase().includes(q);
+      (roleLabels[s.role ?? "teacher"] ?? s.role ?? "").toLowerCase().includes(q);
     const matchesRole = roleFilter === "all" || s.role === roleFilter;
     return matchesSearch && matchesRole;
   });
 
   const certAlerts = (certifications ?? []).filter((c) => c.status !== "active").length;
+
+  const exportCsv = () => {
+    if (!filtered.length) { toast.message("No staff to export yet."); return; }
+    const rows = filtered.map((s) => ({
+      name: `${s.firstName} ${s.lastName}`,
+      role: roleLabels[s.role ?? "teacher"] ?? s.role ?? "",
+      email: s.email ?? "",
+      phone: s.phone ?? "",
+      classroom: classroomByStaffName.get(`${s.firstName} ${s.lastName}`) ?? "",
+    }));
+    downloadCsv(`staff-${new Date().toISOString().slice(0, 10)}.csv`, objectsToCsv(rows));
+    toast.success(`Exported ${rows.length} staff member${rows.length === 1 ? "" : "s"} to CSV`);
+  };
 
   const openEdit = (member: (typeof staffList)[number]) => {
     setForm({
@@ -152,7 +190,7 @@ export default function Staff() {
       email: member.email ?? "",
       phone: member.phone ?? "",
       position: member.position ?? "",
-      role: member.role,
+      role: member.role ?? "teacher",
     });
     setEditId(member.id);
   };
@@ -204,7 +242,7 @@ export default function Staff() {
         </div>
         <div className="space-y-1.5">
           <Label>Role</Label>
-          <Select value={form.role} onValueChange={(v) => setForm(f => ({ ...f, role: v as StaffFormState["role"] }))}>
+          <Select value={form.role} onValueChange={(v) => setForm(f => ({ ...f, role: v as StaffRole }))}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -229,7 +267,7 @@ export default function Staff() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" />Export</Button>
+          <Button variant="outline" size="sm" className="gap-2" onClick={exportCsv}><Download className="h-4 w-4" />Export</Button>
           {isAdmin && (
             <Button size="sm" className="gap-2" onClick={() => { setForm(emptyForm); setAddOpen(true); }}>
               <Plus className="h-4 w-4" />Add Staff
@@ -326,8 +364,8 @@ export default function Staff() {
                             )}
                           </div>
                           <div className="flex items-center gap-1.5 mt-1">
-                            <Badge className={`text-xs ${roleColors[member.role] || "bg-gray-100 text-gray-700"} hover:bg-opacity-100`}>
-                              {member.position || roleLabels[member.role] || member.role}
+                            <Badge className={`text-xs ${roleColors[member.role ?? "teacher"] || "bg-gray-100 text-gray-700"} hover:bg-opacity-100`}>
+                              {member.position || roleLabels[member.role ?? "teacher"] || member.role}
                             </Badge>
                             {member.isActive !== 1 && (
                               <Badge variant="outline" className="text-xs text-muted-foreground">Inactive</Badge>

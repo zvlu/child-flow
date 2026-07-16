@@ -99,3 +99,48 @@ describe("routers", () => {
     });
   });
 });
+
+// These assert the authorization layer rejects BEFORE any DB call, so they're
+// hermetic (no database needed) — the tenant/role gates throw in middleware.
+describe("tenant isolation", () => {
+  function ctxWith(overrides: Partial<AuthenticatedUser>): TrpcContext {
+    const user = {
+      id: 5,
+      openId: "staff-5",
+      email: "staff@example.com",
+      name: "Staff Member",
+      loginMethod: "email",
+      role: "staff",
+      organizationId: 1,
+      familyId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+      ...overrides,
+    } as AuthenticatedUser;
+    return {
+      user,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: { clearCookie: () => {} } as TrpcContext["res"],
+    };
+  }
+
+  const codeOf = async (p: Promise<unknown>) => p.then(() => null, (e) => (e as { code?: string })?.code ?? "THREW");
+
+  it("denies a staff member access to a different org's data", async () => {
+    const caller = appRouter.createCaller(ctxWith({ organizationId: 1 }));
+    // Staff in org 1 requesting org 2's PIR report must be FORBIDDEN.
+    expect(await codeOf(caller.compliance.getReport({ organizationId: 2, year: "2024-2025" }))).toBe("FORBIDDEN");
+  });
+
+  it("denies a parent account on a staff-only route", async () => {
+    const caller = appRouter.createCaller(ctxWith({ role: "parent", familyId: 9, organizationId: null }));
+    expect(await codeOf(caller.children.list(1))).toBe("FORBIDDEN");
+  });
+
+  it("denies a non-admin on an admin-only route", async () => {
+    const caller = appRouter.createCaller(ctxWith({ role: "staff", organizationId: 1 }));
+    // Submitting a PIR report is admin-only (orgAdminProcedure).
+    expect(await codeOf(caller.compliance.submitReport({ organizationId: 1, year: "2024-2025" }))).toBe("FORBIDDEN");
+  });
+});

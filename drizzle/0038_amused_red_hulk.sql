@@ -1,0 +1,2 @@
+ALTER TABLE `families` ADD `familyAdvocateId` int;--> statement-breakpoint
+ALTER TABLE `families` ADD CONSTRAINT `families_familyAdvocateId_staff_id_fk` FOREIGN KEY (`familyAdvocateId`) REFERENCES `staff`(`id`) ON DELETE no action ON UPDATE no action;

@@ -154,6 +154,11 @@ const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(
 
 export default defineConfig({
   plugins,
+  // Allow overriding vite cache dir via env var (useful when running in
+  // sandboxed environments where node_modules is read-only).
+  cacheDir: process.env.VITE_CACHE_DIR
+    ? path.resolve(process.env.VITE_CACHE_DIR)
+    : path.resolve(import.meta.dirname, "node_modules/.vite"),
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),

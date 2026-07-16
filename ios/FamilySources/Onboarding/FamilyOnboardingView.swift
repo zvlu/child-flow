@@ -53,9 +53,18 @@ struct FamilyOnboardingView: View {
 struct WelcomeView: View {
     let onSignUp: () -> Void
     let onSignIn: () -> Void
+    @ObservedObject private var l10n = FamilyL10n.shared
 
     var body: some View {
         VStack(spacing: 0) {
+            // #50 Multilingual: language is the FIRST choice a family makes.
+            HStack {
+                Spacer()
+                LanguageMenuButton()
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+
             Spacer()
 
             VStack(spacing: 16) {
@@ -66,7 +75,7 @@ struct WelcomeView: View {
                 Text("Sprout")
                     .font(.largeTitle.bold())
 
-                Text("Stay connected with your child's\nHead Start program")
+                Text(L(.appTagline))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -76,7 +85,7 @@ struct WelcomeView: View {
 
             VStack(spacing: 12) {
                 Button(action: onSignUp) {
-                    Text("Get Started")
+                    Text(L(.getStarted))
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -86,7 +95,7 @@ struct WelcomeView: View {
                 }
 
                 Button(action: onSignIn) {
-                    Text("I already have an account")
+                    Text(L(.haveAccount))
                         .fontWeight(.medium)
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -95,7 +104,7 @@ struct WelcomeView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
 
-                Text("You need an invitation from your program to sign up.")
+                Text(L(.inviteNeeded))
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -110,7 +119,7 @@ struct WelcomeView: View {
 
 // MARK: - Invite Code Entry
 // `VerifiedInvitation` is defined in Sources/Models/Models.swift, which is also
-// compiled into the ChildFlowFamily target. Don't redeclare it here.
+// compiled into the SproutFamily target. Don't redeclare it here.
 
 struct InviteCodeView: View {
     let onVerified: (VerifiedInvitation) -> Void
@@ -119,6 +128,8 @@ struct InviteCodeView: View {
     @State private var code = ""
     @State private var isVerifying = false
     @State private var errorMessage: String?
+    @State private var showWhereFindHelp = false
+    @ObservedObject private var l10n = FamilyL10n.shared
 
     var body: some View {
         ScrollView {
@@ -127,9 +138,9 @@ struct InviteCodeView: View {
                     Image(systemName: "envelope.open.fill")
                         .font(.system(size: 52))
                         .foregroundColor(.accentColor)
-                    Text("Enter Your Invitation Code")
+                    Text(L(.enterInviteTitle))
                         .font(.title2.bold())
-                    Text("Check the email sent to you by your child's program. It contains a unique code.")
+                    Text(L(.enterInviteSubtitle))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -137,7 +148,7 @@ struct InviteCodeView: View {
                 .padding(.top, 32)
 
                 VStack(spacing: 16) {
-                    TextField("Unique Code", text: $code)
+                    TextField(L(.uniqueCode), text: $code)
                         .textFieldStyle(.roundedBorder)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.characters)
@@ -157,7 +168,7 @@ struct InviteCodeView: View {
                     Button(action: verify) {
                         Group {
                             if isVerifying { ProgressView().tint(.white) }
-                            else { Text("Continue").fontWeight(.semibold) }
+                            else { Text(L(.continueBtn)).fontWeight(.semibold) }
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -167,8 +178,11 @@ struct InviteCodeView: View {
                     }
                     .disabled(code.isEmpty || isVerifying)
 
-                    Button("Where do I find this?") {
-                        // Link to help
+                    Button(L(.whereFind)) {
+                        // Previously an empty action body — tapping this did
+                        // nothing at all, a dead tappable element on the one
+                        // screen where a stuck parent needs help most.
+                        showWhereFindHelp = true
                     }
                     .font(.footnote)
                     .foregroundColor(.accentColor)
@@ -176,7 +190,7 @@ struct InviteCodeView: View {
                 .padding(.horizontal, 32)
             }
         }
-        .navigationTitle("Sign Up")
+        .navigationTitle(L(.signUpTitle))
         .navigationBarBackButtonHidden()
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -184,6 +198,11 @@ struct InviteCodeView: View {
                     Image(systemName: "chevron.left")
                 }
             }
+        }
+        .alert(L(.whereFind), isPresented: $showWhereFindHelp) {
+            Button("OK") { showWhereFindHelp = false }
+        } message: {
+            Text(L(.whereFindHelp))
         }
     }
 
@@ -199,7 +218,7 @@ struct InviteCodeView: View {
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = "Invalid code. Please check and try again."
+                    errorMessage = L(.invalidCode)
                     isVerifying = false
                 }
             }
@@ -222,6 +241,8 @@ struct FamilyRegistrationView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
 
+    @ObservedObject private var l10n = FamilyL10n.shared
+
     var passwordsMatch: Bool { password == confirmPassword && !password.isEmpty }
     var canSubmit: Bool { !email.isEmpty && passwordsMatch && !isLoading }
 
@@ -235,12 +256,12 @@ struct FamilyRegistrationView: View {
                             .foregroundColor(.green)
                             .font(.title2)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Code verified!")
+                            Text(L(.codeVerified))
                                 .font(.subheadline.weight(.semibold))
-                            Text("Program: \(inv.programName)")
+                            Text("\(L(.programLabel)): \(inv.programName)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("Child: \(inv.childName)")
+                            Text("\(L(.childLabel)): \(inv.childName)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -254,9 +275,9 @@ struct FamilyRegistrationView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Create Your Account")
+                    Text(L(.createAccountTitle))
                         .font(.title2.bold())
-                    Text("Use the email your invitation was sent to and your date of birth.")
+                    Text(L(.createAccountSubtitle))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -264,14 +285,18 @@ struct FamilyRegistrationView: View {
                 .padding(.horizontal, 24)
 
                 VStack(spacing: 14) {
-                    TextField("Email address", text: $email)
+                    TextField(L(.emailAddress), text: $email)
                         .textFieldStyle(.roundedBorder)
                         .keyboardType(.emailAddress)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
 
-                    DatePicker("Date of Birth", selection: $dateOfBirth,
-                               in: ...Calendar.current.date(byAdding: .year, value: -18, to: Date())!,
+                    DatePicker(L(.dateOfBirth), selection: $dateOfBirth,
+                               // Force-unwrapped before; this arithmetic can't
+                               // realistically fail, but a crash here would be
+                               // an unusually bad first impression for a
+                               // brand-new parent signing up.
+                               in: ...(Calendar.current.date(byAdding: .year, value: -18, to: Date()) ?? Date()),
                                displayedComponents: .date)
                         .datePickerStyle(.compact)
 
@@ -280,9 +305,9 @@ struct FamilyRegistrationView: View {
                     HStack {
                         Group {
                             if isPasswordVisible {
-                                TextField("Create password", text: $password)
+                                TextField(L(.createPassword), text: $password)
                             } else {
-                                SecureField("Create password", text: $password)
+                                SecureField(L(.createPassword), text: $password)
                             }
                         }
                         Button(action: { isPasswordVisible.toggle() }) {
@@ -294,11 +319,11 @@ struct FamilyRegistrationView: View {
                     .background(Color(.systemBackground))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(.systemGray4)))
 
-                    SecureField("Confirm password", text: $confirmPassword)
+                    SecureField(L(.confirmPassword), text: $confirmPassword)
                         .textFieldStyle(.roundedBorder)
 
                     if !confirmPassword.isEmpty && !passwordsMatch {
-                        Text("Passwords don't match")
+                        Text(L(.passwordsDontMatch))
                             .font(.caption)
                             .foregroundColor(.red)
                     }
@@ -315,7 +340,7 @@ struct FamilyRegistrationView: View {
                     Button(action: register) {
                         Group {
                             if isLoading { ProgressView().tint(.white) }
-                            else { Text("Create Account").fontWeight(.semibold) }
+                            else { Text(L(.createAccountBtn)).fontWeight(.semibold) }
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -329,7 +354,7 @@ struct FamilyRegistrationView: View {
             }
             .padding(.bottom, 32)
         }
-        .navigationTitle("Create Account")
+        .navigationTitle(L(.createAccountBtn))
         .navigationBarBackButtonHidden()
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -355,7 +380,7 @@ struct FamilyRegistrationView: View {
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = "Registration failed. Check your email and date of birth match your records."
+                    errorMessage = L(.registrationFailed)
                     isLoading = false
                 }
             }
@@ -374,6 +399,7 @@ struct FamilySignInView: View {
     @State private var isPasswordVisible = false
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @ObservedObject private var l10n = FamilyL10n.shared
 
     var body: some View {
         ScrollView {
@@ -382,13 +408,13 @@ struct FamilySignInView: View {
                     Image(systemName: "figure.2.and.child.holdinghands")
                         .font(.system(size: 60))
                         .foregroundColor(.accentColor)
-                    Text("Welcome Back")
+                    Text(L(.welcomeBack))
                         .font(.title2.bold())
                 }
                 .padding(.top, 32)
 
                 VStack(spacing: 14) {
-                    TextField("Email", text: $email)
+                    TextField(L(.email), text: $email)
                         .textFieldStyle(.roundedBorder)
                         .keyboardType(.emailAddress)
                         .autocorrectionDisabled()
@@ -397,9 +423,9 @@ struct FamilySignInView: View {
                     HStack {
                         Group {
                             if isPasswordVisible {
-                                TextField("Password", text: $password)
+                                TextField(L(.password), text: $password)
                             } else {
-                                SecureField("Password", text: $password)
+                                SecureField(L(.password), text: $password)
                             }
                         }
                         Button(action: { isPasswordVisible.toggle() }) {
@@ -423,7 +449,7 @@ struct FamilySignInView: View {
                     Button(action: signIn) {
                         Group {
                             if isLoading { ProgressView().tint(.white) }
-                            else { Text("Sign In").fontWeight(.semibold) }
+                            else { Text(L(.signIn)).fontWeight(.semibold) }
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -433,14 +459,14 @@ struct FamilySignInView: View {
                     }
                     .disabled(email.isEmpty || password.isEmpty || isLoading)
 
-                    Button("Don't have an account? Sign up") { onBack() }
+                    Button(L(.noAccountSignUp)) { onBack() }
                         .font(.footnote)
                         .foregroundColor(.accentColor)
                 }
                 .padding(.horizontal, 32)
             }
         }
-        .navigationTitle("Sign In")
+        .navigationTitle(L(.signIn))
         .navigationBarBackButtonHidden()
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -461,7 +487,7 @@ struct FamilySignInView: View {
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = "Incorrect email or password."
+                    errorMessage = L(.incorrectCredentials)
                     isLoading = false
                 }
             }

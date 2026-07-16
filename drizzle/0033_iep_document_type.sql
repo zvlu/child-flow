@@ -1,0 +1,1 @@
+ALTER TABLE `digitalDocuments` MODIFY COLUMN `documentType` enum('enrollment','consent','waiver','health_form','iep') NOT NULL;

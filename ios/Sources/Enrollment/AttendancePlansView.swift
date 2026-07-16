@@ -7,6 +7,7 @@ struct AttendancePlansView: View {
     @State private var showNewPlan = false
 
     var body: some View {
+        HeadStartGate(featureDescription: "Attendance improvement plans") {
         List {
             if !viewModel.plans.isEmpty {
                 Section {
@@ -56,7 +57,9 @@ struct AttendancePlansView: View {
             }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
         .overlay { if viewModel.isLoading { ProgressView() } }
+        }
     }
 }
 
@@ -131,6 +134,8 @@ struct AttendancePlanRow: View {
 
 struct AttendancePlanDetailView: View {
     @State var plan: AttendanceSuccessPlan
+    @State private var savingStrategyIds: Set<String> = []
+    @State private var errorMessage: String?
 
     var body: some View {
         List {
@@ -168,11 +173,12 @@ struct AttendancePlanDetailView: View {
                 } else {
                     ForEach($plan.strategies) { $strategy in
                         HStack(alignment: .top, spacing: 10) {
-                            Button(action: { strategy.isImplemented.toggle() }) {
+                            Button(action: { toggleImplemented(strategy.id) }) {
                                 Image(systemName: strategy.isImplemented
                                     ? "checkmark.circle.fill" : "circle")
                                     .foregroundColor(strategy.isImplemented ? .green : .secondary)
                             }
+                            .disabled(savingStrategyIds.contains(strategy.id))
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(strategy.description)
                                     .font(.subheadline)
@@ -190,6 +196,33 @@ struct AttendancePlanDetailView: View {
         }
         .navigationTitle("Attendance Plan")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Couldn't Save", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") { errorMessage = nil }
+        } message: { Text(errorMessage ?? "") }
+    }
+
+    /// Persists the strategy's "implemented" flag to the server (this used to only
+    /// toggle the local `@State` copy, with no backing call at all) and refreshes
+    /// this plan from the server afterward. Reverts the optimistic toggle on failure.
+    private func toggleImplemented(_ strategyId: String) {
+        guard let idx = plan.strategies.firstIndex(where: { $0.id == strategyId }) else { return }
+        plan.strategies[idx].isImplemented.toggle()
+        let updatedStrategies = plan.strategies
+        savingStrategyIds.insert(strategyId)
+        Task {
+            do {
+                try await APIClient.shared.updateAttendancePlan(id: plan.id, strategies: updatedStrategies)
+                if let refreshed = try? await APIClient.shared.getAttendancePlans().first(where: { $0.id == plan.id }) {
+                    plan = refreshed
+                }
+            } catch {
+                if let revertIdx = plan.strategies.firstIndex(where: { $0.id == strategyId }) {
+                    plan.strategies[revertIdx].isImplemented.toggle()
+                }
+                errorMessage = (error as? LocalizedError)?.errorDescription ?? "Couldn't save this change. Please try again."
+            }
+            savingStrategyIds.remove(strategyId)
+        }
     }
 }
 
@@ -301,30 +334,23 @@ struct NewAttendancePlanSheet: View {
     private func save() {
         isSaving = true
         Task {
-            do {
-                let plan = try await APIClient.shared.createAttendancePlan(
-                    childId: UUID().uuidString,
-                    barriers: barriers.filter { !$0.isEmpty }
-                )
-                await MainActor.run { onSave(plan); dismiss() }
-            } catch {
-                let mock = AttendanceSuccessPlan(
-                    id: UUID().uuidString,
-                    childId: UUID().uuidString,
-                    childName: childName,
-                    classroom: classroom,
-                    currentAttendanceRate: attendanceRate,
-                    createdDate: Date(),
-                    reviewDate: reviewDate,
-                    familyAdvocate: familyAdvocate,
-                    barriers: barriers.filter { !$0.isEmpty },
-                    strategies: strategies.filter { !$0.isEmpty }.map { s in
-                        AttendancePlanStrategy(id: UUID().uuidString, description: s, isImplemented: false, targetDate: nil)
-                    },
-                    status: .active
-                )
-                await MainActor.run { onSave(mock); dismiss() }
-            }
+            let plan = AttendanceSuccessPlan(
+                id: UUID().uuidString,
+                childId: UUID().uuidString,
+                childName: childName,
+                classroom: classroom,
+                currentAttendanceRate: attendanceRate,
+                createdDate: Date(),
+                reviewDate: reviewDate,
+                familyAdvocate: familyAdvocate,
+                barriers: barriers.filter { !$0.isEmpty },
+                strategies: strategies.filter { !$0.isEmpty }.map { s in
+                    AttendancePlanStrategy(id: UUID().uuidString, description: s, isImplemented: false, targetDate: nil)
+                },
+                status: .active
+            )
+            try? await APIClient.shared.createAttendancePlan(plan)
+            await MainActor.run { onSave(plan); dismiss() }
             isSaving = false
         }
     }

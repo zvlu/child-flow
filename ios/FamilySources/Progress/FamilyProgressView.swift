@@ -4,6 +4,7 @@ import Charts
 /// Graphs for parents: weekly attendance per child and family goal progress.
 struct FamilyProgressView: View {
     @StateObject private var viewModel = FamilyProgressViewModel()
+    @ObservedObject private var l10n = FamilyL10n.shared
 
     var body: some View {
         NavigationStack {
@@ -25,13 +26,19 @@ struct FamilyProgressView: View {
                         if progress.attendance.isEmpty && progress.goals.isEmpty {
                             emptyState
                         }
+                    } else if viewModel.loadFailed {
+                        // Previously this fell through to the same emptyState
+                        // as "no progress data yet" — indistinguishable from a
+                        // failed fetch, so a parent on a bad connection would
+                        // conclude there was simply nothing to see.
+                        errorState
                     } else {
                         emptyState
                     }
                 }
                 .padding(.vertical)
             }
-            .navigationTitle("Progress")
+            .navigationTitle(L(.tabProgress))
             .refreshable { await viewModel.load() }
             .task { await viewModel.load() }
         }
@@ -42,9 +49,23 @@ struct FamilyProgressView: View {
             Image(systemName: "chart.bar")
                 .font(.largeTitle)
                 .foregroundColor(.secondary)
-            Text("No progress data yet")
+            Text(L(.noProgressData))
                 .font(.headline)
-            Text("Attendance and goal progress will appear here.")
+            Text(L(.progressWillAppear))
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .padding(.top, 60)
+    }
+
+    private var errorState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.largeTitle)
+                .foregroundColor(.orange)
+            Text(L(.somethingWentWrong))
+                .font(.headline)
+            Text(L(.pullToRefreshRetry))
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
@@ -66,18 +87,18 @@ struct AttendanceChartCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("\(series.childName) — Attendance")
+                Text(L(.attendanceChartFmt, series.childName))
                     .font(.headline)
                 Spacer()
                 if let latest = series.weeks.last {
-                    Text("\(latest.rate)% this week")
+                    Text(L(.thisWeekFmt, latest.rate))
                         .font(.caption.weight(.semibold))
                         .foregroundColor(barColor(latest.rate))
                 }
             }
 
             if series.weeks.isEmpty {
-                Text("No attendance recorded yet.")
+                Text(L(.noAttendanceRecorded))
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
@@ -97,7 +118,7 @@ struct AttendanceChartCard: View {
                 .chartYScale(domain: 0...100)
                 .frame(height: 170)
 
-                Text("Dashed line: the 85% attendance goal")
+                Text(L(.dashedLine85))
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -115,7 +136,7 @@ struct GoalsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Family Goals")
+            Text(L(.familyGoals))
                 .font(.headline)
 
             ForEach(goals) { goal in
@@ -125,7 +146,7 @@ struct GoalsCard: View {
                             .font(.subheadline.weight(.medium))
                         Spacer()
                         if goal.status == "completed" {
-                            Label("Done", systemImage: "checkmark.circle.fill")
+                            Label(L(.done), systemImage: "checkmark.circle.fill")
                                 .font(.caption.weight(.semibold))
                                 .foregroundColor(.green)
                         } else {
@@ -151,10 +172,20 @@ struct GoalsCard: View {
 class FamilyProgressViewModel: ObservableObject {
     @Published var progress: FamilyProgress?
     @Published var isLoading = false
+    /// Previously there was no way to tell "the fetch failed" apart from
+    /// "the family genuinely has no progress data" — both rendered the same
+    /// emptyState. This distinguishes the two so a parent on a dropped
+    /// connection doesn't read a real error as "nothing to see here yet."
+    @Published var loadFailed = false
 
     func load() async {
         isLoading = true
-        progress = (try? await APIClient.shared.getFamilyProgress()) ?? progress
+        if let latest = try? await APIClient.shared.getFamilyProgress() {
+            progress = latest
+            loadFailed = false
+        } else {
+            loadFailed = progress == nil
+        }
         isLoading = false
     }
 }

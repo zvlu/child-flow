@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ConfirmProvider } from "@/components/ConfirmDialog";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -7,9 +8,24 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Children from "./pages/Children";
+import DataImport from "./pages/DataImport";
+import Kiosk from "./pages/Kiosk";
+import Caseloads from "./pages/Caseloads";
 import ChildDetail from "./pages/ChildDetail";
+import DailyReports from "./pages/DailyReports";
+import LessonPlanning from "./pages/LessonPlanning";
+import Portfolios from "./pages/Portfolios";
+import Subsidies from "./pages/Subsidies";
+import GlossaryPage from "./pages/GlossaryPage";
 import Attendance from "./pages/Attendance";
+import ChronicAbsence from "./pages/ChronicAbsence";
+import FamilyPartnership from "./pages/FamilyPartnership";
+import PolicyCouncil from "./pages/PolicyCouncil";
+import DisabilityServices from "./pages/DisabilityServices";
+import GrantBudget from "./pages/GrantBudget";
+import ClassroomQuality from "./pages/ClassroomQuality";
 import Health from "./pages/Health";
+import HealthDeadlines from "./pages/HealthDeadlines";
 import FamilyServices from "./pages/FamilyServices";
 import Staff from "./pages/Staff";
 import Reports from "./pages/Reports";
@@ -30,12 +46,22 @@ import { MealPlanning } from "./pages/MealPlanning";
 import { StaffOperations } from "./pages/StaffOperations";
 import { ReportBuilder } from "./pages/ReportBuilder";
 import { ActionQueue } from "./pages/ActionQueue";
+import InKind from "./pages/InKind";
+import Assessments from "./pages/Assessments";
+import OrgAdmin from "./pages/OrgAdmin";
+import RequestProgram from "./pages/RequestProgram";
+import SignIn from "./pages/SignIn";
 import AppLayout from "./components/AppLayout";
+import ModuleGate from "./components/ModuleGate";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/request-program" component={RequestProgram} />
+      <Route path="/signin" component={SignIn} />
+      {/* Kiosk runs chromeless — it's the tablet at the classroom door. */}
+      <Route path="/kiosk" component={Kiosk} />
       <Route path="/dashboard">
         {() => (
           <AppLayout>
@@ -71,10 +97,61 @@ function Router() {
           </AppLayout>
         )}
       </Route>
+      <Route path="/caseloads">
+        {() => (
+          <AppLayout>
+            <ModuleGate module="head_start">
+              <Caseloads />
+            </ModuleGate>
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/data-import">
+        {() => (
+          <AppLayout>
+            <DataImport />
+          </AppLayout>
+        )}
+      </Route>
       <Route path="/children/:id">
         {(params: { id: string }) => (
           <AppLayout>
             <ChildDetail id={params.id} />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/daily-reports">
+        {() => (
+          <AppLayout>
+            <DailyReports />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/lesson-planning">
+        {() => (
+          <AppLayout>
+            <LessonPlanning />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/portfolios">
+        {() => (
+          <AppLayout>
+            <Portfolios />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/subsidies">
+        {() => (
+          <AppLayout>
+            <Subsidies />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/glossary">
+        {() => (
+          <AppLayout>
+            <GlossaryPage />
           </AppLayout>
         )}
       </Route>
@@ -85,10 +162,87 @@ function Router() {
           </AppLayout>
         )}
       </Route>
+      <Route path="/in-kind">
+        {() => (
+          <AppLayout>
+            <ModuleGate module="head_start">
+              <InKind />
+            </ModuleGate>
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/assessments">
+        {() => (
+          <AppLayout>
+            <Assessments />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/org-admin">
+        {() => (
+          <AppLayout>
+            <OrgAdmin />
+          </AppLayout>
+        )}
+      </Route>
       <Route path="/attendance">
         {() => (
           <AppLayout>
             <Attendance />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/chronic-absence">
+        {() => (
+          <AppLayout>
+            <ModuleGate module="head_start">
+              <ChronicAbsence />
+            </ModuleGate>
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/family-partnership">
+        {() => (
+          <AppLayout>
+            <ModuleGate module="head_start">
+              <FamilyPartnership />
+            </ModuleGate>
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/policy-council">
+        {() => (
+          <AppLayout>
+            <ModuleGate module="head_start">
+              <PolicyCouncil />
+            </ModuleGate>
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/disability-services">
+        {() => (
+          <AppLayout>
+            <ModuleGate module="head_start">
+              <DisabilityServices />
+            </ModuleGate>
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/grant-budget">
+        {() => (
+          <AppLayout>
+            <ModuleGate module="head_start">
+              <GrantBudget />
+            </ModuleGate>
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/classroom-quality">
+        {() => (
+          <AppLayout>
+            <ModuleGate module="head_start">
+              <ClassroomQuality />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>
@@ -106,10 +260,21 @@ function Router() {
           </AppLayout>
         )}
       </Route>
+      <Route path="/health-deadlines">
+        {() => (
+          <AppLayout>
+            <ModuleGate module="head_start">
+              <HealthDeadlines />
+            </ModuleGate>
+          </AppLayout>
+        )}
+      </Route>
       <Route path="/family-services">
         {() => (
           <AppLayout>
-            <FamilyServices />
+            <ModuleGate module="head_start">
+              <FamilyServices />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>
@@ -130,7 +295,9 @@ function Router() {
       <Route path="/compliance">
         {() => (
           <AppLayout>
-            <Compliance />
+            <ModuleGate module="head_start">
+              <Compliance />
+            </ModuleGate>
           </AppLayout>
         )}
       </Route>
@@ -222,8 +389,10 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light" switchable>
         <TooltipProvider>
-          <Toaster richColors position="top-right" />
-          <Router />
+          <ConfirmProvider>
+            <Toaster richColors position="top-right" />
+            <Router />
+          </ConfirmProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

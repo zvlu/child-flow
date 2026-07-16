@@ -111,16 +111,16 @@ export function FamilyManagementModal({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="rounded-full gap-2 font-bold border-slate-200 hover:bg-primary hover:text-white hover:border-primary transition-all">
+        <Button variant="outline" className="gap-2 font-bold border-border hover:bg-primary hover:text-white hover:border-primary transition-all">
           <Users className="h-4 w-4" /> Manage Family
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl rounded-3xl">
+      <DialogContent className="max-w-2xl rounded-xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold flex items-center gap-2">
             <Users className="h-6 w-6 text-primary" /> Family Management
           </DialogTitle>
-          <DialogDescription className="font-bold text-slate-600">
+          <DialogDescription className="font-bold text-muted-foreground">
             Manage contacts and addresses for {familyName}
           </DialogDescription>
         </DialogHeader>
@@ -128,19 +128,19 @@ export function FamilyManagementModal({
         <div className="space-y-6 py-4">
           {/* Current Contacts */}
           <div className="space-y-3">
-            <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+            <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" /> Current Contacts ({contacts.length})
             </h3>
 
             {contacts.length > 0 ? (
               <div className="space-y-2 max-h-[300px] overflow-y-auto">
                 {contacts.map((contact) => (
-                  <Card key={contact.id} className="rounded-2xl border-slate-200 overflow-hidden">
+                  <Card key={contact.id} className="rounded-xl border-border overflow-hidden">
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            <p className="font-bold text-slate-900">{contact.name}</p>
+                            <p className="font-bold text-foreground">{contact.name}</p>
                             <Badge className="bg-primary/10 text-primary border-primary/20 rounded-full text-xs font-bold">
                               {contact.relationship}
                             </Badge>
@@ -153,18 +153,18 @@ export function FamilyManagementModal({
 
                           <div className="space-y-1 text-sm">
                             {contact.phone && (
-                              <div className="flex items-center gap-2 text-slate-600 font-medium">
-                                <Phone className="h-4 w-4 text-slate-400" /> {contact.phone}
+                              <div className="flex items-center gap-2 text-muted-foreground font-medium">
+                                <Phone className="h-4 w-4 text-muted-foreground" /> {contact.phone}
                               </div>
                             )}
                             {contact.email && (
-                              <div className="flex items-center gap-2 text-slate-600 font-medium">
-                                <Mail className="h-4 w-4 text-slate-400" /> {contact.email}
+                              <div className="flex items-center gap-2 text-muted-foreground font-medium">
+                                <Mail className="h-4 w-4 text-muted-foreground" /> {contact.email}
                               </div>
                             )}
                             {contact.address && (
-                              <div className="flex items-start gap-2 text-slate-600 font-medium">
-                                <MapPin className="h-4 w-4 text-slate-400 mt-0.5" /> {contact.address}
+                              <div className="flex items-start gap-2 text-muted-foreground font-medium">
+                                <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" /> {contact.address}
                               </div>
                             )}
                           </div>
@@ -196,20 +196,20 @@ export function FamilyManagementModal({
                 ))}
               </div>
             ) : (
-              <div className="p-6 rounded-2xl border border-dashed border-slate-200 text-center">
-                <AlertCircle className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                <p className="text-sm text-slate-500 font-bold">No contacts added yet</p>
+              <div className="p-6 rounded-xl border border-dashed border-border text-center">
+                <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground font-bold">No contacts added yet</p>
               </div>
             )}
           </div>
 
           {/* Add New Contact */}
-          <div className="space-y-3 pt-4 border-t border-slate-200">
-            <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+          <div className="space-y-3 pt-4 border-t border-border">
+            <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
               <Plus className="h-5 w-5 text-primary" /> Add New Contact
             </h3>
 
-            <Card className="rounded-2xl border-slate-200 bg-slate-50/50">
+            <Card className="rounded-xl border-border bg-muted/50">
               <CardContent className="p-4 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <Input
@@ -218,7 +218,7 @@ export function FamilyManagementModal({
                     onChange={(e) =>
                       setNewContact({ ...newContact, name: e.target.value })
                     }
-                    className="rounded-lg border-slate-200 focus:border-primary focus:ring-primary font-bold"
+                    className="rounded-lg border-border focus:border-primary focus:ring-primary font-bold"
                   />
                   <Input
                     placeholder="Relationship"
@@ -226,7 +226,7 @@ export function FamilyManagementModal({
                     onChange={(e) =>
                       setNewContact({ ...newContact, relationship: e.target.value })
                     }
-                    className="rounded-lg border-slate-200 focus:border-primary focus:ring-primary font-bold"
+                    className="rounded-lg border-border focus:border-primary focus:ring-primary font-bold"
                   />
                 </div>
 
@@ -237,7 +237,7 @@ export function FamilyManagementModal({
                     onChange={(e) =>
                       setNewContact({ ...newContact, phone: e.target.value })
                     }
-                    className="rounded-lg border-slate-200 focus:border-primary focus:ring-primary font-bold"
+                    className="rounded-lg border-border focus:border-primary focus:ring-primary font-bold"
                   />
                   <Input
                     placeholder="Email Address"
@@ -245,7 +245,7 @@ export function FamilyManagementModal({
                     onChange={(e) =>
                       setNewContact({ ...newContact, email: e.target.value })
                     }
-                    className="rounded-lg border-slate-200 focus:border-primary focus:ring-primary font-bold"
+                    className="rounded-lg border-border focus:border-primary focus:ring-primary font-bold"
                   />
                 </div>
 
@@ -255,7 +255,7 @@ export function FamilyManagementModal({
                   onChange={(e) =>
                     setNewContact({ ...newContact, address: e.target.value })
                   }
-                  className="rounded-lg border-slate-200 focus:border-primary focus:ring-primary font-bold"
+                  className="rounded-lg border-border focus:border-primary focus:ring-primary font-bold"
                 />
 
                 <div className="flex items-center gap-2">
@@ -268,7 +268,7 @@ export function FamilyManagementModal({
                     }
                     className="rounded-lg w-4 h-4 accent-primary cursor-pointer"
                   />
-                  <label htmlFor="isPrimary" className="font-bold text-sm text-slate-700 cursor-pointer">
+                  <label htmlFor="isPrimary" className="font-bold text-sm text-muted-foreground cursor-pointer">
                     Set as primary contact
                   </label>
                 </div>
@@ -284,11 +284,11 @@ export function FamilyManagementModal({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 pt-4 border-t border-slate-200">
+        <div className="flex items-center gap-3 pt-4 border-t border-border">
           <Button
             variant="outline"
             onClick={() => setIsOpen(false)}
-            className="flex-1 rounded-lg font-bold border-slate-200 hover:bg-slate-100 transition-all"
+            className="flex-1 rounded-lg font-bold border-border hover:bg-muted transition-all"
           >
             Cancel
           </Button>

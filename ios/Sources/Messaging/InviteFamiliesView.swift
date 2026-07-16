@@ -77,6 +77,7 @@ struct InviteFamiliesView: View {
             }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
         .confirmationDialog(
             "Send \(viewModel.selectedIds.count) invitation\(viewModel.selectedIds.count == 1 ? "" : "s")?",
             isPresented: $viewModel.showConfirmation,
@@ -92,6 +93,9 @@ struct InviteFamiliesView: View {
         } message: {
             Text("\(viewModel.lastSentCount) invitation\(viewModel.lastSentCount == 1 ? "" : "s") sent successfully.")
         }
+        .alert("Couldn't Send Invitations", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") { viewModel.errorMessage = nil }
+        } message: { Text(viewModel.errorMessage ?? "") }
         .overlay {
             if viewModel.isLoading { ProgressView() }
         }
@@ -220,6 +224,7 @@ class InviteFamiliesViewModel: ObservableObject {
     @Published var showConfirmation = false
     @Published var showSuccess = false
     @Published var lastSentCount = 0
+    @Published var errorMessage: String?
 
     var allSelected: Bool {
         let eligible = invitations.filter { $0.missingInfo.isEmpty }.map(\.id)
@@ -234,7 +239,9 @@ class InviteFamiliesViewModel: ObservableObject {
             locations = response.locations
             programTerms = response.programTerms.isEmpty ? programTerms : response.programTerms
             recalcStats()
-        } catch {}
+        } catch {
+            errorMessage = "Couldn't load invitations. Check your connection and try again."
+        }
         isLoading = false
     }
 
@@ -263,7 +270,11 @@ class InviteFamiliesViewModel: ObservableObject {
                 selectedIds.removeAll()
                 showSuccess = true
                 await load()
-            } catch {}
+            } catch {
+                // Previously silent — staff had no way to know a send failed,
+                // and the selection stayed unsent with no explanation.
+                errorMessage = "These invitations weren't sent. Check your connection and try again."
+            }
         }
     }
 

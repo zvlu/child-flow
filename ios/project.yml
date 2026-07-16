@@ -1,6 +1,6 @@
-name: ChildFlow
+name: Sprout
 options:
-  bundleIdPrefix: org.childflow
+  bundleIdPrefix: org.sprout
   deploymentTarget:
     iOS: "17.0"
   xcodeVersion: "15.0"
@@ -21,7 +21,7 @@ targets:
   # ─────────────────────────────────────────────
   # STAFF APP
   # ─────────────────────────────────────────────
-  ChildFlow:
+  Sprout:
     type: application
     platform: iOS
     sources:
@@ -30,20 +30,20 @@ targets:
       - Resources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: org.childflow.app
+        PRODUCT_BUNDLE_IDENTIFIER: org.sprout.app
         INFOPLIST_FILE: Resources/Info.plist
         DEVELOPMENT_TEAM: ""
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: false
-        PRODUCT_NAME: ChildFlow
+        PRODUCT_NAME: Sprout
     scheme:
       testTargets:
-        - ChildFlowTests
+        - SproutTests
 
   # ─────────────────────────────────────────────
   # FAMILY APP
   # ─────────────────────────────────────────────
-  ChildFlowFamily:
+  SproutFamily:
     type: application
     platform: iOS
     sources:
@@ -61,25 +61,25 @@ targets:
       - FamilyResources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: org.childflow.family
+        PRODUCT_BUNDLE_IDENTIFIER: org.sprout.family
         INFOPLIST_FILE: FamilyResources/Info.plist
         DEVELOPMENT_TEAM: ""
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: false
-        PRODUCT_NAME: ChildFlow
+        PRODUCT_NAME: Sprout
 
   # ─────────────────────────────────────────────
   # TESTS
   # ─────────────────────────────────────────────
-  ChildFlowTests:
+  SproutTests:
     type: bundle.unit-test
     platform: iOS
     sources:
       - Tests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: org.childflow.tests
+        PRODUCT_BUNDLE_IDENTIFIER: org.sprout.tests
         BUNDLE_LOADER: "$(TEST_HOST)"
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/ChildFlow.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ChildFlow"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Sprout.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Sprout"
     dependencies:
-      - target: ChildFlow
+      - target: Sprout

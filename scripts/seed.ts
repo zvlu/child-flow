@@ -6,25 +6,28 @@
  */
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/mysql2";
+import { eq } from "drizzle-orm";
 import mysql from "mysql2/promise";
 import { hashPassword } from "../server/_core/password";
 import {
   users, organizations, families, children, staff, classrooms,
   childClassroomAssignments, staffCaseloads, attendance, healthRecords,
-  familyServices, communicationLogs, educationRecords, pirData, studentNotes,
+  familyServices, communicationLogs, educationRecords, pirData, pirReports, pirQuestions, studentNotes,
   calendarEvents, familyContactAddresses, documents, bulkActionLogs,
   aiInsights, invoices, payments, activityLogs, parentNotifications,
   digitalDocuments, mealPlans, mealItems, cacfpReports, timeClock,
   certifications, customReports,
+  conversations, chatMessages, familyCaseNotes, familyGoals,
 } from "../drizzle/schema";
 
 const TABLES = [
+  "chat_messages", "conversations", "family_case_notes", "family_goals",
   "reportResults", "customReports", "certifications", "timeClock",
   "cacfpReports", "mealItems", "mealPlans", "digitalDocuments",
   "parentNotifications", "activityLogs", "payments", "invoices",
   "ai_insights", "bulk_action_logs", "documents", "family_contact_addresses",
   "calendar_events", "student_notes", "staff_caseloads",
-  "child_classroom_assignments", "pir_data", "education_records",
+  "child_classroom_assignments", "pir_data", "pir_reports", "education_records",
   "communication_logs", "family_services", "health_records", "attendance",
   "classrooms", "children", "families", "staff", "organizations", "users",
 ];
@@ -57,8 +60,22 @@ async function main() {
     hashPassword(demoPassword),
   ]);
   await db.insert(users).values([
-    { openId: "dev-test-user", name: "Test Administrator", email: "admin@childflow.org", loginMethod: "email", role: "admin", passwordHash: adminHash },
-    { openId: "user-maria", name: "Maria Lopez", email: "maria.lopez@childflow.org", loginMethod: "email", role: "user", passwordHash: staffHash },
+    { openId: "dev-test-user", name: "Test Administrator", email: "admin@childflow.org", loginMethod: "email", role: "admin", organizationId: 1, passwordHash: adminHash },
+    { openId: "user-maria", name: "Maria Lopez", email: "maria.lopez@childflow.org", loginMethod: "email", role: "staff", organizationId: 1, passwordHash: staffHash },
+    // Parent accounts power the family side of chat threads (users 3 & 4).
+    { openId: "parent-garcia", name: "Carmen Garcia", email: "carmen.garcia@example.com", loginMethod: "email", role: "parent", organizationId: 1, familyId: 1, passwordHash: staffHash },
+    { openId: "parent-nguyen", name: "Linh Nguyen", email: "linh.nguyen@example.com", loginMethod: "email", role: "parent", organizationId: 1, familyId: 2, passwordHash: staffHash },
+    // One login per staff member (users 5-12) so every §1302.91 role can be
+    // exercised: sign in as the nurse, the nutritionist, an advocate, etc.
+    // staff.userId links these to their staff rows below.
+    { openId: "staff-diana", name: "Diana Reyes", email: "diana.reyes@childflow.org", loginMethod: "email", role: "admin", organizationId: 1, passwordHash: staffHash },
+    { openId: "staff-james", name: "James Mitchell", email: "james.mitchell@childflow.org", loginMethod: "email", role: "staff", organizationId: 1, passwordHash: staffHash },
+    { openId: "staff-aisha", name: "Aisha Johnson", email: "aisha.johnson@childflow.org", loginMethod: "email", role: "staff", organizationId: 1, passwordHash: staffHash },
+    { openId: "staff-sofia", name: "Sofia Hernandez", email: "sofia.hernandez@childflow.org", loginMethod: "email", role: "staff", organizationId: 1, passwordHash: staffHash },
+    { openId: "staff-marcus", name: "Marcus Webb", email: "marcus.webb@childflow.org", loginMethod: "email", role: "staff", organizationId: 1, passwordHash: staffHash },
+    { openId: "staff-linda", name: "Linda Tran", email: "linda.tran@childflow.org", loginMethod: "email", role: "staff", organizationId: 1, passwordHash: staffHash },
+    { openId: "staff-rachel", name: "Rachel Kim", email: "rachel.kim@childflow.org", loginMethod: "email", role: "staff", organizationId: 1, passwordHash: staffHash },
+    { openId: "staff-carlos", name: "Carlos Mendoza", email: "carlos.mendoza@childflow.org", loginMethod: "email", role: "staff", organizationId: 1, passwordHash: staffHash },
   ]);
   console.log(`  Demo login → admin@childflow.org / ${demoPassword}`);
 
@@ -71,22 +88,29 @@ async function main() {
     subscriptionTier: "professional",
     maxChildren: 150,
     maxStaff: 30,
+    // Demo org is a Head Start program — module on so the full demo works.
+    enabledModules: ["head_start"],
   });
   const ORG = 1;
+  // Bind the seeded staff accounts to the org so tenant scoping resolves to a
+  // real organization (the REST layer no longer falls back to "first org").
+  // Only the two staff users exist at this point, so an unfiltered update is safe.
+  await db.update(users).set({ organizationId: ORG });
 
   console.log("Seeding staff…");
   const staffRows = [
-    ["Diana", "Reyes", "Center Director", "admin"],
+    ["Diana", "Reyes", "Center Director", "director"],
     ["James", "Mitchell", "Lead Teacher", "teacher"],
-    ["Aisha", "Johnson", "Lead Teacher", "teacher"],
+    ["Aisha", "Johnson", "Education Coordinator", "education_coordinator"],
     ["Sofia", "Hernandez", "Teacher Assistant", "assistant"],
-    ["Marcus", "Webb", "Teacher Assistant", "assistant"],
-    ["Linda", "Tran", "Family Services Coordinator", "coordinator"],
-    ["Rachel", "Kim", "Health Coordinator", "coordinator"],
-    ["Carlos", "Mendoza", "Lead Teacher", "teacher"],
+    ["Marcus", "Webb", "Nutritionist (RD)", "nutritionist"],
+    ["Linda", "Tran", "Family Advocate", "family_advocate"],
+    ["Rachel", "Kim", "Program Nurse (RN)", "nurse"],
+    ["Carlos", "Mendoza", "Family Advocate", "family_advocate"],
   ] as const;
   await db.insert(staff).values(staffRows.map(([firstName, lastName, position, role], i) => ({
     organizationId: ORG, firstName, lastName, position, role,
+    userId: 5 + i, // staff logins seeded above, same order
     email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@childflow.org`,
     phone: `(916) 555-0${100 + i}`,
   })));
@@ -237,14 +261,60 @@ async function main() {
     { childId: 3, organizationId: ORG, type: "home_visit", title: "Educational Home Visit", description: "Shared at-home literacy activities with family.", assessmentDate: daysAgo(15), recordedBy: 2 },
   ]);
 
-  console.log("Seeding PIR data…");
-  await db.insert(pirData).values([
-    { organizationId: ORG, year: "2025-2026", section: "Section A: Program Information", questionId: "A.1", value: "120", updatedBy: 1 },
-    { organizationId: ORG, year: "2025-2026", section: "Section A: Program Information", questionId: "A.10", value: "118", updatedBy: 1 },
-    { organizationId: ORG, year: "2025-2026", section: "Section B: Program Staff", questionId: "B.1", value: "24", updatedBy: 1 },
-    { organizationId: ORG, year: "2025-2026", section: "Section C: Child Health", questionId: "C.19", value: "112", updatedBy: 7 },
-    { organizationId: ORG, year: "2025-2026", section: "Section C: Child Health", questionId: "C.23", value: "104", updatedBy: 7 },
-  ]);
+  console.log("Seeding PIR reports + data…");
+  // Question *definitions* live in pir_questions (run scripts/seed-pir-questions.ts).
+  // Demo *values* are keyed by catalog code so they appear in the PIR editor/viewer.
+  const pirSectionByCode = new Map(
+    (await db.select({ code: pirQuestions.code, section: pirQuestions.section }).from(pirQuestions))
+      .map((q) => [q.code, q.section] as const),
+  );
+  if (pirSectionByCode.size === 0) {
+    console.warn("  ⚠ pir_questions is empty — run `npx tsx scripts/seed-pir-questions.ts` first so PIR demo values map to the catalog.");
+  }
+  const pirValues: Record<string, string | number> = {
+    "program_information.structure.program_type": "Head Start",
+    "program_information.structure.center_based_count": 96,
+    "program_information.enrollment.funded_enrollment": 120,
+    "program_information.enrollment.total_cumulative_enrollment": 138,
+    "program_information.enrollment.avg_daily_attendance_pct": 89,
+    "program_information.eligibility.income_below_100_poverty": 96,
+    "program_information.age.age_3": 40,
+    "program_information.age.age_4": 78,
+    "program_information.race_ethnicity.hispanic_latino": 71,
+    "program_staff.counts.total_paid_staff": 24,
+    "program_staff.teaching_qualifications.total_teachers": 12,
+    "program_staff.teaching_qualifications.baccalaureate_degree": 9,
+    "program_staff.turnover.departed_during_year": 3,
+    "child_family_services.health_insurance_access.medical_home_eoy": 131,
+    "child_family_services.preventive_care.immunizations_up_to_date": 129,
+    "child_family_services.bmi.healthy_weight": 92,
+    "child_family_services.families.total_families": 132,
+    "child_family_services.family_services.housing_assistance": 14,
+    "child_family_services.disabilities.iep_ifsp_total": 18,
+    "grant_level.grant.total_approved_enrollment": 120,
+    "grant_level.facilities.number_of_centers": 6,
+    "grant_level.facilities.cacfp_participation": "true",
+  };
+  // Current year is a partial, in-progress draft; prior years are finished reports.
+  const pirReportSeed = [
+    { year: "2025-2026", status: "draft" as const, submittedAt: null as Date | null, codes: Object.keys(pirValues).slice(0, 9) },
+    { year: "2024-2025", status: "submitted" as const, submittedAt: daysAgo(120), codes: Object.keys(pirValues) },
+    { year: "2023-2024", status: "accepted" as const, submittedAt: daysAgo(500), codes: Object.keys(pirValues) },
+    { year: "2022-2023", status: "accepted" as const, submittedAt: daysAgo(860), codes: Object.keys(pirValues) },
+  ];
+  for (let i = 0; i < pirReportSeed.length; i++) {
+    const r = pirReportSeed[i];
+    const [res] = await db.insert(pirReports).values({ organizationId: ORG, year: r.year, status: r.status, submittedAt: r.submittedAt });
+    const reportId = res.insertId;
+    const rows = r.codes
+      .filter((code) => pirSectionByCode.has(code))
+      .map((code) => {
+        const raw = pirValues[code];
+        const value = typeof raw === "number" ? String(Math.max(0, raw - i * 2)) : raw;
+        return { organizationId: ORG, year: r.year, section: pirSectionByCode.get(code)!, questionId: code, value, reportId, updatedBy: 1 };
+      });
+    if (rows.length) await db.insert(pirData).values(rows);
+  }
 
   console.log("Seeding student notes…");
   await db.insert(studentNotes).values([
@@ -402,6 +472,43 @@ async function main() {
     { organizationId: ORG, createdByUserId: 1, reportName: "Monthly Attendance Summary", reportType: "attendance", filters: { range: "last_30_days" }, columns: ["child", "daysPresent", "daysAbsent", "rate"], lastRunAt: daysAgo(2) },
     { organizationId: ORG, createdByUserId: 1, reportName: "Health Compliance Status", reportType: "health", filters: { status: ["overdue", "due_soon"] }, columns: ["child", "screening", "status", "expiry"], lastRunAt: daysAgo(5) },
     { organizationId: ORG, createdByUserId: 1, reportName: "Enrollment by Classroom", reportType: "enrollment", filters: {}, columns: ["classroom", "enrolled", "capacity", "utilization"] },
+  ]);
+
+
+  console.log("Seeding family goals & case notes…");
+  await db.insert(familyGoals).values([
+    { familyId: 1, organizationId: ORG, title: "Enroll in ESL evening classes", description: "Mother wants to improve English for job applications.", category: "education", progress: 40, status: "in_progress", targetDate: daysAhead(90), steps: [{ id: "s1", title: "Collect program options", isCompleted: true, dueDate: null, notes: null }, { id: "s2", title: "Submit application", isCompleted: false, dueDate: dateStr(daysAhead(14)), notes: null }] },
+    { familyId: 2, organizationId: ORG, title: "Secure stable housing", description: "Family at risk of losing current rental; pursuing assistance.", category: "housing", progress: 25, status: "in_progress", targetDate: daysAhead(60), steps: [{ id: "s1", title: "Housing Alliance application", isCompleted: true, dueDate: null, notes: "Submitted" }, { id: "s2", title: "Follow up on waitlist", isCompleted: false, dueDate: dateStr(daysAhead(7)), notes: null }] },
+    { familyId: 5, organizationId: ORG, title: "Consistent daily attendance", description: "Address transportation barrier affecting Madison's attendance.", category: "attendance", progress: 60, status: "in_progress", targetDate: daysAhead(30), steps: [{ id: "s1", title: "Bus route enrollment", isCompleted: true, dueDate: null, notes: null }, { id: "s2", title: "Two weeks full attendance", isCompleted: false, dueDate: dateStr(daysAhead(14)), notes: null }] },
+  ]);
+
+  await db.insert(familyCaseNotes).values([
+    { organizationId: ORG, familyId: 1, authorId: 6, type: "home_visit", confidentiality: "standard", body: "Fall home visit completed. Home environment is warm and organized. Mother expressed strong interest in ESL classes — connected her with two evening programs near their apartment. Isabella shows growing vocabulary in both languages.", followUpRequired: 1, followUpDue: daysAhead(18), createdAt: daysAgo(12) },
+    { organizationId: ORG, familyId: 1, authorId: 6, type: "phone_call", confidentiality: "standard", body: "Mother called to confirm she picked up the ESL program brochures. She plans to apply to the Tuesday/Thursday program. Asked about childcare during classes — shared Head Start extended-day options.", followUpRequired: 0, createdAt: daysAgo(6) },
+    { organizationId: ORG, familyId: 5, authorId: 6, type: "phone_call", confidentiality: "standard", body: "Check-in about Madison's attendance gaps. Grandmother shared that the family car broke down two weeks ago and repairs are unaffordable this month. Shared bus route info and voucher program.", followUpRequired: 1, followUpDue: daysAhead(10), createdAt: daysAgo(3) },
+    { organizationId: ORG, familyId: 5, authorId: 2, type: "general", confidentiality: "sensitive", body: "Madison arrived visibly tired two days this week and mentioned the family is staying with relatives temporarily. Monitoring; will raise gently at next family contact. No safety concerns observed.", followUpRequired: 1, followUpDue: daysAhead(5), createdAt: daysAgo(1) },
+  ]);
+
+  console.log("Assigning family case loads…");
+  // Family advocates for the caseload control tower: staff 6 carries most
+  // families, staff 7 a couple, family 6 left unassigned so the supervisor
+  // queue has something to triage.
+  const advocateAssignments: Array<[number, number]> = [[1, 6], [2, 6], [3, 6], [4, 7], [5, 7]];
+  for (const [familyId, advocateId] of advocateAssignments) {
+    await db.update(families).set({ familyAdvocateId: advocateId }).where(eq(families.id, familyId));
+  }
+
+  console.log("Seeding chat conversations…");
+  await db.insert(conversations).values([
+    { organizationId: ORG, familyId: 1, createdBy: 1, isActive: 1, staffLastReadAt: at(daysAgo(0), 9), familyLastReadAt: at(daysAgo(0), 8) },
+    { organizationId: ORG, familyId: 2, createdBy: 2, isActive: 1, staffLastReadAt: at(daysAgo(1), 15), familyLastReadAt: at(daysAgo(1), 16) },
+  ]);
+  await db.insert(chatMessages).values([
+    { conversationId: 1, senderUserId: 1, senderRole: "staff", body: "Good morning! Just a reminder that Isabella's physical exam is due March 12. Let us know if you need help scheduling.", translations: { __source: "en" }, sentAt: at(daysAgo(2), 9, 15) },
+    { conversationId: 1, senderUserId: 3, senderRole: "family", body: "¡Gracias! Ya tenemos la cita con el doctor para el 10 de marzo.", translations: { __source: "es" }, sentAt: at(daysAgo(2), 12, 40) },
+    { conversationId: 1, senderUserId: 1, senderRole: "staff", body: "Wonderful — we'll mark it on her record. Isabella had a great day today!", translations: { __source: "en" }, sentAt: at(daysAgo(0), 8, 5) },
+    { conversationId: 2, senderUserId: 2, senderRole: "staff", body: "Hi! Sharing this month's family engagement calendar — the science night is next Thursday at 5:30.", translations: { __source: "en" }, sentAt: at(daysAgo(1), 14, 30) },
+    { conversationId: 2, senderUserId: 4, senderRole: "family", body: "Cảm ơn cô! Chúng tôi sẽ tham gia.", translations: { __source: "vi" }, sentAt: at(daysAgo(1), 15, 45) },
   ]);
 
   console.log("✅ Seed complete.");

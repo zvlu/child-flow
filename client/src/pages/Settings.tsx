@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,14 +7,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Settings as SettingsIcon, Bell, Lock, Users, Building2, Save, UserCircle, Loader2, Plus, Trash2, ShieldCheck } from "lucide-react";
+import { Settings as SettingsIcon, Bell, Lock, Users, Building2, Save, UserCircle, Loader2, Plus, Trash2, ShieldCheck, LayoutGrid, ChevronUp, ChevronDown, RotateCcw, Eye, EyeOff, Camera } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ConfirmDialog";
+import {
+  TOP_NAV_PRIMARY_COUNT, sortByOrder, topNavForRole, sideNavForRole,
+  type EnabledModules, type NavItem, type NavSection, type NavRole,
+} from "@/config/nav";
+import { useOrgModules } from "@/hooks/useOrgModules";
+import { MODULE_DESCRIPTIONS, MODULE_IDS, MODULE_LABELS, hasModule, type ModuleId } from "@shared/modules";
 
 const roleLabel: Record<string, string> = { admin: "Administrator", staff: "Staff", parent: "Parent" };
 
@@ -50,6 +57,7 @@ const roleColorClasses: Record<RoleColor, string> = {
 export default function Settings() {
   const { user, loading, refresh } = useAuth();
   const isAdmin = useIsAdmin();
+  const orgModules = useOrgModules();
 
   const initials = user?.name
     ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -68,10 +76,11 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="account">
-        <TabsList className={`grid w-full ${isAdmin ? "grid-cols-5 max-w-2xl" : "grid-cols-3 max-w-md"}`}>
+        <TabsList className={`grid w-full ${isAdmin ? "grid-cols-6 max-w-3xl" : "grid-cols-4 max-w-xl"}`}>
           <TabsTrigger value="account">Account</TabsTrigger>
           {isAdmin && <TabsTrigger value="program">Program</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
+          <TabsTrigger value="layout">Layout</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
@@ -104,6 +113,8 @@ export default function Settings() {
         {isAdmin && (
         <TabsContent value="program" className="mt-4 space-y-4">
           <ProgramSettings />
+          <ModulesCard />
+          <PlanUsageCard />
         </TabsContent>
         )}
 
@@ -115,12 +126,32 @@ export default function Settings() {
         </TabsContent>
         )}
 
+        {/* Layout — customize the sidebar + top nav (all roles) */}
+        <TabsContent value="layout" className="mt-4 space-y-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          ) : (
+            <NavigationSettings
+              // Re-key on module availability so the working copy re-derives once the org loads or a module is toggled.
+              key={`${(user as any)?.id ?? "anon"}-${MODULE_IDS.filter((m) => orgModules.has(m)).join(",")}`}
+              settings={user?.settings}
+              role={((user as any)?.role ?? "staff") as NavRole}
+              modules={orgModules}
+              onSaved={refresh}
+              disabled={!user}
+            />
+          )}
+        </TabsContent>
+
         {/* Notifications — persisted per user */}
         <TabsContent value="notifications" className="mt-4 space-y-4">
           {loading ? (
             <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : (
-            <NotificationPreferences settings={user?.settings} onSaved={refresh} disabled={!user} />
+            <>
+              <NotificationPreferences settings={user?.settings} onSaved={refresh} disabled={!user} />
+              <ChatLanguageCard settings={user?.settings} onSaved={refresh} disabled={!user} />
+            </>
           )}
         </TabsContent>
 
@@ -153,14 +184,77 @@ export default function Settings() {
 
 /* ----------------------------- Account ----------------------------- */
 
+/**
+ * Read an image File, center-crop to a square and downscale to `size`px, then
+ * return a compact JPEG data URL. Keeps avatars small enough to live in the DB
+ * column and travel over tRPC.
+ */
+async function fileToAvatarDataUrl(file: File, size = 256): Promise<string> {
+  const sourceUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("decode failed"));
+    i.src = sourceUrl;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no canvas context");
+  const min = Math.min(img.width, img.height);
+  const sx = (img.width - min) / 2;
+  const sy = (img.height - min) / 2;
+  ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+
 function AccountForm({ user, initials, onSaved }: { user: any; initials: string; onSaved: () => Promise<void> }) {
   const [name, setName] = useState<string>(user.name ?? "");
   useEffect(() => { setName(user.name ?? ""); }, [user.name]);
+
+  // Real job title (e.g. "Family Advocate") beats the generic admin/staff
+  // access tier badge here too.
+  const { data: myStaffRole } = trpc.staff.myRole.useQuery(undefined, { enabled: user.role !== "parent" });
+  const titleLabel = myStaffRole?.position || roleLabel[user.role] || user.role || "Member";
+
+  const [avatar, setAvatar] = useState<string | null>(user.avatarUrl ?? null);
+  useEffect(() => { setAvatar(user.avatarUrl ?? null); }, [user.avatarUrl]);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const updateProfile = trpc.auth.updateProfile.useMutation({
     onSuccess: async () => { await onSaved(); toast.success("Profile updated"); },
     onError: (e) => toast.error(e.message || "Could not update profile"),
   });
+
+  const setAvatarMut = trpc.auth.setAvatar.useMutation({
+    onSuccess: async () => { await onSaved(); },
+    onError: (e) => { setAvatar(user.avatarUrl ?? null); toast.error(e.message || "Could not update picture"); },
+  });
+
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // let the same file be re-picked later
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please choose an image file."); return; }
+    try {
+      const dataUrl = await fileToAvatarDataUrl(file);
+      setAvatar(dataUrl); // optimistic preview
+      setAvatarMut.mutate({ avatarUrl: dataUrl }, { onSuccess: () => toast.success("Profile picture updated") });
+    } catch {
+      toast.error("Could not read that image. Try a different file.");
+    }
+  };
+
+  const onRemoveAvatar = () => {
+    setAvatar(null);
+    setAvatarMut.mutate({ avatarUrl: null }, { onSuccess: () => toast.success("Profile picture removed") });
+  };
 
   const trimmed = name.trim();
   const dirty = trimmed !== (user.name ?? "") && trimmed.length > 0;
@@ -168,15 +262,39 @@ function AccountForm({ user, initials, onSaved }: { user: any; initials: string;
   return (
     <>
       <div className="flex items-center gap-4">
-        <Avatar className="h-16 w-16">
-          <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">{initials}</AvatarFallback>
-        </Avatar>
+        <div className="relative">
+          <Avatar className="h-16 w-16">
+            {avatar ? <AvatarImage src={avatar} alt={user.name || "Profile picture"} className="object-cover" /> : null}
+            <AvatarFallback className="bg-primary/10 text-primary text-xl font-bold">{initials}</AvatarFallback>
+          </Avatar>
+          <button
+            type="button"
+            data-icon-button
+            onClick={() => fileRef.current?.click()}
+            disabled={setAvatarMut.isPending}
+            className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow ring-2 ring-card disabled:opacity-60"
+            aria-label="Change profile picture"
+          >
+            {setAvatarMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
+        </div>
         <div>
           <p className="text-lg font-bold text-foreground">{user.name || "Unnamed user"}</p>
           <p className="text-sm text-muted-foreground">{user.email || "No email on file"}</p>
           <Badge className="mt-1 bg-primary/10 text-primary hover:bg-primary/10 text-xs">
-            {roleLabel[user.role] ?? user.role ?? "Member"}
+            {titleLabel}
           </Badge>
+          <div className="flex items-center gap-2 mt-2">
+            <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" disabled={setAvatarMut.isPending} onClick={() => fileRef.current?.click()}>
+              <Camera className="h-3.5 w-3.5" />{avatar ? "Change photo" : "Upload photo"}
+            </Button>
+            {avatar && (
+              <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs text-destructive" disabled={setAvatarMut.isPending} onClick={onRemoveAvatar}>
+                <Trash2 className="h-3.5 w-3.5" />Remove
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -191,7 +309,7 @@ function AccountForm({ user, initials, onSaved }: { user: any; initials: string;
         </div>
         <div className="space-y-1">
           <Label className="text-muted-foreground">Role</Label>
-          <p className="text-sm font-medium">{roleLabel[user.role] ?? "—"}</p>
+          <p className="text-sm font-medium">{titleLabel}</p>
         </div>
         <div className="space-y-1">
           <Label className="text-muted-foreground">Account ID</Label>
@@ -268,6 +386,64 @@ function NotificationPreferences({ settings, onSaved, disabled }: { settings: an
         >
           {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Save Preferences
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ------------------------- Chat language ------------------------- */
+
+const CHAT_LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Español (Spanish)" },
+  { code: "ht", label: "Kreyòl Ayisyen (Haitian Creole)" },
+  { code: "zh-Hans", label: "简体中文 (Simplified Chinese)" },
+  { code: "vi", label: "Tiếng Việt (Vietnamese)" },
+  { code: "ar", label: "العربية (Arabic)" },
+] as const;
+
+/** Family-chat translation preference: messages from families render in this language. */
+function ChatLanguageCard({ settings, onSaved, disabled }: { settings: any; onSaved: () => Promise<void>; disabled: boolean }) {
+  const stored: string = settings?.preferredLanguage ?? "en";
+  const [lang, setLang] = useState(stored);
+  useEffect(() => { setLang(stored); }, [stored]);
+
+  const save = trpc.auth.updateSettings.useMutation({
+    onSuccess: async () => { await onSaved(); toast.success("Chat language saved"); },
+    onError: (e) => toast.error(e.message || "Could not save language"),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Bell className="h-4 w-4 text-primary" />
+          Family Chat Language
+        </CardTitle>
+        <CardDescription>
+          Messages from families are automatically translated into this language for you. Your replies are
+          translated into each family's language.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <Select value={lang} onValueChange={setLang} disabled={disabled}>
+          <SelectTrigger className="sm:w-72">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CHAT_LANGUAGES.map((l) => (
+              <SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          className="gap-2"
+          disabled={disabled || lang === stored || save.isPending}
+          onClick={() => save.mutate({ preferredLanguage: lang as any })}
+        >
+          {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Save
         </Button>
       </CardContent>
     </Card>
@@ -378,6 +554,15 @@ function CustomRolesManager() {
     onSuccess: () => { utils.roles.list.invalidate(); toast.success("Role removed"); },
     onError: (e) => toast.error(e.message || "Could not remove role"),
   });
+  const confirm = useConfirm();
+  const confirmRemove = async (role: { id: number; name: string }) => {
+    if (await confirm({
+      title: `Remove the "${role.name}" role?`,
+      description: "Staff currently assigned this role label will keep their access tier, but the label will be gone.",
+      confirmLabel: "Remove",
+      destructive: true,
+    })) remove.mutate({ id: role.id, organizationId: ORGANIZATION_ID });
+  };
 
   return (
     <Card>
@@ -410,7 +595,7 @@ function CustomRolesManager() {
                   className="opacity-50 hover:opacity-100 transition-opacity"
                   title={`Remove ${role.name}`}
                   disabled={remove.isPending}
-                  onClick={() => remove.mutate({ id: role.id, organizationId: ORGANIZATION_ID })}
+                  onClick={() => confirmRemove(role)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -524,33 +709,399 @@ function StaffUsers() {
 // Program-wide details are presentational here; persisting them is tracked
 // separately (the organizations table doesn't yet carry these columns).
 function ProgramSettings() {
-  const [saved, setSaved] = useState(false);
-  const note = () => { setSaved(true); toast.message("Program settings are display-only for now"); setTimeout(() => setSaved(false), 1500); };
+  const orgQuery = trpc.organizations.get.useQuery(ORGANIZATION_ID);
+  const org = orgQuery.data;
+
+  const blank = { name: "", director: "", directorEmail: "", phone: "", address: "", maxChildren: "", classroomCount: "" };
+  const [form, setForm] = useState(blank);
+  useEffect(() => {
+    if (!org) return;
+    setForm({
+      name: org.name ?? "",
+      director: org.director ?? "",
+      directorEmail: org.directorEmail ?? "",
+      phone: org.phone ?? "",
+      address: org.address ?? "",
+      maxChildren: org.maxChildren != null ? String(org.maxChildren) : "",
+      classroomCount: org.classroomCount != null ? String(org.classroomCount) : "",
+    });
+  }, [org]);
+
+  const update = trpc.organizations.update.useMutation({
+    onSuccess: async () => { await orgQuery.refetch(); toast.success("Program settings saved"); },
+    onError: (e) => toast.error(e.message || "Could not save program settings"),
+  });
+
+  const set = (k: keyof typeof blank) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const baseline = org
+    ? {
+        name: org.name ?? "", director: org.director ?? "", directorEmail: org.directorEmail ?? "",
+        phone: org.phone ?? "", address: org.address ?? "",
+        maxChildren: org.maxChildren != null ? String(org.maxChildren) : "",
+        classroomCount: org.classroomCount != null ? String(org.classroomCount) : "",
+      }
+    : blank;
+  const dirty = !!org && JSON.stringify(form) !== JSON.stringify(baseline);
+
+  const onSave = () => {
+    if (!form.name.trim()) { toast.error("Program name is required."); return; }
+    update.mutate({
+      id: ORGANIZATION_ID,
+      name: form.name.trim(),
+      director: form.director.trim() || null,
+      directorEmail: form.directorEmail.trim() || null,
+      phone: form.phone.trim() || null,
+      address: form.address.trim() || null,
+      maxChildren: form.maxChildren.trim() === "" ? undefined : Number(form.maxChildren),
+      classroomCount: form.classroomCount.trim() === "" ? null : Number(form.classroomCount),
+    });
+  };
+
+  if (orgQuery.isLoading) {
+    return <Card><CardContent className="py-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></CardContent></Card>;
+  }
+  if (!org) {
+    return <Card><CardContent className="py-6 text-center text-sm text-muted-foreground">Couldn't load your program details.</CardContent></Card>;
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Program Information</CardTitle>
+        <CardDescription>Contact and capacity details for {org.name}. Changes save to your program.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2"><Label htmlFor="program-name">Program Name</Label><Input id="program-name" value={form.name} maxLength={255} onChange={set("name")} /></div>
+          <div className="space-y-2"><Label htmlFor="program-id">Program ID</Label><Input id="program-id" value={org.agencyId} disabled className="bg-muted" /></div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2"><Label htmlFor="director">Program Director</Label><Input id="director" value={form.director} maxLength={160} onChange={set("director")} /></div>
+          <div className="space-y-2"><Label htmlFor="director-email">Director Email</Label><Input id="director-email" type="email" value={form.directorEmail} maxLength={320} onChange={set("directorEmail")} /></div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2"><Label htmlFor="phone">Program Phone</Label><Input id="phone" value={form.phone} maxLength={32} onChange={set("phone")} /></div>
+          <div className="space-y-2"><Label htmlFor="address">Program Address</Label><Input id="address" value={form.address} maxLength={400} onChange={set("address")} /></div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2"><Label htmlFor="capacity">Total Capacity</Label><Input id="capacity" type="number" min={0} value={form.maxChildren} onChange={set("maxChildren")} /></div>
+          <div className="space-y-2"><Label htmlFor="classrooms">Number of Classrooms</Label><Input id="classrooms" type="number" min={0} value={form.classroomCount} onChange={set("classroomCount")} /></div>
+        </div>
+        <Button onClick={onSave} disabled={!dirty || update.isPending} className="w-full gap-2">
+          {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save Changes
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ------------------------------- Modules -------------------------------- */
+
+/**
+ * Optional feature modules (admin only). Toggling writes
+ * organizations.enabledModules and invalidates the org query so nav, routes,
+ * and gated pages update immediately.
+ */
+function ModulesCard() {
+  const utils = trpc.useUtils();
+  const orgQuery = trpc.organizations.get.useQuery(ORGANIZATION_ID);
+  const org = orgQuery.data;
+
+  const update = trpc.organizations.update.useMutation({
+    onSuccess: async () => {
+      await utils.organizations.get.invalidate(ORGANIZATION_ID);
+      toast.success("Modules updated");
+    },
+    onError: (e) => toast.error(e.message || "Could not update modules"),
+  });
+
+  if (orgQuery.isLoading) {
+    return <Card><CardContent className="py-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></CardContent></Card>;
+  }
+  if (!org) return null;
+
+  const enabled = new Set<ModuleId>(MODULE_IDS.filter((m) => hasModule(org, m)));
+
+  const toggleModule = (id: ModuleId, on: boolean) => {
+    const next = new Set(enabled);
+    on ? next.add(id) : next.delete(id);
+    update.mutate({ id: ORGANIZATION_ID, enabledModules: MODULE_IDS.filter((m) => next.has(m)) });
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2"><LayoutGrid className="h-4 w-4 text-primary" />Modules</CardTitle>
+        <CardDescription>Optional feature sets for your program type. Turning a module off hides its pages and data entry — nothing is deleted.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {MODULE_IDS.map((id) => (
+          <div key={id} className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+            <div>
+              <p className="text-sm font-medium">{MODULE_LABELS[id]}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{MODULE_DESCRIPTIONS[id]}</p>
+            </div>
+            <Switch
+              checked={enabled.has(id)}
+              disabled={update.isPending}
+              onCheckedChange={(on) => toggleModule(id, on)}
+              aria-label={`Toggle ${MODULE_LABELS[id]}`}
+            />
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ----------------------------- Plan & Usage ----------------------------- */
+
+const TIERS: Record<string, { label: string; perChild: number; base: number }> = {
+  starter: { label: "Starter", perChild: 3, base: 0 },
+  professional: { label: "Professional", perChild: 2.5, base: 49 },
+  enterprise: { label: "Enterprise", perChild: 2, base: 199 },
+};
+const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+
+function UsageBar({ label, used, max }: { label: string; used: number; max: number | null }) {
+  const pct = max && max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
+  const over = max != null && used > max;
+  const near = pct >= 90;
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-sm">
+        <span className="text-muted-foreground">{label}</span>
+        <span className={`font-semibold ${over ? "text-destructive" : ""}`}>{used}{max != null ? ` / ${max}` : ""}</span>
+      </div>
+      <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${over || near ? "bg-destructive" : pct >= 75 ? "bg-amber-500" : "bg-primary"}`} style={{ width: `${max ? Math.max(pct, 4) : 0}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function PlanUsageCard() {
+  const orgId = ORGANIZATION_ID;
+  const usageQuery = trpc.organizations.usage.useQuery(orgId);
+  const u = usageQuery.data;
+
+  const [tier, setTier] = useState<string>("starter");
+  const [maxStaff, setMaxStaff] = useState<string>("");
+  useEffect(() => { if (u) { setTier(u.subscriptionTier); setMaxStaff(u.maxStaff != null ? String(u.maxStaff) : ""); } }, [u]);
+
+  const update = trpc.organizations.update.useMutation({
+    onSuccess: async () => { await usageQuery.refetch(); toast.success("Plan updated"); },
+    onError: (e) => toast.error(e.message || "Could not update plan"),
+  });
+
+  if (usageQuery.isLoading) return <Card><CardContent className="py-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></CardContent></Card>;
+  if (!u) return null;
+
+  const dirty = tier !== u.subscriptionTier || (maxStaff === "" ? u.maxStaff != null : Number(maxStaff) !== u.maxStaff);
+  const rate = TIERS[tier] ?? TIERS.starter;
+  const estimate = rate.base + u.children * rate.perChild;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" />Plan & Usage</CardTitle>
+        <CardDescription>Subscription tier, capacity limits, and current usage. Limits are enforced when adding children or staff.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Subscription Tier</Label>
+            <Select value={tier} onValueChange={setTier}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(TIERS).map(([v, t]) => <SelectItem key={v} value={v}>{t.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2"><Label>Staff Limit</Label><Input type="number" min={0} value={maxStaff} onChange={(e) => setMaxStaff(e.target.value)} /></div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <UsageBar label="Children enrolled" used={u.children} max={u.maxChildren} />
+          <UsageBar label="Staff" used={u.staff} max={maxStaff === "" ? null : Number(maxStaff)} />
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border border-border p-3">
+          <div>
+            <p className="text-sm font-medium">Estimated monthly cost</p>
+            <p className="text-xs text-muted-foreground">{rate.label}: {usd(rate.base)} base + {u.children} × {usd(rate.perChild)}/child</p>
+          </div>
+          <p className="text-xl font-bold text-primary">{usd(estimate)}</p>
+        </div>
+        <p className="text-[11px] text-muted-foreground">Capacity (children) is set as “Total Capacity” above. Estimate is illustrative.</p>
+
+        <div className="flex justify-end">
+          <Button disabled={!dirty || update.isPending} className="gap-2" onClick={() => update.mutate({ id: orgId, subscriptionTier: tier as any, maxStaff: maxStaff === "" ? undefined : Number(maxStaff) })}>
+            {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save Plan
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* --------------------------- Layout / Navigation --------------------------- */
+
+function reorder<T>(arr: T[], idx: number, dir: -1 | 1): T[] {
+  const j = idx + dir;
+  if (j < 0 || j >= arr.length) return arr;
+  const copy = [...arr];
+  [copy[idx], copy[j]] = [copy[j], copy[idx]];
+  return copy;
+}
+
+function NavigationSettings({ settings, role, modules, onSaved, disabled }: { settings: any; role: NavRole; modules: EnabledModules; onSaved: () => Promise<void>; disabled: boolean }) {
+  const nav = settings?.navigation;
+  // Only the items this role (and the org's enabled modules) can actually see are customizable.
+  const roleTop = topNavForRole(role, modules);
+  const roleSections = sideNavForRole(role, modules);
+
+  // Local working copy: full item lists in the saved order (hidden items kept so
+  // they can be re-enabled), plus the hidden sets.
+  const [topItems, setTopItems] = useState<NavItem[]>(() => sortByOrder(roleTop, nav?.topNav?.order));
+  const [topHidden, setTopHidden] = useState<Set<string>>(() => new Set<string>(nav?.topNav?.hidden ?? []));
+  const [sideSections, setSideSections] = useState<NavSection[]>(
+    () => roleSections.map(s => ({ ...s, items: sortByOrder(s.items, nav?.sideNav?.order) }))
+  );
+  const [sideHidden, setSideHidden] = useState<Set<string>>(() => new Set<string>(nav?.sideNav?.hidden ?? []));
+
+  const save = trpc.auth.updateSettings.useMutation({
+    onSuccess: async () => { await onSaved(); toast.success("Navigation layout saved"); },
+    onError: (e) => toast.error(e.message || "Could not save layout"),
+  });
+
+  const buildNavigation = () => ({
+    topNav: { order: topItems.map(i => i.path), hidden: Array.from(topHidden) },
+    sideNav: { order: sideSections.flatMap(s => s.items.map(i => i.path)), hidden: Array.from(sideHidden) },
+  });
+
+  // Compare current working copy to what's saved to drive the Save button.
+  const savedSerialized = JSON.stringify({
+    t: sortByOrder(roleTop, nav?.topNav?.order).map(i => i.path),
+    th: [...(nav?.topNav?.hidden ?? [])].sort(),
+    s: roleSections.flatMap(s => sortByOrder(s.items, nav?.sideNav?.order)).map(i => i.path),
+    sh: [...(nav?.sideNav?.hidden ?? [])].sort(),
+  });
+  const currentSerialized = JSON.stringify({
+    t: topItems.map(i => i.path),
+    th: Array.from(topHidden).sort(),
+    s: sideSections.flatMap(s => s.items.map(i => i.path)),
+    sh: Array.from(sideHidden).sort(),
+  });
+  const dirty = currentSerialized !== savedSerialized;
+  const hasCustomization = Boolean(nav?.topNav || nav?.sideNav) || topHidden.size > 0 || sideHidden.size > 0 || dirty;
+
+  const toggle = (set: Set<string>, setter: (s: Set<string>) => void, path: string) => {
+    const next = new Set(set);
+    next.has(path) ? next.delete(path) : next.add(path);
+    setter(next);
+  };
+
+  const reset = () => {
+    setTopItems(topNavForRole(role, modules));
+    setTopHidden(new Set());
+    setSideSections(sideNavForRole(role, modules).map(s => ({ ...s })));
+    setSideHidden(new Set());
+    // Persist the cleared state (server drops the navigation key -> defaults).
+    save.mutate({ navigation: {} });
+  };
+
+  const Row = ({ item, hidden, onToggle, onUp, onDown, isFirst, isLast, dim }: {
+    item: NavItem; hidden: boolean; onToggle: () => void; onUp: () => void; onDown: () => void;
+    isFirst: boolean; isLast: boolean; dim?: boolean;
+  }) => {
+    const Icon = item.icon;
+    return (
+      <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border border-border ${hidden ? "opacity-50" : ""}`}>
+        <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        <span className="flex-1 text-sm font-medium truncate">{item.label}{dim && <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">More</span>}</span>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-7 w-7" disabled={isFirst} onClick={onUp} aria-label={`Move ${item.label} up`}><ChevronUp className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" disabled={isLast} onClick={onDown} aria-label={`Move ${item.label} down`}><ChevronDown className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggle} aria-label={hidden ? `Show ${item.label}` : `Hide ${item.label}`}>
+            {hidden ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-primary" />}
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  const visibleTopCount = topItems.filter(i => !topHidden.has(i.path)).length;
+
   return (
     <>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-foreground flex items-center gap-2"><LayoutGrid className="h-4 w-4 text-primary" />Customize Navigation</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Reorder and hide items in your top bar and side menu. Saved to your account.</p>
+        </div>
+        <Button variant="outline" size="sm" className="gap-2" disabled={disabled || save.isPending || !hasCustomization} onClick={reset}>
+          <RotateCcw className="h-4 w-4" />Reset to default
+        </Button>
+      </div>
+
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Program Information</CardTitle>
-          <CardDescription>Contact and capacity details shown across the program.</CardDescription>
+          <CardTitle className="text-base">Top Navigation Bar</CardTitle>
+          <CardDescription>The first {TOP_NAV_PRIMARY_COUNT} visible items show in the bar; the rest collapse under “More”.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label htmlFor="program-name">Program Name</Label><Input id="program-name" defaultValue="Springfield Head Start" /></div>
-            <div className="space-y-2"><Label htmlFor="program-id">Program ID</Label><Input id="program-id" defaultValue="IL-001" disabled className="bg-muted" /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label htmlFor="director">Program Director</Label><Input id="director" defaultValue="Lisa Thompson" /></div>
-            <div className="space-y-2"><Label htmlFor="director-email">Director Email</Label><Input id="director-email" type="email" defaultValue="l.thompson@childflow.org" /></div>
-          </div>
-          <div className="space-y-2"><Label htmlFor="address">Program Address</Label><Input id="address" defaultValue="123 Education Lane, Springfield, IL 62701" /></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label htmlFor="capacity">Total Capacity</Label><Input id="capacity" type="number" defaultValue="51" /></div>
-            <div className="space-y-2"><Label htmlFor="classrooms">Number of Classrooms</Label><Input id="classrooms" type="number" defaultValue="3" /></div>
-          </div>
-          <Button onClick={note} className="w-full gap-2"><Save className="h-4 w-4" />Save Changes</Button>
-          {saved && <p className="text-xs text-center text-muted-foreground">Not yet persisted.</p>}
+        <CardContent className="space-y-2">
+          {topItems.map((item, i) => (
+            <Row
+              key={item.path}
+              item={item}
+              hidden={topHidden.has(item.path)}
+              isFirst={i === 0}
+              isLast={i === topItems.length - 1}
+              dim={!topHidden.has(item.path) && topItems.filter((x, xi) => xi <= i && !topHidden.has(x.path)).length > TOP_NAV_PRIMARY_COUNT}
+              onToggle={() => toggle(topHidden, setTopHidden, item.path)}
+              onUp={() => setTopItems(prev => reorder(prev, i, -1))}
+              onDown={() => setTopItems(prev => reorder(prev, i, 1))}
+            />
+          ))}
+          <p className="text-xs text-muted-foreground pt-1">{visibleTopCount} of {topItems.length} items visible.</p>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Side Menu</CardTitle>
+          <CardDescription>Reorder within each section and hide items you don’t use.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {sideSections.map((section, si) => (
+            <div key={section.title} className="space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{section.title}</p>
+              {section.items.map((item, ii) => (
+                <Row
+                  key={item.path}
+                  item={item}
+                  hidden={sideHidden.has(item.path)}
+                  isFirst={ii === 0}
+                  isLast={ii === section.items.length - 1}
+                  onToggle={() => toggle(sideHidden, setSideHidden, item.path)}
+                  onUp={() => setSideSections(prev => prev.map((s, x) => x !== si ? s : { ...s, items: reorder(s.items, ii, -1) }))}
+                  onDown={() => setSideSections(prev => prev.map((s, x) => x !== si ? s : { ...s, items: reorder(s.items, ii, 1) }))}
+                />
+              ))}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end">
+        <Button className="gap-2" disabled={disabled || !dirty || save.isPending} onClick={() => save.mutate({ navigation: buildNavigation() })}>
+          {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Save Layout
+        </Button>
+      </div>
     </>
   );
 }

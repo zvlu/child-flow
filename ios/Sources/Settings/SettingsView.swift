@@ -27,7 +27,7 @@ struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(user.fullName)
                                 .font(.subheadline.weight(.medium))
-                            Text(user.role)
+                            Text(user.displayTitle)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -67,13 +67,18 @@ struct SettingsView: View {
             }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
     }
 }
 
 struct ChangePasswordView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var current = ""
     @State private var newPassword = ""
     @State private var confirm = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+    @State private var showSuccess = false
 
     var body: some View {
         List {
@@ -81,13 +86,47 @@ struct ChangePasswordView: View {
                 SecureField("Current Password", text: $current)
                 SecureField("New Password", text: $newPassword)
                 SecureField("Confirm New Password", text: $confirm)
+            } footer: {
+                Text("Password must be at least 8 characters.")
             }
             Section {
-                Button("Update Password") {}
-                    .disabled(newPassword.isEmpty || newPassword != confirm)
+                Button {
+                    update()
+                } label: {
+                    if isSaving {
+                        HStack { Spacer(); ProgressView(); Spacer() }
+                    } else {
+                        Text("Update Password")
+                    }
+                }
+                .disabled(newPassword.count < 8 || newPassword != confirm || isSaving)
             }
         }
         .navigationTitle("Change Password")
+        .alert("Couldn't Update Password", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") { errorMessage = nil }
+        } message: { Text(errorMessage ?? "") }
+        .alert("Password Updated", isPresented: $showSuccess) {
+            Button("OK") { dismiss() }
+        } message: { Text("Your password has been changed.") }
+    }
+
+    private func update() {
+        isSaving = true
+        Task {
+            do {
+                try await APIClient.shared.changePassword(
+                    currentPassword: current.isEmpty ? nil : current,
+                    newPassword: newPassword
+                )
+                showSuccess = true
+            } catch {
+                // This button used to be a no-op `{}` — tapping it did nothing
+                // at all, with no way to tell whether a password was ever set.
+                errorMessage = "Check that your current password is correct, then try again."
+            }
+            isSaving = false
+        }
     }
 }
 
@@ -99,7 +138,7 @@ struct AboutView: View {
                 LabeledContent("Purpose", value: "Head Start Management")
             }
             Section("Contact") {
-                Link("support@childflow.org", destination: URL(string: "mailto:support@childflow.org")!)
+                Link("support@sprout.org", destination: URL(string: "mailto:support@sprout.org")!)
             }
         }
         .navigationTitle("About")
@@ -111,12 +150,27 @@ class SettingsViewModel: ObservableObject {
     @Published var programName = ""
     @Published var region = ""
     @Published var fiscalYear = ""
-    @Published var attendanceReminders = true
-    @Published var healthAlerts = true
-    @Published var complianceAlerts = true
+    // These three used to reset to "on" every launch no matter what the user
+    // picked — the toggles moved, but nothing ever saved the choice. There's
+    // no server-side notification-preference model yet, so this persists
+    // per-device for now; still real, just not synced across devices.
+    @Published var attendanceReminders = true { didSet { UserDefaults.standard.set(attendanceReminders, forKey: Self.attendanceKey) } }
+    @Published var healthAlerts = true { didSet { UserDefaults.standard.set(healthAlerts, forKey: Self.healthKey) } }
+    @Published var complianceAlerts = true { didSet { UserDefaults.standard.set(complianceAlerts, forKey: Self.complianceKey) } }
+
+    private static let attendanceKey = "settings.notify.attendance"
+    private static let healthKey = "settings.notify.health"
+    private static let complianceKey = "settings.notify.compliance"
 
     var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
+
+    init() {
+        let d = UserDefaults.standard
+        if d.object(forKey: Self.attendanceKey) != nil { attendanceReminders = d.bool(forKey: Self.attendanceKey) }
+        if d.object(forKey: Self.healthKey) != nil { healthAlerts = d.bool(forKey: Self.healthKey) }
+        if d.object(forKey: Self.complianceKey) != nil { complianceAlerts = d.bool(forKey: Self.complianceKey) }
     }
 
     func load() async {
@@ -125,6 +179,11 @@ class SettingsViewModel: ObservableObject {
             programName = settings.programName
             region = settings.region
             fiscalYear = settings.fiscalYear
-        } catch {}
+        } catch {
+            // Read-only info display — worth noting the failure without an
+            // intrusive alert, since there's nothing actionable for the user
+            // to retry beyond pulling to refresh.
+            print("SettingsViewModel.load failed: \(error)")
+        }
     }
 }

@@ -43,6 +43,7 @@ struct ClockInView: View {
             .navigationTitle("My Timesheet")
             .navigationBarTitleDisplayMode(.large)
             .task { await viewModel.load() }
+            .refreshable { await viewModel.load() }
         }
     }
 }

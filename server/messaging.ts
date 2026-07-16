@@ -1,8 +1,11 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
 import {
   chatMessages,
   children,
+  childClassroomAssignments,
+  classrooms,
+  conversationArchives,
   conversations,
   families,
   users,
@@ -11,7 +14,15 @@ import {
 } from "../drizzle/schema";
 import { clientIpFromReq } from "./_core/audit";
 import { sdk } from "./_core/sdk";
-import { getDb, insertAuditLog } from "./db";
+import { getDb, insertAuditLog, updateUserSettings } from "./db";
+import { resolveStaffId } from "./moduleDb";
+import { createFamilyInvitation } from "./family";
+import { familyInvitations } from "../drizzle/schema";
+import {
+  isSupportedLanguage,
+  translateThreadForViewer,
+  type SupportedLanguage,
+} from "./translation";
 
 /**
  * Two-way in-app messaging between staff and families.
@@ -45,12 +56,14 @@ async function requireViewer(req: Request): Promise<Viewer | null> {
 
 /** Can this viewer see this conversation at all? */
 function canAccess(viewer: Viewer, conversation: Conversation): boolean {
-  if (viewer.side === "staff") return true;
+  // Staff may only see threads in their own organization; a parent only their
+  // own family's thread (which is inherently within their org).
+  if (viewer.side === "staff") return conversation.organizationId === viewer.user.organizationId;
   return conversation.familyId === viewer.familyId;
 }
 
 /** Serialize a conversation the way the iOS apps decode it. */
-async function serializeConversation(conversation: Conversation, viewer: Viewer) {
+async function serializeConversation(conversation: Conversation, viewer: Viewer, archivedByMe = false) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -96,14 +109,22 @@ async function serializeConversation(conversation: Conversation, viewer: Viewer)
     lastMessageDate: (latest?.sentAt ?? conversation.createdAt).toISOString(),
     unreadCount,
     isActive: conversation.isActive === 1,
+    archived: archivedByMe,
   };
+}
+
+/** The viewer's preferred message language (users.settings.preferredLanguage). */
+function viewerLanguage(viewer: Viewer): SupportedLanguage {
+  const pref = viewer.user.settings?.preferredLanguage;
+  return pref && isSupportedLanguage(pref) ? pref : "en";
 }
 
 function serializeMessage(
   m: typeof chatMessages.$inferSelect,
   senderName: string,
   viewer: Viewer,
-  conversation: Conversation
+  conversation: Conversation,
+  translation?: { body: string; translated: boolean }
 ) {
   // The viewer's own messages count as read once the OTHER side has seen the
   // thread; everything the viewer is fetching right now is read by definition.
@@ -120,7 +141,10 @@ function serializeMessage(
     senderId: String(m.senderUserId),
     senderName,
     senderRole: m.senderRole,
-    body: m.body,
+    body: translation?.body ?? m.body,
+    // Original text so clients can offer a "show original" toggle.
+    bodyOriginal: translation?.translated ? m.body : undefined,
+    isTranslated: translation?.translated ?? false,
     sentAt: m.sentAt.toISOString(),
     isRead,
   };
@@ -152,14 +176,76 @@ export function registerMessagingRoutes(app: Express) {
 
     const rows =
       viewer.side === "staff"
-        ? await db.select().from(conversations).orderBy(desc(conversations.updatedAt))
+        ? await db
+            .select()
+            .from(conversations)
+            .where(eq(conversations.organizationId, viewer.user.organizationId ?? -1))
+            .orderBy(desc(conversations.updatedAt))
         : await db
             .select()
             .from(conversations)
             .where(eq(conversations.familyId, viewer.familyId!))
             .orderBy(desc(conversations.updatedAt));
 
-    res.json(await Promise.all(rows.map(c => serializeConversation(c, viewer))));
+    // Per-viewer archive state (see drizzle/schema.ts's
+    // conversationArchives) — archiving is per-user, so a staff member
+    // archiving a thread doesn't hide it from a colleague or the family.
+    const archives = await db
+      .select({ conversationId: conversationArchives.conversationId })
+      .from(conversationArchives)
+      .where(eq(conversationArchives.userId, viewer.user.id));
+    const archivedIds = new Set(archives.map(a => a.conversationId));
+    const includeArchived = req.query.includeArchived === "true";
+
+    const visible = includeArchived ? rows : rows.filter(c => !archivedIds.has(c.id));
+    res.json(await Promise.all(visible.map(c => serializeConversation(c, viewer, archivedIds.has(c.id)))));
+  });
+
+  /** Archive a conversation for the caller only (not global). */
+  app.post("/api/messaging/conversations/:id/archive", async (req: Request, res: Response) => {
+    const viewer = await requireViewer(req);
+    if (!viewer) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const conversationId = Number(req.params.id);
+    const [conversation] = await db.select().from(conversations).where(eq(conversations.id, conversationId)).limit(1);
+    if (!conversation || !canAccess(viewer, conversation)) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+    const existing = await db
+      .select({ id: conversationArchives.id })
+      .from(conversationArchives)
+      .where(and(eq(conversationArchives.conversationId, conversationId), eq(conversationArchives.userId, viewer.user.id)));
+    if (existing.length === 0) {
+      await db.insert(conversationArchives).values({ conversationId, userId: viewer.user.id });
+    }
+    res.json({ archived: true });
+  });
+
+  /** Un-archive a conversation for the caller. */
+  app.post("/api/messaging/conversations/:id/unarchive", async (req: Request, res: Response) => {
+    const viewer = await requireViewer(req);
+    if (!viewer) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const conversationId = Number(req.params.id);
+    await db
+      .delete(conversationArchives)
+      .where(and(eq(conversationArchives.conversationId, conversationId), eq(conversationArchives.userId, viewer.user.id)));
+    res.json({ archived: false });
   });
 
   /** Fetch a thread; marks the viewer's side as read. */
@@ -188,12 +274,28 @@ export function registerMessagingRoutes(app: Express) {
         return;
       }
 
-      const msgs = await db
+      // This had no limit at all — a long-running thread (a family that's
+      // been enrolled for years, or a busy staff/parent conversation) would
+      // load every message ever sent on every open, with no way to page
+      // further back. Cap to the most recent MAX_MESSAGES, fetched newest
+      // first then reversed back to chronological order for rendering.
+      // True infinite-scroll pagination (loading older messages on demand)
+      // is a bigger client+server change; this bounds the worst case for now.
+      const MAX_MESSAGES = 500;
+      const recent = await db
         .select()
         .from(chatMessages)
         .where(eq(chatMessages.conversationId, conversationId))
-        .orderBy(chatMessages.sentAt);
+        .orderBy(desc(chatMessages.sentAt), desc(chatMessages.id))
+        .limit(MAX_MESSAGES);
+      const msgs = recent.reverse();
       const names = await senderNames(Array.from(new Set(msgs.map(m => m.senderUserId))));
+
+      // Real-time translation: messages from the other side render in the
+      // viewer's preferred language (staff default to English). Source-language
+      // stamps let same-language messages skip the LLM entirely.
+      const lang = viewerLanguage(viewer);
+      const translationsByMessage = await translateThreadForViewer(msgs, viewer.side, lang);
 
       // Mark the viewer's side as caught up.
       await db
@@ -207,7 +309,13 @@ export function registerMessagingRoutes(app: Express) {
 
       res.json(
         msgs.map(m =>
-          serializeMessage(m, names.get(m.senderUserId) ?? "Unknown", viewer, conversation)
+          serializeMessage(
+            m,
+            names.get(m.senderUserId) ?? "Unknown",
+            viewer,
+            conversation,
+            translationsByMessage.get(m.id)
+          )
         )
       );
     }
@@ -258,6 +366,9 @@ export function registerMessagingRoutes(app: Express) {
           : { familyLastReadAt: new Date() }
       )
       .where(eq(conversations.id, conversationId));
+    // New activity un-archives the thread for everyone who'd archived it
+    // (the usual "reply reopens it" inbox convention).
+    await db.delete(conversationArchives).where(eq(conversationArchives.conversationId, conversationId));
 
     const [saved] = await db
       .select()
@@ -300,6 +411,11 @@ export function registerMessagingRoutes(app: Express) {
       res.status(404).json({ error: "Family not found" });
       return;
     }
+    // Staff may only start threads with families in their own org.
+    if (viewer.side === "staff" && family.organizationId !== viewer.user.organizationId) {
+      res.status(403).json({ error: "You don't have access to that family." });
+      return;
+    }
 
     // One active thread per family keeps the inbox tidy.
     let [conversation] = await db
@@ -335,6 +451,9 @@ export function registerMessagingRoutes(app: Express) {
       senderUserId: viewer.user.id,
       senderRole: viewer.side,
       body,
+      // Stamp the sender's language so readers in the same language never
+      // trigger a pointless LLM round-trip (see translateThreadForViewer).
+      translations: { __source: viewerLanguage(viewer) },
       sentAt: new Date(),
     });
     await db
@@ -347,5 +466,301 @@ export function registerMessagingRoutes(app: Express) {
       .where(eq(conversations.id, conversation!.id));
 
     res.json(await serializeConversation(conversation!, viewer));
+  });
+
+  /**
+   * Broadcast an announcement to many families at once (staff/admin only).
+   * Reuses the same "one active thread per family" model as a 1:1 message —
+   * a broadcast just fans the same body out into each target family's thread,
+   * so families see it exactly like any other staff message.
+   */
+  app.post("/api/messaging/broadcast", async (req: Request, res: Response) => {
+    const viewer = await requireViewer(req);
+    if (!viewer || viewer.side !== "staff") {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const body = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+    const audience = req.body?.audience === "caseload" ? "caseload" : "all";
+    if (!body) {
+      res.status(400).json({ error: "body is required" });
+      return;
+    }
+    const orgId = viewer.user.organizationId;
+    if (!orgId) {
+      res.status(400).json({ error: "No organization on this account" });
+      return;
+    }
+
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+
+    let targetFamilyIds: number[];
+    if (audience === "caseload") {
+      const staffId = await resolveStaffId(orgId, viewer.user.id);
+      let familyIdSet = new Set<number>();
+      if (staffId != null) {
+        // Family Advocates: families assigned directly to them (case load).
+        const advocateFamilies = await db
+          .select({ id: families.id })
+          .from(families)
+          .where(and(eq(families.organizationId, orgId), eq(families.familyAdvocateId, staffId)));
+        for (const f of advocateFamilies) familyIdSet.add(f.id);
+        const myRooms = await db
+          .select({ id: classrooms.id })
+          .from(classrooms)
+          .where(
+            and(eq(classrooms.organizationId, orgId), or(eq(classrooms.teacherId, staffId), eq(classrooms.assistantId, staffId)))
+          );
+        if (myRooms.length > 0) {
+          const roomIds = myRooms.map(r => r.id);
+          const assigned = await db
+            .select({ childId: childClassroomAssignments.childId })
+            .from(childClassroomAssignments)
+            .where(and(inArray(childClassroomAssignments.classroomId, roomIds), eq(childClassroomAssignments.isActive, 1)));
+          const childIds = assigned.map(a => a.childId);
+          if (childIds.length > 0) {
+            const kids = await db
+              .select({ familyId: children.familyId })
+              .from(children)
+              .where(inArray(children.id, childIds));
+            familyIdSet = new Set(kids.map(k => k.familyId).filter((id): id is number => id != null));
+          }
+        }
+      }
+      // No resolvable classroom assignment (admin, family advocate, etc.) —
+      // fall back to the full org roster rather than silently sending to nobody.
+      if (familyIdSet.size === 0) {
+        const all = await db.select({ id: families.id }).from(families).where(eq(families.organizationId, orgId));
+        targetFamilyIds = all.map(f => f.id);
+      } else {
+        targetFamilyIds = Array.from(familyIdSet);
+      }
+    } else {
+      const all = await db.select({ id: families.id }).from(families).where(eq(families.organizationId, orgId));
+      targetFamilyIds = all.map(f => f.id);
+    }
+
+    let sentCount = 0;
+    for (const familyId of targetFamilyIds) {
+      let [conversation] = await db
+        .select()
+        .from(conversations)
+        .where(and(eq(conversations.familyId, familyId), eq(conversations.isActive, 1)))
+        .limit(1);
+      if (!conversation) {
+        await db.insert(conversations).values({ organizationId: orgId, familyId, createdBy: viewer.user.id });
+        [conversation] = await db
+          .select()
+          .from(conversations)
+          .where(and(eq(conversations.familyId, familyId), eq(conversations.isActive, 1)))
+          .orderBy(desc(conversations.id))
+          .limit(1);
+      }
+      await db.insert(chatMessages).values({
+        conversationId: conversation!.id,
+        senderUserId: viewer.user.id,
+        senderRole: "staff",
+        body,
+        translations: { __source: viewerLanguage(viewer) },
+        sentAt: new Date(),
+      });
+      await db
+        .update(conversations)
+        .set({ staffLastReadAt: new Date() })
+        .where(eq(conversations.id, conversation!.id));
+      sentCount++;
+    }
+
+    await insertAuditLog({
+      userId: viewer.user.id,
+      actorOpenId: viewer.user.openId,
+      action: "create",
+      resourceType: "broadcast",
+      resourceId: audience,
+      ipAddress: clientIpFromReq(req),
+    });
+
+    res.json({ ok: true, sentCount, audience });
+  });
+
+  /**
+   * Set the caller's preferred message language. The family app calls this
+   * whenever the user changes language; staff messages then arrive translated.
+   */
+  app.post("/api/messaging/language", async (req: Request, res: Response) => {
+    const viewer = await requireViewer(req);
+    if (!viewer) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const language = typeof req.body?.language === "string" ? req.body.language : "";
+    if (!isSupportedLanguage(language)) {
+      res.status(400).json({ error: `Unsupported language: ${language}` });
+      return;
+    }
+    await updateUserSettings(viewer.user.openId, { preferredLanguage: language });
+    res.json({ ok: true, language });
+  });
+
+  // ---- Family Invitations (staff-side) ----
+  // ios/Sources/Messaging/InviteFamiliesView.swift has always called these —
+  // previously unregistered, which showed a misleading "check your
+  // connection" network-error banner instead of the real problem (a missing
+  // route). One row per family (this schema doesn't model a second
+  // invitable adult per family, so `excludeOneOfTwoParents` is accepted but
+  // has no effect — every family has exactly one row here).
+  app.post("/api/messaging/invitations/search", async (req: Request, res: Response) => {
+    const viewer = await requireViewer(req);
+    if (!viewer || viewer.side !== "staff") {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const orgId = viewer.user.organizationId;
+    if (orgId == null) {
+      res.json({ invitations: [], locations: [], programTerms: [] });
+      return;
+    }
+
+    const location = typeof req.body?.location === "string" ? req.body.location.trim() : "";
+    const enrollmentStatus = typeof req.body?.enrollmentStatus === "string" ? req.body.enrollmentStatus.trim() : "";
+    const excludeWithAccounts = Boolean(req.body?.excludeWithAccounts);
+
+    const familyRows = await db.select().from(families).where(eq(families.organizationId, orgId));
+    const kidRows = await db
+      .select({ familyId: children.familyId, firstName: children.firstName, lastName: children.lastName, status: children.status })
+      .from(children)
+      .where(eq(children.organizationId, orgId));
+    const kidsByFamily = new Map<number, typeof kidRows>();
+    for (const k of kidRows) {
+      if (k.familyId == null) continue;
+      const list = kidsByFamily.get(k.familyId) ?? [];
+      list.push(k);
+      kidsByFamily.set(k.familyId, list);
+    }
+
+    const familyIds = familyRows.map((f) => f.id);
+    const parentUsers = familyIds.length
+      ? await db.select({ familyId: users.familyId, createdAt: users.createdAt }).from(users)
+          .where(and(eq(users.role, "parent"), inArray(users.familyId, familyIds)))
+      : [];
+    const accountCreatedAt = new Map<number, Date>();
+    for (const u of parentUsers) {
+      if (u.familyId != null && !accountCreatedAt.has(u.familyId)) accountCreatedAt.set(u.familyId, u.createdAt ?? new Date());
+    }
+    const invites = familyIds.length
+      ? await db.select().from(familyInvitations).where(inArray(familyInvitations.familyId, familyIds))
+      : [];
+    const latestInviteByFamily = new Map<number, (typeof invites)[number]>();
+    for (const inv of invites) {
+      const cur = latestInviteByFamily.get(inv.familyId);
+      if (!cur || inv.createdAt > cur.createdAt) latestInviteByFamily.set(inv.familyId, inv);
+    }
+
+    const rows = familyRows
+      .filter((f) => !location || (f.city ?? "").toLowerCase() === location.toLowerCase())
+      .filter((f) => {
+        if (!enrollmentStatus || enrollmentStatus.toLowerCase() === "all") return true;
+        const kids = kidsByFamily.get(f.id) ?? [];
+        return kids.some((k) => (k.status ?? "").toLowerCase() === enrollmentStatus.toLowerCase());
+      })
+      .map((f) => {
+        const kids = kidsByFamily.get(f.id) ?? [];
+        const hasAccount = accountCreatedAt.has(f.id);
+        const invite = latestInviteByFamily.get(f.id);
+        const accountStatus = hasAccount
+          ? "Account created"
+          : invite
+            ? "Invitation sent"
+            : "No invitation sent";
+        const statusDate = hasAccount
+          ? accountCreatedAt.get(f.id)!
+          : invite
+            ? invite.createdAt
+            : f.createdAt;
+        const missingInfo: string[] = [];
+        if (!f.primaryContactEmail) missingInfo.push("Email");
+        if (!f.primaryContactPhone) missingInfo.push("Phone");
+        return {
+          id: String(f.id),
+          childName: kids[0] ? `${kids[0].firstName} ${kids[0].lastName}` : "—",
+          adultName: f.primaryContactName,
+          adultEmail: f.primaryContactEmail ?? "",
+          adultStatus: "Primary",
+          accountStatus,
+          statusDate,
+          missingInfo,
+        };
+      })
+      .filter((r) => !excludeWithAccounts || r.accountStatus !== "Account created");
+
+    const locations = Array.from(new Set(familyRows.map((f) => f.city).filter((c): c is string => !!c))).sort();
+    // No "program term" concept in this schema yet — an honest empty list
+    // beats inventing values the UI would otherwise treat as real filters.
+    res.json({ invitations: rows, locations, programTerms: [] });
+  });
+
+  app.post("/api/messaging/invitations/send", async (req: Request, res: Response) => {
+    const viewer = await requireViewer(req);
+    if (!viewer || viewer.side !== "staff") {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const orgId = viewer.user.organizationId;
+    if (orgId == null) {
+      res.status(400).json({ error: "No organization" });
+      return;
+    }
+    const recipientIds = Array.isArray(req.body?.recipientIds) ? req.body.recipientIds.map(Number).filter(Boolean) : [];
+    if (recipientIds.length === 0) {
+      res.status(400).json({ error: "recipientIds is required" });
+      return;
+    }
+
+    // Only invite families that actually belong to this org — a recipientId
+    // list is client-supplied and shouldn't be trusted blindly.
+    const orgFamilies = await db
+      .select({ id: families.id, primaryContactEmail: families.primaryContactEmail })
+      .from(families)
+      .where(and(eq(families.organizationId, orgId), inArray(families.id, recipientIds)));
+
+    let sent = 0;
+    for (const f of orgFamilies) {
+      try {
+        await createFamilyInvitation({
+          organizationId: orgId,
+          familyId: f.id,
+          adultEmail: f.primaryContactEmail,
+          createdBy: viewer.user.id,
+        });
+        sent += 1;
+      } catch {
+        // One bad family shouldn't fail the whole batch send.
+      }
+    }
+
+    await insertAuditLog({
+      userId: viewer.user.id,
+      actorOpenId: viewer.user.openId,
+      action: "create",
+      resourceType: "family_invitation",
+      resourceId: null,
+      ipAddress: clientIpFromReq(req),
+      detail: `bulk invite sent to ${sent} of ${recipientIds.length} requested families`,
+    });
+    res.json({ success: true, sentCount: sent });
   });
 }

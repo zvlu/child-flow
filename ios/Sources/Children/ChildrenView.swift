@@ -101,6 +101,7 @@ struct ChildrenView: View {
             }
             .sheet(isPresented: $showMenu) { AppMenuSheet() }
             .task { await viewModel.load() }
+            .refreshable { await viewModel.load() }
             .overlay {
                 if viewModel.isLoading {
                     ProgressView()
@@ -124,7 +125,7 @@ struct ChildrenView: View {
     @ViewBuilder
     private func childRow(_ child: Child) -> some View {
         NavigationLink(destination: ChildDetailView(child: child)) {
-            ChildRow(child: child, showRoom: viewModel.grouping == .all)
+            ChildRow(child: child, showRoom: viewModel.grouping == .all, clearance: viewModel.clearanceMap[child.id])
         }
         .contextMenu {
             Menu {
@@ -223,6 +224,9 @@ struct FlagChipRow: View {
 struct ChildRow: View {
     let child: Child
     var showRoom: Bool = true
+    /// nil while clearance hasn't loaded, or if the org has no clearance
+    /// record for this child. Non-blocking — purely a visible warning.
+    var clearance: ChildClearanceStatus? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -249,6 +253,9 @@ struct ChildRow: View {
                 FlagChipRow(flags: child.flags).padding(.top, 1)
             }
             Spacer()
+            if let clearance, !clearance.cleared {
+                ClearanceWarningBadge(childName: child.fullName, blockers: clearance.blockers)
+            }
             HealthStatusBadge(status: child.healthStatus)
         }
         .padding(.vertical, 4)
@@ -448,7 +455,17 @@ struct ChildFamilyTab: View {
             }
         }
         .task {
-            let families = (try? await APIClient.shared.getFamilies()) ?? MockData.families
+            var families: [Family] = []
+            do {
+                families = try await APIClient.shared.getFamilies()
+            } catch {
+                // This fallback used to run unconditionally — a failed request
+                // in a real deployment would silently show demo family data to
+                // real staff. Only fall back to mock data in debug builds.
+                #if DEBUG
+                families = MockData.families
+                #endif
+            }
             family = families.first { f in
                 if let fid = child.familyId, !fid.isEmpty { return f.id == fid }
                 // Demo fallback when the child carries no familyId.
@@ -477,6 +494,9 @@ class ChildrenViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var statusFilter: String? = nil
     @Published var isLoading = false
+    /// "Cleared to attend" status keyed by childId, org-wide — one request
+    /// instead of one per child. See ios/Sources/Networking/ParticipationClearance.swift.
+    @Published var clearanceMap: [String: ChildClearanceStatus] = [:]
 
     var isSearching: Bool { !searchText.isEmpty }
 
@@ -557,6 +577,10 @@ class ChildrenViewModel: ObservableObject {
             rebuildMockClassroomCounts()
             #endif
         }
+        // Supplementary, non-blocking data — a failure here shouldn't stop
+        // the roster from loading, so it's fetched independently and
+        // swallowed on error (the warning badges just won't show).
+        clearanceMap = (try? await APIClient.shared.getClearanceMap()) ?? clearanceMap
         isLoading = false
     }
 

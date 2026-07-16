@@ -1,0 +1,2 @@
+ALTER TABLE `documents` MODIFY COLUMN `childId` int;--> statement-breakpoint
+ALTER TABLE `documents` MODIFY COLUMN `documentType` enum('birth_certificate','immunization_record','consent_form','medical_record','assessment','other','iep','enrollment') NOT NULL;

@@ -6,20 +6,23 @@ struct FamilyServicesView: View {
     @StateObject private var viewModel = FamilyServicesViewModel()
 
     var body: some View {
-        List {
-            ForEach(viewModel.filteredFamilies) { family in
-                NavigationLink(destination: FamilyDetailView(family: family)) {
-                    FamilyRow(family: family)
+        HeadStartGate(featureDescription: "Family services case management") {
+            List {
+                ForEach(viewModel.filteredFamilies) { family in
+                    NavigationLink(destination: FamilyDetailView(family: family)) {
+                        FamilyRow(family: family)
+                    }
                 }
             }
-        }
-        .navigationTitle("Family Services")
-        .searchable(text: $viewModel.searchText, prompt: "Search families")
-        .task { await viewModel.load() }
-        .overlay {
-            if viewModel.isLoading { ProgressView() }
-            else if viewModel.filteredFamilies.isEmpty && !viewModel.searchText.isEmpty {
-                ContentUnavailableView.search
+            .navigationTitle("Family Services")
+            .searchable(text: $viewModel.searchText, prompt: "Search families")
+            .task { await viewModel.load() }
+            .refreshable { await viewModel.load() }
+            .overlay {
+                if viewModel.isLoading { ProgressView() }
+                else if viewModel.filteredFamilies.isEmpty && !viewModel.searchText.isEmpty {
+                    ContentUnavailableView.search
+                }
             }
         }
     }
@@ -53,6 +56,7 @@ enum FamilyDetailTab: Int {
 
 struct FamilyDetailView: View {
     let family: Family
+    @EnvironmentObject var appState: AppState
     @State private var selectedTab: Int
 
     init(family: Family, initialTab: FamilyDetailTab = .overview) {
@@ -60,9 +64,28 @@ struct FamilyDetailView: View {
         _selectedTab = State(initialValue: initialTab.rawValue)
     }
 
-    var tabs = ["Overview", "Contacts", "Goals", "FNA", "CFCR", "Notes", "Moments"]
+    /// Contacts/Goals/FNA/CFCR/Notes are all Head Start case-management
+    /// features (§1302 family services). This view is reached from Children,
+    /// global search, and dashboard task links — all core, ungated screens —
+    /// so unlike the rest of Family Services, this can't just be gated as a
+    /// whole; only the HS-only tabs are hidden for a core-only org.
+    private static let allTabs: [(title: String, tab: FamilyDetailTab)] = [
+        ("Overview", .overview), ("Contacts", .contacts), ("Goals", .goals),
+        ("FNA", .fna), ("CFCR", .cfcr), ("Notes", .notes), ("Moments", .moments),
+    ]
+    private static let headStartOnlyTabs: Set<FamilyDetailTab> = [.contacts, .goals, .fna, .cfcr, .notes]
+
+    private var visibleTabs: [(title: String, tab: FamilyDetailTab)] {
+        let hasHeadStart = appState.hasModule(.headStart)
+        return Self.allTabs.filter { hasHeadStart || !Self.headStartOnlyTabs.contains($0.tab) }
+    }
 
     var body: some View {
+        let tabs = visibleTabs
+        // If we launched on a tab that just got filtered out (e.g. a stale
+        // deep link to .goals for a core-only org), fall back to Overview.
+        let activeTab = tabs.first { $0.tab.rawValue == selectedTab }?.tab ?? .overview
+
         VStack(spacing: 0) {
             // Family header card
             VStack(spacing: 4) {
@@ -90,15 +113,15 @@ struct FamilyDetailView: View {
             // Tab picker
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 0) {
-                    ForEach(tabs.indices, id: \.self) { i in
-                        Button(action: { withAnimation { selectedTab = i } }) {
-                            Text(tabs[i])
-                                .font(.subheadline.weight(selectedTab == i ? .semibold : .regular))
+                    ForEach(tabs, id: \.tab) { entry in
+                        Button(action: { withAnimation { selectedTab = entry.tab.rawValue } }) {
+                            Text(entry.title)
+                                .font(.subheadline.weight(activeTab == entry.tab ? .semibold : .regular))
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 10)
-                                .foregroundColor(selectedTab == i ? .accentColor : .secondary)
+                                .foregroundColor(activeTab == entry.tab ? .accentColor : .secondary)
                                 .overlay(alignment: .bottom) {
-                                    if selectedTab == i {
+                                    if activeTab == entry.tab {
                                         Rectangle().fill(Color.accentColor).frame(height: 2)
                                     }
                                 }
@@ -112,15 +135,14 @@ struct FamilyDetailView: View {
 
             // Tab content — plain Group avoids TabView/NavigationStack conflicts
             Group {
-                switch selectedTab {
-                case 0: FamilyOverviewTab(family: family)
-                case 1: MonthlyContactsTab(familyId: family.id)
-                case 2: FamilyGoalsTab(familyId: family.id, familyName: family.name)
-                case 3: FNATab(familyId: family.id, familyName: family.name)
-                case 4: CFCRTab(familyId: family.id)
-                case 5: CaseNotesTab(familyId: family.id)
-                case 6: ChildMomentsTab(familyId: family.id, familyName: family.name)
-                default: EmptyView()
+                switch activeTab {
+                case .overview: FamilyOverviewTab(family: family)
+                case .contacts: MonthlyContactsTab(familyId: family.id)
+                case .goals:    FamilyGoalsTab(family: family)
+                case .fna:      FNATab(familyId: family.id, familyName: family.name)
+                case .cfcr:     CFCRTab(familyId: family.id)
+                case .notes:    CaseNotesTab(familyId: family.id)
+                case .moments:  ChildMomentsTab(familyId: family.id, familyName: family.name)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -133,10 +155,25 @@ struct FamilyDetailView: View {
 // MARK: - Overview Tab
 
 struct FamilyOverviewTab: View {
+    @EnvironmentObject var appState: AppState
     let family: Family
 
     var body: some View {
+        // Home visits and family goals are Head Start case-management
+        // concepts (§1302 Family Services) — hidden here too for core-only
+        // orgs, same as the Contacts/Goals/FNA/CFCR/Notes tabs above.
+        let hasHeadStart = appState.hasModule(.headStart)
+
         List {
+            if hasHeadStart {
+                // Home Visit Mode — top of every family's Overview tab
+                Section {
+                    StartHomeVisitButton(family: family)
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(.init(.init(top: 4, leading: 16, bottom: 4, trailing: 16)))
+            }
+
             Section("Contact Information") {
                 LabeledContent("Phone", value: family.phone)
                 LabeledContent("Email", value: family.email)
@@ -144,9 +181,11 @@ struct FamilyOverviewTab: View {
             }
             Section("Schedule") {
                 LabeledContent("Last Contact", value: family.lastContact)
-                LabeledContent("Next Home Visit", value: family.nextHomeVisit)
+                if hasHeadStart {
+                    LabeledContent("Next Home Visit", value: family.nextHomeVisit)
+                }
             }
-            if !family.goals.isEmpty {
+            if hasHeadStart && !family.goals.isEmpty {
                 Section("Active Goals") {
                     ForEach(family.goals, id: \.self) { goal in
                         Label(goal, systemImage: "target")
@@ -250,6 +289,7 @@ struct LogContactSheet: View {
     @State private var followUpNeeded = false
     @State private var followUpDate = Date().addingTimeInterval(7 * 24 * 3600)
     @State private var isSaving = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -293,6 +333,9 @@ struct LogContactSheet: View {
                         .disabled(isSaving)
                 }
             }
+            .alert("Couldn't Save Contact", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 
@@ -315,21 +358,11 @@ struct LogContactSheet: View {
                     dismiss()
                 }
             } catch {
-                // Optimistic local mock
-                let mock = MonthlyContact(
-                    id: UUID().uuidString,
-                    familyId: familyId,
-                    familyName: "",
-                    date: contactDate,
-                    contactType: contactType,
-                    contactedBy: "Current User",
-                    notes: notes,
-                    followUpNeeded: followUpNeeded,
-                    followUpDate: followUpNeeded ? followUpDate : nil
-                )
+                // Do NOT fabricate a fake success — a network/server failure here
+                // must not look like a saved contact. Surface the error and let
+                // the user retry or cancel without losing what they typed.
                 await MainActor.run {
-                    onSave(mock)
-                    dismiss()
+                    errorMessage = "This contact wasn't saved. Check your connection and try again."
                 }
             }
             isSaving = false
@@ -361,22 +394,24 @@ class ContactsViewModel: ObservableObject {
 // MARK: - Goals Tab (FPA + SMART Goals)
 
 struct FamilyGoalsTab: View {
-    let familyId: String
-    let familyName: String
+    let family: Family
+    var familyId: String { family.id }
+    var familyName: String { family.name }
     @StateObject private var viewModel: GoalsViewModel
     @State private var showAddGoal = false
 
-    init(familyId: String, familyName: String) {
-        self.familyId = familyId
-        self.familyName = familyName
-        _viewModel = StateObject(wrappedValue: GoalsViewModel(familyId: familyId))
+    init(family: Family) {
+        self.family = family
+        _viewModel = StateObject(wrappedValue: GoalsViewModel(familyId: family.id))
     }
 
     var body: some View {
         List {
-            // FPA Status banner
+            // FPA Status banner → taps into full FPA Builder
             Section {
-                FPAStatusBanner(status: viewModel.fpaStatus)
+                NavigationLink(destination: FamilyPartnershipView(family: family)) {
+                    FPAStatusBanner(status: viewModel.fpaStatus)
+                }
             }
 
             // Goals
@@ -565,6 +600,7 @@ struct AddGoalSheet: View {
     @State private var hasTargetDate = false
     @State private var steps: [String] = [""]
     @State private var isSaving = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -613,6 +649,9 @@ struct AddGoalSheet: View {
                         .disabled(title.isEmpty || isSaving)
                 }
             }
+            .alert("Couldn't Save Goal", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 
@@ -632,21 +671,10 @@ struct AddGoalSheet: View {
                 let saved = try await APIClient.shared.createGoal(request: request)
                 await MainActor.run { onSave(saved); dismiss() }
             } catch {
-                let mock = FamilyGoal(
-                    id: UUID().uuidString,
-                    familyId: familyId,
-                    title: title,
-                    description: description,
-                    category: category,
-                    status: .notStarted,
-                    targetDate: hasTargetDate ? targetDate : nil,
-                    completedDate: nil,
-                    steps: steps.filter { !$0.isEmpty }.enumerated().map { i, s in
-                        GoalStep(id: UUID().uuidString, title: s, isCompleted: false, dueDate: nil, notes: nil)
-                    },
-                    createdDate: Date()
-                )
-                await MainActor.run { onSave(mock); dismiss() }
+                // Do NOT fabricate a fake success — see LogContactSheet.save().
+                await MainActor.run {
+                    errorMessage = "This goal wasn't saved. Check your connection and try again."
+                }
             }
             isSaving = false
         }
@@ -776,6 +804,7 @@ struct FNAFormSheet: View {
     @State private var ratings: [FNADomainRating]
     @State private var notes = ""
     @State private var isSaving = false
+    @State private var errorMessage: String?
 
     init(familyId: String, familyName: String, existing: FamilyNeedsAssessment?, onSave: @escaping (FamilyNeedsAssessment) -> Void) {
         self.familyId = familyId
@@ -835,6 +864,9 @@ struct FNAFormSheet: View {
                         .disabled(isSaving)
                 }
             }
+            .alert("Couldn't Save Assessment", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 
@@ -845,18 +877,12 @@ struct FNAFormSheet: View {
                 let saved = try await APIClient.shared.saveFNA(familyId: familyId, ratings: ratings, notes: notes)
                 await MainActor.run { onSave(saved); dismiss() }
             } catch {
-                let mock = FamilyNeedsAssessment(
-                    id: existing?.id ?? UUID().uuidString,
-                    familyId: familyId,
-                    familyName: familyName,
-                    conductedBy: "Current User",
-                    conductedDate: Date(),
-                    reviewDate: Calendar.current.date(byAdding: .month, value: 6, to: Date()),
-                    ratings: ratings,
-                    notes: notes,
-                    isComplete: true
-                )
-                await MainActor.run { onSave(mock); dismiss() }
+                // Do NOT fabricate a fake success — see LogContactSheet.save().
+                // An FNA is confidential case documentation; losing it silently
+                // is worse than making the user retry.
+                await MainActor.run {
+                    errorMessage = "This assessment wasn't saved. Check your connection and try again."
+                }
             }
             isSaving = false
         }
@@ -1035,8 +1061,12 @@ struct NewCFCRSheet: View {
     let onSave: (CFCRRecord) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @State private var childId = ""
-    @State private var childName = ""
+    // Picked from this family's real children — a free-typed name has no real
+    // childId to attach the review to, which used to make every CFCR silently
+    // fail server-side (see save()).
+    @State private var familyChildren: [Child] = []
+    @State private var selectedChildId: String?
+    @State private var isLoadingChildren = true
     @State private var classroom = ""
     @State private var meetingDate = Date()
     @State private var attendanceNotes = ""
@@ -1051,12 +1081,29 @@ struct NewCFCRSheet: View {
         ("", "Health Specialist", false)
     ]
     @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private var selectedChild: Child? {
+        familyChildren.first { $0.id == selectedChildId }
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Child & Meeting") {
-                    TextField("Child Name", text: $childName)
+                    if isLoadingChildren {
+                        ProgressView()
+                    } else if familyChildren.isEmpty {
+                        Text("No children found for this family.")
+                            .foregroundColor(.secondary)
+                    } else {
+                        Picker("Child", selection: $selectedChildId) {
+                            Text("Select a child").tag(String?.none)
+                            ForEach(familyChildren) { child in
+                                Text("\(child.firstName) \(child.lastName)").tag(Optional(child.id))
+                            }
+                        }
+                    }
                     TextField("Classroom", text: $classroom)
                     DatePicker("Meeting Date", selection: $meetingDate, displayedComponents: .date)
                 }
@@ -1096,17 +1143,33 @@ struct NewCFCRSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(childName.isEmpty || isSaving)
+                        .disabled(selectedChildId == nil || isSaving)
                 }
+            }
+            .alert("Couldn't Save CFCR", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
+            .task {
+                do {
+                    let all = try await APIClient.shared.getChildren()
+                    familyChildren = all.filter { $0.familyId == familyId }
+                    if familyChildren.count == 1 { selectedChildId = familyChildren.first?.id }
+                } catch {
+                    #if DEBUG
+                    familyChildren = MockData.children.filter { $0.familyId == familyId }
+                    #endif
+                }
+                isLoadingChildren = false
             }
         }
     }
 
     private func save() {
+        guard let child = selectedChild else { return }
         isSaving = true
         let iso = ISO8601DateFormatter()
         let request = NewCFCRRequest(
-            childId: childId.isEmpty ? UUID().uuidString : childId,
+            childId: child.id,
             meetingDate: iso.string(from: meetingDate),
             attendanceNotes: attendanceNotes,
             healthNotes: healthNotes,
@@ -1119,24 +1182,10 @@ struct NewCFCRSheet: View {
                 let saved = try await APIClient.shared.createCFCR(request: request)
                 await MainActor.run { onSave(saved); dismiss() }
             } catch {
-                let mock = CFCRRecord(
-                    id: UUID().uuidString,
-                    childId: request.childId,
-                    childName: childName,
-                    classroom: classroom,
-                    meetingDate: meetingDate,
-                    participants: participants.map { p in
-                        CFCRParticipant(id: UUID().uuidString, name: p.name, role: p.role, attended: p.attended)
-                    },
-                    attendanceNotes: attendanceNotes,
-                    healthNotes: healthNotes,
-                    behaviorNotes: behaviorNotes,
-                    developmentalNotes: developmentalNotes,
-                    familyGoalNotes: familyGoalNotes,
-                    actionItems: [],
-                    conductedBy: "Current User"
-                )
-                await MainActor.run { onSave(mock); dismiss() }
+                // Do NOT fabricate a fake success — see LogContactSheet.save().
+                await MainActor.run {
+                    errorMessage = "This review wasn't saved. Check your connection and try again."
+                }
             }
             isSaving = false
         }
@@ -1359,6 +1408,537 @@ struct CaseNoteRow: View {
     }
 }
 
+// MARK: - Case Note Template Engine
+
+struct CaseNoteTemplate: Identifiable {
+    let id: String
+    let title: String
+    let description: String
+    let icon: String
+    let body: String
+    let suggestsFollowUp: Bool
+    let recommendedConfidentiality: CaseNote.NoteConfidentiality
+}
+
+struct CaseNoteTemplateEngine {
+
+    static let dateStamp: String = {
+        let f = DateFormatter()
+        f.dateStyle = .long
+        return f.string(from: Date())
+    }()
+
+    // MARK: Template catalogue
+    static func templates(for type: CaseNote.NoteType, familyName: String = "Family") -> [CaseNoteTemplate] {
+        switch type {
+
+        case .homeVisit:
+            return [
+                CaseNoteTemplate(
+                    id: "hv-standard", title: "Standard Home Visit",
+                    description: "Full structured visit note with observations and next steps",
+                    icon: "house.fill",
+                    body: """
+[HOME VISIT — \(dateStamp)]
+
+PURPOSE OF VISIT:
+•\u{0020}
+
+CHILD OBSERVATIONS:
+•\u{0020}
+
+FAMILY STRENGTHS NOTED:
+•\u{0020}
+
+CONCERNS / NEEDS IDENTIFIED:
+•\u{0020}
+
+REFERRALS MADE:
+• None
+
+ACTION STEPS:
+•\u{0020}
+
+NEXT CONTACT:
+""",
+                    suggestsFollowUp: true,
+                    recommendedConfidentiality: .standard
+                ),
+                CaseNoteTemplate(
+                    id: "hv-attendance", title: "Attendance Focused Visit",
+                    description: "For visits where chronic absence is the primary concern",
+                    icon: "calendar.badge.exclamationmark",
+                    body: """
+[HOME VISIT — ATTENDANCE CONCERN — \(dateStamp)]
+
+REASON FOR VISIT:
+• Chronic absence follow-up (attendance below 85% threshold)
+
+BARRIERS IDENTIFIED:
+•\u{0020}
+
+FAMILY RESPONSE / PLAN:
+•\u{0020}
+
+ATTENDANCE IMPROVEMENT PLAN DISCUSSION:
+•\u{0020}
+
+NEXT CHECK-IN DATE:
+""",
+                    suggestsFollowUp: true,
+                    recommendedConfidentiality: .standard
+                ),
+                CaseNoteTemplate(
+                    id: "hv-fpa", title: "FPA Review Visit",
+                    description: "Family Partnership Agreement goal progress check",
+                    icon: "checkmark.seal.fill",
+                    body: """
+[FPA REVIEW VISIT — \(dateStamp)]
+
+GOALS REVIEWED:
+•\u{0020}
+
+PROGRESS SINCE LAST VISIT:
+•\u{0020}
+
+BARRIERS TO GOAL COMPLETION:
+•\u{0020}
+
+UPDATED GOALS / NEW GOALS:
+•\u{0020}
+
+COMMUNITY RESOURCES DISCUSSED:
+•\u{0020}
+
+NEXT VISIT:
+""",
+                    suggestsFollowUp: true,
+                    recommendedConfidentiality: .standard
+                ),
+            ]
+
+        case .phoneCall:
+            return [
+                CaseNoteTemplate(
+                    id: "ph-outreach", title: "Outreach Call",
+                    description: "Documenting a family outreach or check-in call",
+                    icon: "phone.fill",
+                    body: """
+[PHONE CONTACT — \(dateStamp)]
+
+CALL INITIATED BY:
+•\u{0020}
+
+FAMILY MEMBER REACHED:
+•\u{0020}
+
+REASON FOR CONTACT:
+•\u{0020}
+
+FAMILY RESPONSE:
+•\u{0020}
+
+ACTION ITEMS:
+•\u{0020}
+
+FOLLOW-UP NEEDED:
+""",
+                    suggestsFollowUp: false,
+                    recommendedConfidentiality: .standard
+                ),
+                CaseNoteTemplate(
+                    id: "ph-absence", title: "Absence Follow-Up Call",
+                    description: "Calling to address missed days or verify wellbeing",
+                    icon: "phone.badge.exclamationmark.fill",
+                    body: """
+[ABSENCE FOLLOW-UP CALL — \(dateStamp)]
+
+DAYS ABSENT LEADING TO CALL:
+•\u{0020}
+
+CONTACT REACHED: ☐ Yes  ☐ No — Left voicemail
+
+REASON FOR ABSENCE GIVEN:
+•\u{0020}
+
+CHILD WELLBEING:
+•\u{0020}
+
+PLAN FOR RETURN:
+•\u{0020}
+
+NEXT CONTACT DATE:
+""",
+                    suggestsFollowUp: true,
+                    recommendedConfidentiality: .standard
+                ),
+            ]
+
+        case .officeVisit:
+            return [
+                CaseNoteTemplate(
+                    id: "ov-meeting", title: "Office Meeting",
+                    description: "Family meeting at the Head Start center",
+                    icon: "building.2.fill",
+                    body: """
+[OFFICE VISIT — \(dateStamp)]
+
+FAMILY MEMBERS PRESENT:
+•\u{0020}
+
+PURPOSE OF MEETING:
+•\u{0020}
+
+KEY DISCUSSION POINTS:
+•\u{0020}
+
+AGREEMENTS MADE:
+•\u{0020}
+
+REFERRALS PROVIDED:
+• None
+
+NEXT STEPS:
+""",
+                    suggestsFollowUp: false,
+                    recommendedConfidentiality: .standard
+                ),
+                CaseNoteTemplate(
+                    id: "ov-enrollment", title: "Enrollment / Re-enrollment Meeting",
+                    description: "For enrollment paperwork and eligibility review meetings",
+                    icon: "doc.badge.plus",
+                    body: """
+[ENROLLMENT MEETING — \(dateStamp)]
+
+DOCUMENTS REVIEWED:
+• ☐ Income verification  ☐ Birth certificate  ☐ Immunization records  ☐ Custody docs
+
+ELIGIBILITY STATUS:
+•\u{0020}
+
+FAMILY QUESTIONS / CONCERNS:
+•\u{0020}
+
+NEXT ENROLLMENT STEPS:
+""",
+                    suggestsFollowUp: true,
+                    recommendedConfidentiality: .standard
+                ),
+            ]
+
+        case .incident:
+            return [
+                CaseNoteTemplate(
+                    id: "inc-standard", title: "Incident Report",
+                    description: "Document any incident involving a child or family",
+                    icon: "exclamationmark.triangle.fill",
+                    body: """
+[INCIDENT REPORT — \(dateStamp)]
+
+DATE / TIME OF INCIDENT:
+•\u{0020}
+
+LOCATION:
+•\u{0020}
+
+PERSONS INVOLVED:
+•\u{0020}
+
+DESCRIPTION OF INCIDENT:
+•\u{0020}
+
+IMMEDIATE RESPONSE / ACTIONS TAKEN:
+•\u{0020}
+
+SUPERVISOR NOTIFIED: ☐ Yes  ☐ No
+MANDATED REPORT FILED: ☐ Yes  ☐ No  ☐ N/A
+
+FOLLOW-UP REQUIRED:
+""",
+                    suggestsFollowUp: true,
+                    recommendedConfidentiality: .sensitive
+                ),
+                CaseNoteTemplate(
+                    id: "inc-behavior", title: "Behavior / Suspension Note",
+                    description: "§1302.17 — Document behavior incidents and interventions",
+                    icon: "person.badge.shield.checkmark.fill",
+                    body: """
+[BEHAVIOR INCIDENT — \(dateStamp)]
+
+CHILD:
+•\u{0020}
+
+BEHAVIOR OBSERVED (antecedent → behavior → consequence):
+•\u{0020}
+
+DURATION / INTENSITY:
+•\u{0020}
+
+INTERVENTION USED:
+•\u{0020}
+
+MENTAL HEALTH CONSULTANT NOTIFIED: ☐ Yes  ☐ No
+FAMILY NOTIFIED: ☐ Yes  ☐ No
+
+BEHAVIOR SUPPORT PLAN STATUS:
+•\u{0020}
+
+NEXT STEPS:
+""",
+                    suggestsFollowUp: true,
+                    recommendedConfidentiality: .sensitive
+                ),
+            ]
+
+        case .general:
+            return [
+                CaseNoteTemplate(
+                    id: "gen-summary", title: "General Summary Note",
+                    description: "Flexible format for any contact or observation",
+                    icon: "note.text",
+                    body: """
+[NOTE — \(dateStamp)]
+
+SUMMARY:
+•\u{0020}
+
+KEY POINTS:
+•\u{0020}
+
+ACTION ITEMS:
+• None
+
+NEXT STEPS:
+""",
+                    suggestsFollowUp: false,
+                    recommendedConfidentiality: .standard
+                ),
+                CaseNoteTemplate(
+                    id: "gen-health", title: "Health Concern Note",
+                    description: "Document a health issue or referral for a child",
+                    icon: "heart.text.square.fill",
+                    body: """
+[HEALTH CONCERN — \(dateStamp)]
+
+CONCERN IDENTIFIED:
+•\u{0020}
+
+DATE REPORTED BY FAMILY:
+•\u{0020}
+
+PARENT NOTIFICATION: ☐ Completed  ☐ Pending
+
+ACTIONS TAKEN:
+•\u{0020}
+
+PROVIDER / SPECIALIST REFERRAL:
+•\u{0020}
+
+FOLLOW-UP APPOINTMENT DATE:
+""",
+                    suggestsFollowUp: true,
+                    recommendedConfidentiality: .standard
+                ),
+            ]
+        }
+    }
+
+    // MARK: Generate from visit log
+    static func fromVisitLog(_ log: HomeVisitLog) -> CaseNoteTemplate {
+        let df = DateFormatter()
+        df.dateStyle = .long
+        let dateStr = df.string(from: log.visitDate)
+        let topicsText = log.topicsCovered.map { "• \($0.rawValue)" }.joined(separator: "\n")
+        let notesText = log.notes.isEmpty ? "• (None recorded)" : "• \(log.notes)"
+        return CaseNoteTemplate(
+            id: "from-visit-\(log.id)", title: "From Visit Log",
+            description: "Pre-filled from your most recent recorded visit",
+            icon: "house.fill",
+            body: """
+[HOME VISIT — \(dateStr)]
+
+CONDUCTED BY: \(log.conductedBy)
+DURATION: \(log.durationMinutes) minutes
+
+PURPOSE / TOPICS COVERED:
+\(topicsText)
+
+NOTES FROM VISIT:
+\(notesText)
+
+CHILD OBSERVATIONS:
+•\u{0020}
+
+FAMILY STRENGTHS NOTED:
+•\u{0020}
+
+CONCERNS / NEEDS IDENTIFIED:
+•\u{0020}
+
+ACTION STEPS:
+•\u{0020}
+
+NEXT VISIT:
+""",
+            suggestsFollowUp: true,
+            recommendedConfidentiality: .standard
+        )
+    }
+
+    // MARK: Quick-insert phrases by Head Start domain
+    static var quickPhrases: [(label: String, text: String)] {
+        [
+            ("Strength 💪", "Family demonstrated strong support and engagement with the program."),
+            ("Goal Progress ✅", "Family made measurable progress toward the goal of "),
+            ("Barrier 🚧", "Identified barrier: transportation / childcare / work schedule."),
+            ("Referral 📋", "Referred family to [agency] for assistance with "),
+            ("Safe Home 🏠", "Home environment observed to be safe, clean, and nurturing."),
+            ("Child Dev 🌱", "Child showed age-appropriate development in the area of "),
+            ("Health ❤️", "Health concern identified — parent to follow up with pediatrician by "),
+            ("Attendance 📅", "Discussed attendance expectations. Family committed to daily attendance."),
+            ("Next Contact 📞", "Next contact scheduled for "),
+            ("No Concerns ✓", "No immediate safety or wellbeing concerns noted at this time."),
+        ]
+    }
+}
+
+// MARK: - Template Picker Sheet
+
+private struct TemplatePickerSheet: View {
+    let noteType: CaseNote.NoteType
+    let familyId: String
+    let onSelect: (CaseNoteTemplate) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    // Was: computed straight from MockData with no network call at all, and
+    // labeled "Live Data" in the UI even though it could never be anything
+    // but the fixture. Now loaded for real, and the section just doesn't
+    // appear if there's no actual recent visit to import from.
+    @State private var recentVisit: HomeVisitLog?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                // "From visit log" shortcut for home visit type
+                if noteType == .homeVisit, let visit = recentVisit {
+                    Section("From Your Records") {
+                        Button {
+                            onSelect(CaseNoteTemplateEngine.fromVisitLog(visit))
+                            dismiss()
+                        } label: {
+                            TemplateCard(
+                                icon: "clock.arrow.circlepath",
+                                title: "Import from Recent Visit",
+                                description: "Pre-fill from visit on \(visit.visitDate.formatted(.dateTime.month(.abbreviated).day()))",
+                                badge: "Live Data",
+                                badgeColor: .cfAttendance
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Section("Smart Templates") {
+                    ForEach(CaseNoteTemplateEngine.templates(for: noteType)) { template in
+                        Button {
+                            onSelect(template)
+                            dismiss()
+                        } label: {
+                            TemplateCard(
+                                icon: template.icon,
+                                title: template.title,
+                                description: template.description,
+                                badge: template.recommendedConfidentiality == .sensitive ? "Sensitive" : nil,
+                                badgeColor: .cfHealth
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Section {
+                    Button("Start with blank note") {
+                        dismiss()
+                    }
+                    .foregroundColor(.cfTextSecondary)
+                    .font(.subheadline)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle("Choose a Template")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .task {
+                do {
+                    let visits = try await APIClient.shared.getVisitLogs(familyId: familyId)
+                    recentVisit = visits
+                        .filter { $0.visitType == .homeVisit }
+                        .sorted { $0.visitDate > $1.visitDate }
+                        .first
+                } catch {
+                    #if DEBUG
+                    recentVisit = MockData.visitLogs(for: familyId)
+                        .filter { $0.visitType == .homeVisit }
+                        .sorted { $0.visitDate > $1.visitDate }
+                        .first
+                    #endif
+                }
+            }
+        }
+    }
+}
+
+private struct TemplateCard: View {
+    let icon: String
+    let title: String
+    let description: String
+    let badge: String?
+    let badgeColor: Color
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.cfPrimary.opacity(0.1))
+                    .frame(width: 44, height: 44)
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.cfPrimary)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.cfTextPrimary)
+                    if let badge {
+                        Text(badge)
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 5).padding(.vertical, 2)
+                            .background(badgeColor.opacity(0.12))
+                            .foregroundColor(badgeColor)
+                            .clipShape(Capsule())
+                    }
+                }
+                Text(description)
+                    .font(.caption)
+                    .foregroundColor(.cfTextSecondary)
+                    .lineLimit(2)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.cfBorder)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - New Case Note Sheet (AI-Assisted)
+
 struct NewCaseNoteSheet: View {
     let familyId: String
     let onSave: (CaseNote) -> Void
@@ -1370,10 +1950,32 @@ struct NewCaseNoteSheet: View {
     @State private var followUpRequired = false
     @State private var followUpDue = Date().addingTimeInterval(7 * 86400)
     @State private var isSaving = false
+    @State private var showTemplatePicker = true    // open template picker immediately
+    @State private var appliedTemplate: String? = nil
+    @State private var errorMessage: String?
+    @FocusState private var editorFocused: Bool
 
     var body: some View {
         NavigationStack {
             Form {
+                // Smart template status banner
+                if let applied = appliedTemplate {
+                    Section {
+                        HStack(spacing: 10) {
+                            Image(systemName: "wand.and.stars")
+                                .foregroundColor(.cfPrimary)
+                            Text("Template: \(applied)")
+                                .font(.caption.weight(.medium))
+                                .foregroundColor(.cfPrimary)
+                            Spacer()
+                            Button("Change") { showTemplatePicker = true }
+                                .font(.caption)
+                                .foregroundColor(.cfPrimary)
+                        }
+                    }
+                    .listRowBackground(Color.cfPrimary.opacity(0.06))
+                }
+
                 Section("Note Type") {
                     Picker("Type", selection: $noteType) {
                         ForEach(CaseNote.NoteType.allCases, id: \.self) { type in
@@ -1381,6 +1983,9 @@ struct NewCaseNoteSheet: View {
                         }
                     }
                     .pickerStyle(.navigationLink)
+                    .onChange(of: noteType) { _ in
+                        if noteBody.isEmpty { showTemplatePicker = true }
+                    }
                 }
 
                 Section("Confidentiality") {
@@ -1392,15 +1997,54 @@ struct NewCaseNoteSheet: View {
                     .pickerStyle(.segmented)
                     if confidentiality == .sensitive {
                         Label("Only visible to authorized staff", systemImage: "info.circle")
-                            .font(.cfCaption)
-                            .foregroundColor(.cfTextSecondary)
+                            .font(.cfCaption).foregroundColor(.cfTextSecondary)
                     }
                 }
 
-                Section("Note") {
+                Section {
                     TextEditor(text: $noteBody)
-                        .frame(minHeight: 140)
-                        .font(.cfBody)
+                        .frame(minHeight: 200)
+                        .font(.system(.body, design: .monospaced))
+                        .focused($editorFocused)
+                } header: {
+                    HStack {
+                        Text("Note")
+                        Spacer()
+                        Button {
+                            showTemplatePicker = true
+                        } label: {
+                            Label("Smart Template", systemImage: "wand.and.stars")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.cfPrimary)
+                        }
+                    }
+                }
+
+                // Quick-insert phrase chips
+                Section("Quick Insert") {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(CaseNoteTemplateEngine.quickPhrases, id: \.label) { phrase in
+                                Button {
+                                    let trimmed = noteBody.trimmingCharacters(in: .newlines)
+                                    noteBody = trimmed.isEmpty
+                                        ? phrase.text
+                                        : trimmed + "\n" + phrase.text
+                                    editorFocused = true
+                                } label: {
+                                    Text(phrase.label)
+                                        .font(.caption.weight(.medium))
+                                        .foregroundColor(.cfPrimary)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(Color.cfPrimary.opacity(0.08))
+                                        .clipShape(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
 
                 Section("Follow-up") {
@@ -1422,6 +2066,17 @@ struct NewCaseNoteSheet: View {
                         .disabled(noteBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
                 }
             }
+            .sheet(isPresented: $showTemplatePicker) {
+                TemplatePickerSheet(noteType: noteType, familyId: familyId) { template in
+                    noteBody = template.body
+                    confidentiality = template.recommendedConfidentiality
+                    if template.suggestsFollowUp { followUpRequired = true }
+                    appliedTemplate = template.title
+                }
+            }
+            .alert("Couldn't Save Note", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 
@@ -1440,18 +2095,15 @@ struct NewCaseNoteSheet: View {
                 let saved = try await APIClient.shared.createCaseNote(request: request)
                 await MainActor.run { onSave(saved); dismiss() }
             } catch {
-                // Optimistic local insert in debug
-                let local = CaseNote(
-                    id: UUID().uuidString, familyId: familyId,
-                    authorId: "staff-local", authorName: "You",
-                    type: noteType, confidentiality: confidentiality,
-                    body: noteBody, createdAt: Date(),
-                    followUpRequired: followUpRequired,
-                    followUpDue: followUpRequired ? followUpDue : nil,
-                    followUpCompleted: false
-                )
-                await MainActor.run { onSave(local); dismiss() }
+                // A case note is confidential case documentation — fabricating a
+                // fake local success used to make a failed save look identical to
+                // a real one, silently losing the record. Surface the error and
+                // keep the user's text so they can retry instead.
+                await MainActor.run {
+                    errorMessage = "This note wasn't saved. Check your connection and try again."
+                }
             }
+            isSaving = false
         }
     }
 }

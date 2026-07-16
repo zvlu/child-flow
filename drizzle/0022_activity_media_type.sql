@@ -1,0 +1,1 @@
+ALTER TABLE `activityLogs` ADD `mediaType` enum('image','video');

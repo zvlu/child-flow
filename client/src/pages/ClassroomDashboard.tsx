@@ -174,7 +174,7 @@ export default function ClassroomDashboard() {
       case "excused":
         return <AlertCircle className="h-5 w-5 text-red-500" />;
       default:
-        return <Clock className="h-5 w-5 text-slate-400" />;
+        return <Clock className="h-5 w-5 text-muted-foreground" />;
     }
   };
 
@@ -192,12 +192,12 @@ export default function ClassroomDashboard() {
   const MoveMenu = ({ childId, name, currentRoomId }: { childId: number; name: string; currentRoomId: number | null }) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 text-slate-400 hover:text-slate-600">
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-muted-foreground">
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="rounded-2xl">
-        <DropdownMenuLabel className="text-xs uppercase tracking-wider text-slate-400">Move to room</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="rounded-xl">
+        <DropdownMenuLabel className="text-xs uppercase tracking-wider text-muted-foreground">Move to room</DropdownMenuLabel>
         {(classrooms ?? [])
           .filter((r) => r.id !== currentRoomId)
           .map((r) => {
@@ -240,18 +240,18 @@ export default function ClassroomDashboard() {
       <div
         draggable
         onDragStart={(e) => onDragStartStudent(e, student.id, name)}
-        className="rounded-2xl border border-slate-200 bg-white hover:shadow-md hover:border-primary/30 transition-all overflow-hidden group cursor-grab active:cursor-grabbing"
+        className="rounded-xl border border-border bg-card hover:shadow-md hover:border-primary/30 transition-all overflow-hidden group cursor-grab active:cursor-grabbing"
       >
         {/* Student Header */}
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+        <div className="p-4 border-b border-border bg-muted/50 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
-            <GripVertical className="h-4 w-4 text-slate-300 flex-shrink-0" />
+            <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
               {student.firstName[0]}{student.lastName[0]}
             </div>
             <div className="min-w-0">
-              <p className="font-bold text-slate-800 truncate">{name}</p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+              <p className="font-bold text-foreground truncate">{name}</p>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">
                 {age != null ? `Age ${age}` : "Age unknown"}
               </p>
             </div>
@@ -264,7 +264,7 @@ export default function ClassroomDashboard() {
 
         {/* Pinned Notes Section */}
         {pinnedNotes.length > 0 && (
-          <div className="p-4 border-b border-slate-100 bg-gradient-to-b from-amber-50/50 to-transparent space-y-2">
+          <div className="p-4 border-b border-border bg-gradient-to-b from-amber-50/50 to-transparent space-y-2">
             {pinnedNotes.map((note) => (
               <div key={note.id} className={`p-2.5 rounded-xl border ${getPriorityColor(note.priority)} flex items-start gap-2`}>
                 <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
@@ -278,7 +278,7 @@ export default function ClassroomDashboard() {
         )}
 
         {/* Quick Actions */}
-        <div className="p-4 flex items-center gap-2 bg-slate-50/30">
+        <div className="p-4 flex items-center gap-2 bg-muted/30">
           <Link href="/health">
             <Button
               variant="ghost"
@@ -291,10 +291,11 @@ export default function ClassroomDashboard() {
           <Button
             variant="ghost"
             size="sm"
-            className="flex-1 rounded-lg font-bold text-xs h-8 gap-1.5 hover:bg-primary/10 hover:text-primary transition-all"
+            className="flex-1 rounded-lg font-bold text-xs h-8 gap-1.5 opacity-60 cursor-not-allowed hover:bg-transparent hover:text-current"
             onClick={() => toast.info("Quick notes coming soon")}
+            title="Coming soon"
           >
-            <MessageSquare className="h-3.5 w-3.5" /> Note
+            <MessageSquare className="h-3.5 w-3.5" /> Note <span className="font-normal opacity-75">(soon)</span>
           </Button>
           <Link href={`/children/${student.id}`}>
             <Button
@@ -323,32 +324,34 @@ export default function ClassroomDashboard() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
             <LayoutGrid className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">My Classrooms</h1>
-            <p className="text-sm text-slate-500 font-medium">
+            <h1 className="text-2xl font-bold text-foreground">My Classrooms</h1>
+            <p className="text-sm text-muted-foreground font-medium">
               Drag students between rooms, or use a card's menu to move them
             </p>
           </div>
         </div>
         <Button
-          className="rounded-full gap-2 shadow-md hover:shadow-lg transition-all font-bold"
+          variant="outline"
+          className="rounded-full gap-2 font-bold opacity-70"
           onClick={() => toast.info("New classroom feature coming soon")}
+          title="Coming soon"
         >
-          <Plus className="h-4 w-4" /> New Classroom
+          <Plus className="h-4 w-4" /> New Classroom <span className="font-normal opacity-75">(soon)</span>
         </Button>
       </div>
 
       {/* Search Bar */}
       <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search students by name..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 rounded-2xl border-slate-200 focus:border-primary focus:ring-primary"
+          className="pl-10 rounded-xl border-border focus:border-primary focus:ring-primary"
         />
       </div>
 
@@ -357,12 +360,12 @@ export default function ClassroomDashboard() {
       {(unassignedStudents.length > 0 || dragOverTarget != null) && (
         <Card
           {...dragOverProps("unassigned")}
-          className={`rounded-3xl border-2 border-dashed shadow-sm transition-all ${
+          className={`rounded-xl border-2 border-dashed shadow-sm transition-all ${
             dragOverTarget === "unassigned"
               ? "border-amber-400 bg-amber-50"
               : unassignedStudents.length > 0
                 ? "border-amber-300 bg-amber-50/40"
-                : "border-slate-200"
+                : "border-border"
           }`}
         >
           <CardHeader className="pb-2">
@@ -376,7 +379,7 @@ export default function ClassroomDashboard() {
           </CardHeader>
           <CardContent className="pt-2">
             {unassignedStudents.length === 0 ? (
-              <p className="text-sm text-slate-400 font-medium py-2">Every student has a room. 🎉</p>
+              <p className="text-sm text-muted-foreground font-medium py-2">Every student has a room. 🎉</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {unassignedStudents.map((student) => (
@@ -390,8 +393,8 @@ export default function ClassroomDashboard() {
 
       {/* Classrooms */}
       {classroomCards.length === 0 ? (
-        <Card className="rounded-3xl border-slate-200 shadow-sm">
-          <CardContent className="p-12 text-center text-slate-400 font-medium">
+        <Card className="rounded-xl border-border shadow-sm">
+          <CardContent className="p-12 text-center text-muted-foreground font-medium">
             No classrooms found for this organization.
           </CardContent>
         </Card>
@@ -407,33 +410,33 @@ export default function ClassroomDashboard() {
               <div key={classroom.id} className="space-y-4">
                 <Card
                   {...dragOverProps(classroom.id)}
-                  className={`rounded-3xl shadow-sm overflow-hidden transition-all ${
+                  className={`rounded-xl shadow-sm overflow-hidden transition-all ${
                     dragOverTarget === classroom.id
                       ? isFull
                         ? "border-2 border-red-400 bg-red-50/40"
                         : "border-2 border-primary bg-primary/5"
-                      : "border border-slate-200"
+                      : "border border-border"
                   }`}
                 >
-                  <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-slate-100/50 pb-4">
+                  <CardHeader className="border-b border-border bg-gradient-to-r from-background to-muted/50 pb-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div
-                          className="h-12 w-12 rounded-2xl shadow-sm"
+                          className="h-12 w-12 rounded-xl shadow-sm"
                           style={{ backgroundColor: classroom.color ?? "#3b82f6" }}
                         />
                         <div>
-                          <CardTitle className="text-xl font-bold text-slate-900">{classroom.name}</CardTitle>
-                          <p className="text-sm text-slate-500 font-medium">{classroom.ageGroup ?? "All ages"}</p>
+                          <CardTitle className="text-xl font-bold text-foreground">{classroom.name}</CardTitle>
+                          <p className="text-sm text-muted-foreground font-medium">{classroom.ageGroup ?? "All ages"}</p>
                         </div>
                       </div>
                       <div className="text-right min-w-[140px]">
-                        <p className="text-sm font-bold text-slate-700">
+                        <p className="text-sm font-bold text-muted-foreground">
                           {classroom.enrolledCount}
-                          <span className="text-slate-400"> / {capacity || "—"}</span>
+                          <span className="text-muted-foreground"> / {capacity || "—"}</span>
                           {isFull && <span className="ml-2 text-xs font-bold text-red-500 uppercase">Full</span>}
                         </p>
-                        <div className="mt-1.5 h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                        <div className="mt-1.5 h-2 w-full rounded-full bg-muted overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all ${barColor}`}
                             style={{ width: `${Math.min(100, Math.round(fillRatio * 100))}%` }}
@@ -443,11 +446,11 @@ export default function ClassroomDashboard() {
                     </div>
                     {classroom.teacherName && (
                       <div className="flex items-center gap-3 mt-4 text-sm">
-                        <div className="flex items-center gap-1.5 text-slate-600 font-bold">
+                        <div className="flex items-center gap-1.5 text-muted-foreground font-bold">
                           <User className="h-4 w-4" /> {classroom.teacherName}
                         </div>
                         {classroom.assistantName && (
-                          <div className="flex items-center gap-1.5 text-slate-400 font-medium">
+                          <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
                             <User className="h-4 w-4" /> {classroom.assistantName}
                           </div>
                         )}
@@ -459,7 +462,7 @@ export default function ClassroomDashboard() {
                     {/* Students Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {classroom.students.length === 0 && searchQuery.trim() !== "" && (
-                        <div className="col-span-full text-center text-sm text-slate-400 font-medium py-4">
+                        <div className="col-span-full text-center text-sm text-muted-foreground font-medium py-4">
                           No students match "{searchQuery}" in this classroom.
                         </div>
                       )}
@@ -469,7 +472,7 @@ export default function ClassroomDashboard() {
 
                       {/* Drop hint / empty room state */}
                       {classroom.students.length === 0 && searchQuery.trim() === "" && (
-                        <div className="col-span-full rounded-2xl border-2 border-dashed border-slate-200 text-center text-sm text-slate-400 font-medium py-8">
+                        <div className="col-span-full rounded-xl border-2 border-dashed border-border text-center text-sm text-muted-foreground font-medium py-8">
                           No students yet — drag one here or use a student card's menu.
                         </div>
                       )}

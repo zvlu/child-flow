@@ -1,0 +1,1 @@
+ALTER TABLE `activityLogs` ADD `mediaUrl` mediumtext;

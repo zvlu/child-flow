@@ -1,0 +1,19 @@
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: childflow
+      MYSQL_DATABASE: childflow
+    ports:
+      - "3307:3306"
+    volumes:
+      - sprout_db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pchildflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  sprout_db:

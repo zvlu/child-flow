@@ -3,13 +3,18 @@
  * classrooms, calendar, billing, meals, documents, staff ops, parent portal,
  * AI insights, bulk actions, notes, custom reports, and dashboard stats.
  */
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import {
   families, children, staff, classrooms, childClassroomAssignments, childFlags,
-  attendance, healthRecords, studentNotes, calendarEvents, documents,
+  attendance, healthRecords, studentNotes, calendarEvents, documents, familyServices,
   bulkActionLogs, aiInsights, invoices, payments, activityLogs,
   parentNotifications, digitalDocuments, mealPlans, mealItems, cacfpReports,
+  lessonPlans, lessonActivities, InsertLessonPlan, InsertLessonActivity,
+  portfolioEntries, InsertPortfolioEntry,
+  subsidies, InsertSubsidy,
+  deviceTokens, InsertDeviceToken, users,
   timeClock, certifications, customReports, educationRecords, pirData,
+  pirQuestions, pirReports,
   familyContactAddresses,
   InsertFamily, InsertStaff, InsertStudentNote, InsertCalendarEvent,
   InsertDocument, InsertDigitalDocument, InsertInvoice, InsertPayment,
@@ -17,8 +22,14 @@ import {
   InsertEducationRecord, InsertAiInsight, InsertBulkActionLog,
   InsertActivityLog, InsertAttendance,
   customRoles, InsertCustomRole,
+  enrollmentApplications, InsertEnrollmentApplication,
+  inKindContributions, InsertInKindContribution,
+  programRequests, InsertProgramRequest, organizations, InsertOrganization,
+  disabilityServices,
+  familyGoals, familyReferrals, familyHomeVisits, cfcrRecords, familyCaseNotes, attendancePlans,
 } from "../drizzle/schema";
 import { getDb } from "./db";
+import { isEmptyPatch } from "./_core/patch";
 
 async function requireDb() {
   const db = await getDb();
@@ -39,6 +50,14 @@ export async function createFamily(data: InsertFamily) {
   return { id: result.insertId };
 }
 
+/** Update a family record. Caller must verify the family is in the user's org. */
+export async function updateFamily(id: number, data: Partial<typeof families.$inferInsert>) {
+  if (isEmptyPatch(data)) return { id };
+  const db = await requireDb();
+  await db.update(families).set(data).where(eq(families.id, id));
+  return { id };
+}
+
 export async function getFamilyContacts(familyId: number) {
   const db = await requireDb();
   return db.select().from(familyContactAddresses).where(eq(familyContactAddresses.familyId, familyId));
@@ -47,6 +66,7 @@ export async function getFamilyContacts(familyId: number) {
 // ==================== CHILDREN ====================
 
 export async function updateChild(id: number, data: Partial<typeof children.$inferInsert>) {
+  if (isEmptyPatch(data)) return { success: true };
   const db = await requireDb();
   await db.update(children).set(data).where(eq(children.id, id));
   return { success: true };
@@ -125,6 +145,46 @@ export async function removeChildFlag(id: number) {
   await db.delete(childFlags).where(eq(childFlags.id, id));
 }
 
+/** The child a flag belongs to (for record-level tenant checks). */
+export async function getChildIdForFlag(flagId: number): Promise<number | null> {
+  const db = await requireDb();
+  const [row] = await db.select({ childId: childFlags.childId }).from(childFlags).where(eq(childFlags.id, flagId)).limit(1);
+  return row?.childId ?? null;
+}
+
+// Record-id → owning organization, for tenant checks on routes the org-scope
+// middleware can't see (their input is a record id, not an org id). Only tables
+// with a direct organizationId column are listed here.
+const ORG_RECORD_TABLES = {
+  family: families,
+  classroom: classrooms,
+  calendarEvent: calendarEvents,
+  document: documents,
+  digitalDocument: digitalDocuments,
+  mealPlan: mealPlans,
+  lessonPlan: lessonPlans,
+  portfolioEntry: portfolioEntries,
+  subsidy: subsidies,
+  report: customReports,
+  aiInsight: aiInsights,
+  staff: staff,
+  disabilityService: disabilityServices,
+  familyGoal: familyGoals,
+  familyReferral: familyReferrals,
+  familyHomeVisit: familyHomeVisits,
+  cfcrRecord: cfcrRecords,
+  familyCaseNote: familyCaseNotes,
+  attendancePlan: attendancePlans,
+} as const;
+export type OrgRecordKind = keyof typeof ORG_RECORD_TABLES;
+
+export async function getRecordOrgId(kind: OrgRecordKind, id: number): Promise<number | null> {
+  const db = await requireDb();
+  const table = ORG_RECORD_TABLES[kind] as unknown as { organizationId: typeof families.organizationId; id: typeof families.id };
+  const [row] = await db.select({ organizationId: table.organizationId }).from(table as any).where(eq(table.id, id)).limit(1);
+  return row?.organizationId ?? null;
+}
+
 /**
  * Move a child to a classroom (or unassign with null). Ends any active
  * assignment first, so a child is only ever in one room at a time.
@@ -171,19 +231,23 @@ export async function saveAttendanceForDate(
   startOfDay.setHours(0, 0, 0, 0);
   const endOfDay = new Date(date);
   endOfDay.setHours(23, 59, 59, 999);
-  await db.delete(attendance).where(and(
-    eq(attendance.organizationId, organizationId),
-    gte(attendance.date, startOfDay),
-    lte(attendance.date, endOfDay),
-  ));
-  if (records.length === 0) return { saved: 0 };
-  await db.insert(attendance).values(records.map(r => ({
-    ...r,
-    organizationId,
-    date: startOfDay,
-    recordedBy: recordedBy ?? null,
-  })));
-  return { saved: records.length };
+  // Replace-the-day must be atomic: a crash between delete and insert would
+  // otherwise erase the whole day's attendance.
+  return db.transaction(async (tx) => {
+    await tx.delete(attendance).where(and(
+      eq(attendance.organizationId, organizationId),
+      gte(attendance.date, startOfDay),
+      lte(attendance.date, endOfDay),
+    ));
+    if (records.length === 0) return { saved: 0 };
+    await tx.insert(attendance).values(records.map(r => ({
+      ...r,
+      organizationId,
+      date: startOfDay,
+      recordedBy: recordedBy ?? null,
+    })));
+    return { saved: records.length };
+  });
 }
 
 export async function getAttendanceRange(organizationId: number, start: Date, end: Date) {
@@ -204,6 +268,7 @@ export async function createStaff(data: InsertStaff) {
 }
 
 export async function updateStaff(id: number, data: Partial<InsertStaff>) {
+  if (isEmptyPatch(data)) return { success: true };
   const db = await requireDb();
   await db.update(staff).set(data).where(eq(staff.id, id));
   return { success: true };
@@ -233,6 +298,151 @@ export async function deleteCustomRole(id: number, organizationId: number) {
     .delete(customRoles)
     .where(and(eq(customRoles.id, id), eq(customRoles.organizationId, organizationId)));
   return { success: true };
+}
+
+// ==================== ENROLLMENT APPLICATIONS ====================
+
+export async function getEnrollmentApplications(organizationId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(enrollmentApplications)
+    .where(eq(enrollmentApplications.organizationId, organizationId))
+    .orderBy(desc(enrollmentApplications.appliedDate));
+}
+
+export async function createEnrollmentApplication(data: InsertEnrollmentApplication) {
+  const db = await requireDb();
+  const [result] = await db.insert(enrollmentApplications).values(data);
+  return { id: result.insertId };
+}
+
+export async function updateEnrollmentApplication(
+  id: number,
+  organizationId: number,
+  data: Partial<Pick<InsertEnrollmentApplication, "status" | "priority" | "notes">>
+) {
+  if (isEmptyPatch(data)) return { success: true };
+  const db = await requireDb();
+  await db
+    .update(enrollmentApplications)
+    .set(data)
+    .where(and(eq(enrollmentApplications.id, id), eq(enrollmentApplications.organizationId, organizationId)));
+  return { success: true };
+}
+
+/**
+ * Approve-and-enroll: turn an application into real family + child records and
+ * mark it enrolled. Idempotent — if already enrolled, returns the existing
+ * childId instead of creating duplicates.
+ */
+export async function enrollApplication(id: number, organizationId: number) {
+  const db = await requireDb();
+  const [app] = await db
+    .select()
+    .from(enrollmentApplications)
+    .where(and(eq(enrollmentApplications.id, id), eq(enrollmentApplications.organizationId, organizationId)))
+    .limit(1);
+  if (!app) throw new Error("Application not found");
+  if (app.enrolledChildId) return { childId: app.enrolledChildId, familyId: null, alreadyEnrolled: true };
+
+  const [famResult] = await db.insert(families).values({
+    organizationId,
+    primaryContactName: app.parentName || `${app.childFirstName} ${app.childLastName} family`,
+    primaryContactPhone: app.parentPhone ?? null,
+    primaryContactEmail: app.parentEmail ?? null,
+    address: app.address ?? null,
+  });
+  const familyId = Number(famResult.insertId);
+
+  const [childResult] = await db.insert(children).values({
+    organizationId,
+    firstName: app.childFirstName,
+    lastName: app.childLastName,
+    dateOfBirth: app.dateOfBirth ?? null,
+    gender: app.gender ?? null,
+    familyId,
+    status: "active",
+  });
+  const childId = Number(childResult.insertId);
+
+  await db
+    .update(enrollmentApplications)
+    .set({ status: "enrolled", enrolledChildId: childId })
+    .where(eq(enrollmentApplications.id, id));
+
+  return { childId, familyId, alreadyEnrolled: false };
+}
+
+// ==================== IN-KIND CONTRIBUTIONS ====================
+
+export async function getInKindContributions(organizationId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(inKindContributions)
+    .where(eq(inKindContributions.organizationId, organizationId))
+    .orderBy(desc(inKindContributions.date));
+}
+
+export async function createInKindContribution(data: InsertInKindContribution) {
+  const db = await requireDb();
+  const [result] = await db.insert(inKindContributions).values(data);
+  return { id: result.insertId };
+}
+
+export async function deleteInKindContribution(id: number, organizationId: number) {
+  const db = await requireDb();
+  await db
+    .delete(inKindContributions)
+    .where(and(eq(inKindContributions.id, id), eq(inKindContributions.organizationId, organizationId)));
+  return { success: true };
+}
+
+// ==================== PROGRAM REQUESTS (self-serve onboarding) ====================
+
+export async function createProgramRequest(data: InsertProgramRequest) {
+  const db = await requireDb();
+  const [result] = await db.insert(programRequests).values(data);
+  return { id: result.insertId };
+}
+
+export async function getProgramRequests() {
+  const db = await requireDb();
+  return db.select().from(programRequests).orderBy(desc(programRequests.createdAt));
+}
+
+export async function declineProgramRequest(id: number) {
+  const db = await requireDb();
+  await db.update(programRequests).set({ status: "declined" }).where(eq(programRequests.id, id));
+  return { success: true };
+}
+
+/**
+ * Approve a pending request: create the organization (active) and link it back.
+ * Idempotent — if already approved, returns the existing org id.
+ */
+export async function approveProgramRequest(id: number, ownerId: number) {
+  const db = await requireDb();
+  const [req] = await db.select().from(programRequests).where(eq(programRequests.id, id)).limit(1);
+  if (!req) throw new Error("Request not found");
+  if (req.createdOrgId) return { orgId: req.createdOrgId, alreadyApproved: true };
+
+  // Fall back to a generated agency id if the requester didn't supply one.
+  const agencyId = (req.agencyId && req.agencyId.trim()) || `REQ-${req.id}`;
+  const orgValues: InsertOrganization = {
+    name: req.organizationName,
+    agencyId,
+    ownerId,
+    subscriptionTier: "starter",
+    maxChildren: 100,
+    maxStaff: 20,
+    isActive: 1,
+  };
+  const [orgResult] = await db.insert(organizations).values(orgValues);
+  const orgId = Number(orgResult.insertId);
+  await db.update(programRequests).set({ status: "approved", createdOrgId: orgId }).where(eq(programRequests.id, id));
+  return { orgId, alreadyApproved: false };
 }
 
 // ==================== STUDENT NOTES ====================
@@ -265,6 +475,7 @@ export async function createCalendarEvent(data: InsertCalendarEvent) {
 }
 
 export async function updateCalendarEvent(id: number, data: Partial<InsertCalendarEvent>) {
+  if (isEmptyPatch(data)) return { success: true };
   const db = await requireDb();
   await db.update(calendarEvents).set(data).where(eq(calendarEvents.id, id));
   return { success: true };
@@ -286,10 +497,32 @@ export async function getDocuments(organizationId: number, childId?: number) {
   return db.select().from(documents).where(where).orderBy(desc(documents.uploadedAt));
 }
 
+/** Same list with the assigned child's name joined in — backs the iOS REST mirror. */
+export async function getDocumentsWithChildNames(organizationId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ doc: documents, childFirst: children.firstName, childLast: children.lastName })
+    .from(documents)
+    .leftJoin(children, eq(documents.childId, children.id))
+    .where(eq(documents.organizationId, organizationId))
+    .orderBy(desc(documents.uploadedAt));
+  return rows.map(r => ({
+    ...r.doc,
+    childName: r.childFirst != null ? `${r.childFirst} ${r.childLast}` : null,
+  }));
+}
+
 export async function createDocument(data: InsertDocument) {
   const db = await requireDb();
   const [result] = await db.insert(documents).values(data);
   return { id: result.insertId };
+}
+
+/** File an unassigned (or re-file an assigned) document to a child. */
+export async function assignDocumentToChild(id: number, organizationId: number, childId: number) {
+  const db = await requireDb();
+  await db.update(documents).set({ childId }).where(and(eq(documents.id, id), eq(documents.organizationId, organizationId)));
+  return { success: true };
 }
 
 export async function deleteDocument(id: number) {
@@ -303,6 +536,24 @@ export async function deleteDocument(id: number) {
 export async function getDigitalDocuments(organizationId: number) {
   const db = await requireDb();
   return db.select().from(digitalDocuments).where(eq(digitalDocuments.organizationId, organizationId)).orderBy(desc(digitalDocuments.createdAt));
+}
+
+/** Same list with the family's display name joined in — backs the iOS REST mirror. */
+export async function getDigitalDocumentsWithFamily(organizationId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ doc: digitalDocuments, familyName: families.primaryContactName })
+    .from(digitalDocuments)
+    .innerJoin(families, eq(digitalDocuments.familyId, families.id))
+    .where(eq(digitalDocuments.organizationId, organizationId))
+    .orderBy(desc(digitalDocuments.createdAt));
+  return rows.map(r => ({ ...r.doc, familyName: r.familyName }));
+}
+
+export async function getDigitalDocument(id: number) {
+  const db = await requireDb();
+  const [row] = await db.select().from(digitalDocuments).where(eq(digitalDocuments.id, id)).limit(1);
+  return row;
 }
 
 export async function createDigitalDocument(data: InsertDigitalDocument) {
@@ -384,6 +635,170 @@ export async function updateMealPlanStatus(id: number, status: "draft" | "approv
   return { success: true };
 }
 
+// ==================== LESSON PLANNING ====================
+
+export async function getLessonPlans(organizationId: number) {
+  const db = await requireDb();
+  const plans = await db
+    .select({ plan: lessonPlans, classroomName: classrooms.name })
+    .from(lessonPlans)
+    .innerJoin(classrooms, eq(lessonPlans.classroomId, classrooms.id))
+    .where(eq(lessonPlans.organizationId, organizationId))
+    .orderBy(desc(lessonPlans.weekStartDate));
+  return plans.map(r => ({ ...r.plan, classroomName: r.classroomName }));
+}
+
+/** One lesson plan with its classroom name and all activities. */
+export async function getLessonPlan(id: number) {
+  const db = await requireDb();
+  const [row] = await db
+    .select({ plan: lessonPlans, classroomName: classrooms.name })
+    .from(lessonPlans)
+    .innerJoin(classrooms, eq(lessonPlans.classroomId, classrooms.id))
+    .where(eq(lessonPlans.id, id));
+  if (!row) return null;
+  const activities = await db.select().from(lessonActivities).where(eq(lessonActivities.lessonPlanId, id)).orderBy(lessonActivities.id);
+  return { ...row.plan, classroomName: row.classroomName, activities };
+}
+
+export async function createLessonPlan(data: InsertLessonPlan) {
+  const db = await requireDb();
+  const [result] = await db.insert(lessonPlans).values(data);
+  return { id: result.insertId };
+}
+
+export async function updateLessonPlan(id: number, data: Partial<typeof lessonPlans.$inferInsert>) {
+  if (isEmptyPatch(data)) return { id };
+  const db = await requireDb();
+  await db.update(lessonPlans).set(data).where(eq(lessonPlans.id, id));
+  return { id };
+}
+
+export async function addLessonActivity(data: InsertLessonActivity) {
+  const db = await requireDb();
+  const [result] = await db.insert(lessonActivities).values(data);
+  return { id: result.insertId };
+}
+
+export async function deleteLessonActivity(id: number) {
+  const db = await requireDb();
+  await db.delete(lessonActivities).where(eq(lessonActivities.id, id));
+  return { success: true };
+}
+
+/** The org that owns a lesson plan — for tenant checks on activity mutations. */
+export async function getLessonPlanOrg(lessonPlanId: number): Promise<number | null> {
+  const db = await requireDb();
+  const [row] = await db.select({ orgId: lessonPlans.organizationId }).from(lessonPlans).where(eq(lessonPlans.id, lessonPlanId));
+  return row?.orgId ?? null;
+}
+
+// ==================== CHILD PORTFOLIOS ====================
+
+/** A child's developmental portfolio — observations newest first, with author. */
+export async function getPortfolioEntries(childId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ entry: portfolioEntries, staffFirst: staff.firstName, staffLast: staff.lastName })
+    .from(portfolioEntries)
+    .leftJoin(staff, eq(portfolioEntries.createdBy, staff.id))
+    .where(eq(portfolioEntries.childId, childId))
+    .orderBy(desc(portfolioEntries.observedAt), desc(portfolioEntries.createdAt));
+  return rows.map(r => ({
+    ...r.entry,
+    authorName: r.staffFirst ? `${r.staffFirst} ${r.staffLast}` : null,
+  }));
+}
+
+export async function createPortfolioEntry(data: InsertPortfolioEntry) {
+  const db = await requireDb();
+  const [result] = await db.insert(portfolioEntries).values(data);
+  return { id: result.insertId };
+}
+
+export async function deletePortfolioEntry(id: number) {
+  const db = await requireDb();
+  await db.delete(portfolioEntries).where(eq(portfolioEntries.id, id));
+  return { success: true };
+}
+
+// ==================== SUBSIDY TRACKING ====================
+
+/** All subsidies for an org, with the family's primary contact name. */
+export async function getSubsidies(organizationId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ subsidy: subsidies, familyName: families.primaryContactName })
+    .from(subsidies)
+    .innerJoin(families, eq(subsidies.familyId, families.id))
+    .where(eq(subsidies.organizationId, organizationId))
+    .orderBy(desc(subsidies.createdAt));
+  return rows.map(r => ({ ...r.subsidy, familyName: r.familyName }));
+}
+
+export async function createSubsidy(data: InsertSubsidy) {
+  const db = await requireDb();
+  const [result] = await db.insert(subsidies).values(data);
+  return { id: result.insertId };
+}
+
+export async function updateSubsidy(id: number, data: Partial<typeof subsidies.$inferInsert>) {
+  if (isEmptyPatch(data)) return { id };
+  const db = await requireDb();
+  await db.update(subsidies).set(data).where(eq(subsidies.id, id));
+  return { id };
+}
+
+export async function deleteSubsidy(id: number) {
+  const db = await requireDb();
+  await db.delete(subsidies).where(eq(subsidies.id, id));
+  return { success: true };
+}
+
+// ==================== PUSH / DEVICE TOKENS ====================
+
+/** Register (or re-point) a device push token to a user. Idempotent by token. */
+export async function registerDeviceToken(userId: number, token: string, platform: "ios" | "android" | "web") {
+  const db = await requireDb();
+  const existing = await db.select().from(deviceTokens).where(eq(deviceTokens.token, token)).limit(1);
+  if (existing.length > 0) {
+    await db.update(deviceTokens).set({ userId, platform }).where(eq(deviceTokens.token, token));
+    return { id: existing[0].id };
+  }
+  const [result] = await db.insert(deviceTokens).values({ userId, token, platform });
+  return { id: result.insertId };
+}
+
+export async function getDeviceTokensForUser(userId: number): Promise<string[]> {
+  const db = await requireDb();
+  const rows = await db.select({ token: deviceTokens.token }).from(deviceTokens).where(eq(deviceTokens.userId, userId));
+  return rows.map(r => r.token);
+}
+
+/** All device tokens for the parent user(s) attached to a family. */
+export async function getDeviceTokensForFamily(familyId: number): Promise<string[]> {
+  const db = await requireDb();
+  const rows = await db
+    .select({ token: deviceTokens.token })
+    .from(deviceTokens)
+    .innerJoin(users, eq(deviceTokens.userId, users.id))
+    .where(eq(users.familyId, familyId));
+  return rows.map(r => r.token);
+}
+
+/** Remove a token (e.g. APNs reported it invalid). */
+export async function removeDeviceToken(token: string) {
+  const db = await requireDb();
+  await db.delete(deviceTokens).where(eq(deviceTokens.token, token));
+}
+
+/** The family + first name for a child — used to address push notifications. */
+export async function getChildForNotify(childId: number): Promise<{ familyId: number | null; firstName: string } | null> {
+  const db = await requireDb();
+  const [row] = await db.select({ familyId: children.familyId, firstName: children.firstName }).from(children).where(eq(children.id, childId));
+  return row ? { familyId: row.familyId ?? null, firstName: row.firstName } : null;
+}
+
 export async function getCacfpReports(organizationId: number) {
   const db = await requireDb();
   return db.select().from(cacfpReports).where(eq(cacfpReports.organizationId, organizationId)).orderBy(desc(cacfpReports.reportMonth));
@@ -427,6 +842,29 @@ export async function clockOut(entryId: number) {
   return { success: true, hoursWorked: hours.toFixed(2) };
 }
 
+/** Org that owns a time-clock entry (via its staff member), for tenant checks. */
+export async function getTimeClockEntryOrgId(entryId: number): Promise<number | null> {
+  const db = await requireDb();
+  const [row] = await db
+    .select({ organizationId: staff.organizationId })
+    .from(timeClock)
+    .innerJoin(staff, eq(timeClock.staffId, staff.id))
+    .where(eq(timeClock.id, entryId))
+    .limit(1);
+  return row?.organizationId ?? null;
+}
+
+const CERT_EXPIRING_SOON_DAYS = 60;
+
+/** Live status from expiryDate — never trust the stored `status` column, which is only set at creation and drifts stale as the date approaches. */
+export function certificationStatus(expiryDate: Date | string, now: Date = new Date()): "expired" | "expiring_soon" | "active" {
+  const expiry = new Date(expiryDate);
+  const days = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (days < 0) return "expired";
+  if (days <= CERT_EXPIRING_SOON_DAYS) return "expiring_soon";
+  return "active";
+}
+
 export async function getCertifications(organizationId: number) {
   const db = await requireDb();
   const rows = await db
@@ -435,7 +873,18 @@ export async function getCertifications(organizationId: number) {
     .innerJoin(staff, eq(certifications.staffId, staff.id))
     .where(eq(staff.organizationId, organizationId))
     .orderBy(certifications.expiryDate);
-  return rows.map(r => ({ ...r.cert, staffName: `${r.firstName} ${r.lastName}` }));
+  return rows.map(r => ({ ...r.cert, status: certificationStatus(r.cert.expiryDate), staffName: `${r.firstName} ${r.lastName}` }));
+}
+
+/** Counts behind the credential-expiry summary card / Action Queue. */
+export async function getCertificationExpirySummary(organizationId: number) {
+  const certs = await getCertifications(organizationId);
+  return {
+    expired: certs.filter(c => c.status === "expired").length,
+    expiringSoon: certs.filter(c => c.status === "expiring_soon").length,
+    active: certs.filter(c => c.status === "active").length,
+    total: certs.length,
+  };
 }
 
 export async function createCertification(data: InsertCertification) {
@@ -503,7 +952,8 @@ export async function getActivityLogs(organizationId: number, childId?: number) 
     .where(childId
       ? and(eq(children.organizationId, organizationId), eq(activityLogs.childId, childId))
       : eq(children.organizationId, organizationId))
-    .orderBy(desc(activityLogs.timestamp));
+    .orderBy(desc(activityLogs.timestamp))
+    .limit(250);
   return rows.map(r => ({
     ...r.log,
     childName: `${r.childFirst} ${r.childLast}`,
@@ -517,9 +967,187 @@ export async function createActivityLog(data: InsertActivityLog) {
   return { id: result.insertId };
 }
 
+/** Activity feed for one family — every moment for the family's children, newest first. */
+export async function getFamilyActivityLogs(familyId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ log: activityLogs, childFirst: children.firstName, childLast: children.lastName, staffFirst: staff.firstName, staffLast: staff.lastName })
+    .from(activityLogs)
+    .innerJoin(children, eq(activityLogs.childId, children.id))
+    .innerJoin(staff, eq(activityLogs.staffId, staff.id))
+    .where(eq(children.familyId, familyId))
+    .orderBy(desc(activityLogs.timestamp))
+    .limit(250);
+  return rows.map(r => ({
+    ...r.log,
+    childName: `${r.childFirst} ${r.childLast}`,
+    staffName: `${r.staffFirst} ${r.staffLast}`,
+  }));
+}
+
+/**
+ * The staff.id to attribute an action to: the staff row linked to this user if
+ * there is one, else any staff in their org (single-tenant demo fallback).
+ */
+export async function resolveStaffId(organizationId: number | null, userId: number): Promise<number | null> {
+  const db = await requireDb();
+  const byUser = await db.select({ id: staff.id }).from(staff).where(eq(staff.userId, userId)).limit(1);
+  if (byUser.length) return byUser[0].id;
+  const rows = organizationId != null
+    ? await db.select({ id: staff.id }).from(staff).where(eq(staff.organizationId, organizationId)).limit(1)
+    : await db.select({ id: staff.id }).from(staff).limit(1);
+  return rows[0]?.id ?? null;
+}
+
+// ==================== STAFF ACTIVITY REPORTS ====================
+
+/** Family-contact types tracked for advocate workload, in display order. */
+export const FAMILY_CONTACT_TYPES = [
+  "home_visit", "office_visit", "phone_call", "email",
+  "referral", "coordinated_services", "monthly_contact", "other",
+] as const;
+
+export type StaffActivityRow = {
+  staffId: number | null;
+  name: string;
+  position: string | null;
+  total: number;
+  byType: Record<string, number>;
+  lastActivity: Date | null;
+};
+
+/**
+ * Per-staff workload over a date range, built from logged family-service
+ * contacts (home visits, monthly/routine contacts, coordinated-service
+ * discussions, referrals, …). Powers two views from one call:
+ *   - supervisor view — every active staff member's counts side by side
+ *     (including those with zero contacts in the window), and
+ *   - a single advocate's contact log, when `staffId` is supplied (`detail`).
+ */
+export async function getStaffActivityReport(
+  organizationId: number,
+  opts: { start: Date; end: Date; staffId?: number | null },
+) {
+  const db = await requireDb();
+
+  const rows = await db
+    .select({
+      id: familyServices.id,
+      type: familyServices.type,
+      serviceDate: familyServices.serviceDate,
+      description: familyServices.description,
+      outcome: familyServices.outcome,
+      followUpRequired: familyServices.followUpRequired,
+      followUpDate: familyServices.followUpDate,
+      familyId: familyServices.familyId,
+      familyName: families.primaryContactName,
+      staffId: familyServices.recordedBy,
+      firstName: staff.firstName,
+      lastName: staff.lastName,
+      position: staff.position,
+    })
+    .from(familyServices)
+    .leftJoin(staff, eq(familyServices.recordedBy, staff.id))
+    .leftJoin(families, eq(familyServices.familyId, families.id))
+    .where(and(
+      eq(familyServices.organizationId, organizationId),
+      gte(familyServices.serviceDate, opts.start),
+      lte(familyServices.serviceDate, opts.end),
+    ))
+    .orderBy(desc(familyServices.serviceDate))
+    .limit(5000);
+
+  const emptyCounts = () =>
+    Object.fromEntries(FAMILY_CONTACT_TYPES.map((t) => [t, 0])) as Record<string, number>;
+
+  // Seed a bucket for every active staff member so a supervisor sees who has
+  // *zero* contacts in the window, not only who's been active.
+  const activeStaff = await db
+    .select({ id: staff.id, firstName: staff.firstName, lastName: staff.lastName, position: staff.position })
+    .from(staff)
+    .where(and(eq(staff.organizationId, organizationId), eq(staff.isActive, 1)));
+
+  const buckets = new Map<number, StaffActivityRow>();
+  const UNASSIGNED = -1;
+  for (const s of activeStaff) {
+    buckets.set(s.id, {
+      staffId: s.id,
+      name: `${s.firstName} ${s.lastName}`.trim() || `Staff #${s.id}`,
+      position: s.position,
+      total: 0,
+      byType: emptyCounts(),
+      lastActivity: null,
+    });
+  }
+
+  const totals = { total: 0, byType: emptyCounts() };
+
+  for (const r of rows) {
+    const key = r.staffId ?? UNASSIGNED;
+    let b = buckets.get(key);
+    if (!b) {
+      b = {
+        staffId: r.staffId ?? null,
+        name: r.staffId
+          ? `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || `Staff #${r.staffId}`
+          : "Unassigned",
+        position: r.position ?? null,
+        total: 0,
+        byType: emptyCounts(),
+        lastActivity: null,
+      };
+      buckets.set(key, b);
+    }
+    const type = (r.type as string) in b.byType ? (r.type as string) : "other";
+    b.byType[type] += 1;
+    b.total += 1;
+    totals.byType[type] += 1;
+    totals.total += 1;
+    const d = r.serviceDate ? new Date(r.serviceDate) : null;
+    if (d && (!b.lastActivity || d > b.lastActivity)) b.lastActivity = d;
+  }
+
+  // Keep every real staff member (so empty advocates surface); drop the
+  // synthetic "Unassigned" bucket unless it actually has contacts.
+  const staffSummary = Array.from(buckets.values())
+    .filter((b) => b.total > 0 || b.staffId != null)
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+
+  const detail = opts.staffId
+    ? rows
+        .filter((r) => r.staffId === opts.staffId)
+        .map((r) => ({
+          id: r.id,
+          type: r.type as string,
+          serviceDate: r.serviceDate,
+          description: r.description,
+          outcome: r.outcome,
+          followUpRequired: Number(r.followUpRequired) === 1,
+          followUpDate: r.followUpDate,
+          familyId: r.familyId,
+          familyName: r.familyName ?? `Family #${r.familyId}`,
+        }))
+    : [];
+
+  return {
+    range: { start: opts.start, end: opts.end },
+    types: FAMILY_CONTACT_TYPES as readonly string[],
+    staff: staffSummary,
+    totals,
+    detail,
+  };
+}
+
 export async function getParentNotifications(familyId: number) {
   const db = await requireDb();
   return db.select().from(parentNotifications).where(eq(parentNotifications.familyId, familyId)).orderBy(desc(parentNotifications.createdAt));
+}
+
+/** Family a parent-notification belongs to, for tenant checks. */
+export async function getNotificationFamilyId(id: number): Promise<number | null> {
+  const db = await requireDb();
+  const [row] = await db.select({ familyId: parentNotifications.familyId }).from(parentNotifications).where(eq(parentNotifications.id, id)).limit(1);
+  return row?.familyId ?? null;
 }
 
 export async function markNotificationRead(id: number) {
@@ -538,17 +1166,117 @@ export async function createEducationRecord(data: InsertEducationRecord) {
 
 export async function upsertPirValue(organizationId: number, year: string, section: string, questionId: string, value: string, updatedBy?: number | null) {
   const db = await requireDb();
+  // Every value belongs to the (org, year) report envelope; create it lazily.
+  const report = await ensurePirReport(organizationId, year);
+  // Federal reports are immutable once submitted — enforce at the data layer
+  // so direct API calls can't bypass the UI's disabled state. Reopen first.
+  if (report.status !== "draft") {
+    throw new Error(`PIR ${year} is ${report.status} and locked. Reopen the report to edit values.`);
+  }
   const existing = await db.select().from(pirData).where(and(
     eq(pirData.organizationId, organizationId),
     eq(pirData.year, year),
     eq(pirData.questionId, questionId),
   ));
   if (existing.length > 0) {
-    await db.update(pirData).set({ value, updatedBy: updatedBy ?? null }).where(eq(pirData.id, existing[0].id));
+    await db.update(pirData).set({ value, updatedBy: updatedBy ?? null, reportId: report.id }).where(eq(pirData.id, existing[0].id));
     return { id: existing[0].id };
   }
-  const [result] = await db.insert(pirData).values({ organizationId, year, section, questionId, value, updatedBy: updatedBy ?? null });
+  const [result] = await db.insert(pirData).values({ organizationId, year, section, questionId, value, reportId: report.id, updatedBy: updatedBy ?? null });
   return { id: result.insertId };
+}
+
+/** PIR question catalog — global reference data (see scripts/seed-pir-questions.ts). */
+export async function getPirQuestions() {
+  const db = await requireDb();
+  return db.select().from(pirQuestions).where(eq(pirQuestions.isActive, 1)).orderBy(pirQuestions.sortOrder);
+}
+
+/** Get (or lazily create) the report envelope for an org + year. */
+export async function ensurePirReport(organizationId: number, year: string) {
+  const db = await requireDb();
+  const find = () => db.select().from(pirReports).where(and(
+    eq(pirReports.organizationId, organizationId),
+    eq(pirReports.year, year),
+  ));
+  const existing = await find();
+  if (existing.length > 0) return existing[0];
+  await db.insert(pirReports).values({ organizationId, year });
+  const [created] = await find();
+  return created;
+}
+
+/**
+ * Full PIR report for an org + year: the envelope, the question catalog, and
+ * each question's saved value (null when unanswered). The envelope is created
+ * on demand so the editor always has something to attach values to.
+ */
+export async function getPirReport(organizationId: number, year: string) {
+  const db = await requireDb();
+  const report = await ensurePirReport(organizationId, year);
+  const [questions, values] = await Promise.all([
+    db.select().from(pirQuestions).where(eq(pirQuestions.isActive, 1)).orderBy(pirQuestions.sortOrder),
+    db.select().from(pirData).where(and(
+      eq(pirData.organizationId, organizationId),
+      eq(pirData.year, year),
+    )),
+  ]);
+  const valueByCode = new Map(values.map(v => [v.questionId, v.value]));
+  const isAnswered = (v: string | null | undefined) => v !== undefined && v !== null && v !== "";
+  const answered = questions.filter(q => isAnswered(valueByCode.get(q.code))).length;
+  return {
+    report,
+    year,
+    totalQuestions: questions.length,
+    answeredQuestions: answered,
+    questions: questions.map(q => ({ ...q, value: valueByCode.get(q.code) ?? null })),
+  };
+}
+
+/** Mark a report submitted. Creates the envelope first if needed. */
+export async function submitPirReport(organizationId: number, year: string, submittedBy?: number | null) {
+  const db = await requireDb();
+  const report = await ensurePirReport(organizationId, year);
+  await db.update(pirReports)
+    .set({ status: "submitted", submittedBy: submittedBy ?? null, submittedAt: new Date() })
+    .where(eq(pirReports.id, report.id));
+  return { id: report.id, status: "submitted" as const };
+}
+
+/** Re-open a submitted report for further edits. */
+export async function reopenPirReport(organizationId: number, year: string) {
+  const db = await requireDb();
+  const report = await ensurePirReport(organizationId, year);
+  await db.update(pirReports)
+    .set({ status: "draft", submittedAt: null })
+    .where(eq(pirReports.id, report.id));
+  return { id: report.id, status: "draft" as const };
+}
+
+/**
+ * All PIR reports for an org (newest year first), each with its completion count
+ * (catalog questions answered with a non-empty value). Powers the inline,
+ * view-in-place report history — no per-report round trips for the summary.
+ */
+export async function listPirReports(organizationId: number) {
+  const db = await requireDb();
+  const [reports, questions, values] = await Promise.all([
+    db.select().from(pirReports).where(eq(pirReports.organizationId, organizationId)),
+    db.select({ code: pirQuestions.code }).from(pirQuestions).where(eq(pirQuestions.isActive, 1)),
+    db.select({ year: pirData.year, questionId: pirData.questionId, value: pirData.value })
+      .from(pirData).where(eq(pirData.organizationId, organizationId)),
+  ]);
+  const codes = new Set(questions.map(q => q.code));
+  const total = codes.size;
+  const answeredByYear = new Map<string, Set<string>>();
+  for (const v of values) {
+    if (!codes.has(v.questionId) || v.value === "" || v.value == null) continue;
+    if (!answeredByYear.has(v.year)) answeredByYear.set(v.year, new Set());
+    answeredByYear.get(v.year)!.add(v.questionId);
+  }
+  return reports
+    .map(r => ({ ...r, total, answered: answeredByYear.get(r.year)?.size ?? 0 }))
+    .sort((a, b) => b.year.localeCompare(a.year));
 }
 
 // ==================== CUSTOM REPORTS ====================
@@ -562,6 +1290,21 @@ export async function createCustomReport(data: InsertCustomReport) {
   const db = await requireDb();
   const [result] = await db.insert(customReports).values(data);
   return { id: result.insertId };
+}
+
+/**
+ * Was missing — ReportBuilder.tsx's "Edit" only worked by creating a
+ * duplicate (there was no way to update a saved report's own definition
+ * in place).
+ */
+export async function updateCustomReport(
+  id: number,
+  data: Partial<Pick<InsertCustomReport, "reportName" | "reportType" | "filters" | "columns">>
+) {
+  if (isEmptyPatch(data)) return { success: true };
+  const db = await requireDb();
+  await db.update(customReports).set(data).where(eq(customReports.id, id));
+  return { success: true };
 }
 
 /** Run a saved report against live data and return row data by report type. */
@@ -630,6 +1373,16 @@ export async function runCustomReport(reportId: number) {
   return { reportName: report.reportName, reportType: report.reportType, columns: report.columns, rows, generatedAt: new Date() };
 }
 
+/**
+ * Was missing — ReportBuilder.tsx's per-row Delete button had no backing
+ * mutation at all (list/create/run existed, delete didn't).
+ */
+export async function deleteCustomReport(reportId: number) {
+  const db = await requireDb();
+  await db.delete(customReports).where(eq(customReports.id, reportId));
+  return { success: true };
+}
+
 // ==================== DASHBOARD ====================
 
 export async function getDashboardStats(organizationId: number) {
@@ -686,4 +1439,88 @@ export async function getDashboardStats(organizationId: number) {
     openActionItems: openInsights.filter(i => !i.dismissedAt && i.actionRequired === 1).length,
     upcomingEvents: events.slice(0, 5),
   };
+}
+
+/** All device tokens for an org's staff/admin users (chronic-absence alerts etc.). */
+export async function getDeviceTokensForOrgStaff(organizationId: number): Promise<string[]> {
+  const db = await requireDb();
+  const rows = await db
+    .select({ token: deviceTokens.token })
+    .from(deviceTokens)
+    .innerJoin(users, eq(deviceTokens.userId, users.id))
+    .where(and(eq(users.organizationId, organizationId), inArray(users.role, ["admin", "staff"])));
+  return rows.map(r => r.token);
+}
+
+/**
+ * Kiosk check-in/out: upsert ONE child's attendance for today without
+ * touching anyone else's records (saveAttendanceForDate replaces the whole
+ * day, which would be catastrophic from a door tablet).
+ */
+export async function markAttendance(
+  organizationId: number,
+  childId: number,
+  action: "check_in" | "check_out" | "absent",
+  recordedBy?: number | null,
+) {
+  const db = await requireDb();
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+  const now = new Date();
+
+  const [existing] = await db
+    .select()
+    .from(attendance)
+    .where(and(
+      eq(attendance.organizationId, organizationId),
+      eq(attendance.childId, childId),
+      gte(attendance.date, startOfDay),
+      lte(attendance.date, endOfDay),
+    ))
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(attendance)
+      .set(
+        action === "check_in"
+          ? { status: "present", checkInTime: existing.checkInTime ?? now, checkOutTime: null }
+          : action === "check_out"
+            ? { status: "present", checkInTime: existing.checkInTime ?? now, checkOutTime: now }
+            : { status: "absent", checkInTime: null, checkOutTime: null },
+      )
+      .where(eq(attendance.id, existing.id));
+    return { id: existing.id, updated: true };
+  }
+
+  const [ins] = await db.insert(attendance).values({
+    organizationId,
+    childId,
+    date: startOfDay,
+    status: action === "absent" ? "absent" : "present",
+    checkInTime: action === "absent" ? null : now,
+    checkOutTime: action === "check_out" ? now : null,
+    recordedBy: recordedBy ?? null,
+  });
+  return { id: ins.insertId, updated: false };
+}
+
+/**
+ * Remove a mis-logged daily-report moment. Org-scoped through the child join
+ * (activity logs don't carry organizationId directly). Families see moments
+ * in real time, so staff need a way to pull back a wrong-child entry.
+ */
+export async function deleteActivityLog(id: number, organizationId: number) {
+  const db = await requireDb();
+  const [row] = await db
+    .select({ id: activityLogs.id })
+    .from(activityLogs)
+    .innerJoin(children, eq(activityLogs.childId, children.id))
+    .where(and(eq(activityLogs.id, id), eq(children.organizationId, organizationId)))
+    .limit(1);
+  if (!row) return { deleted: false };
+  await db.delete(activityLogs).where(eq(activityLogs.id, id));
+  return { deleted: true };
 }

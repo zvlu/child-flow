@@ -73,7 +73,11 @@ struct ApplicationVerificationView: View {
             }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
         .overlay { if viewModel.isLoading { ProgressView() } }
+        .alert("Not Saved", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") { viewModel.errorMessage = nil }
+        } message: { Text(viewModel.errorMessage ?? "") }
     }
 }
 
@@ -326,6 +330,7 @@ extension ToggleStyle where Self == CheckmarkToggleStyle {
 class VerificationViewModel: ObservableObject {
     @Published var verifications: [ApplicationVerification] = []
     @Published var isLoading = false
+    @Published var errorMessage: String?
 
     func load() async {
         isLoading = true
@@ -344,7 +349,15 @@ class VerificationViewModel: ObservableObject {
             verifications[idx] = verification
         }
         Task {
-            do { _ = try await APIClient.shared.saveVerification(verification: verification) } catch {}
+            do {
+                _ = try await APIClient.shared.saveVerification(verification: verification)
+            } catch {
+                // POST /api/enrollment/verifications/:id is implemented and working
+                // (see server/enrollmentVerificationsRest.ts) — a failure here is a
+                // genuine network/auth/server error, not a missing route. Surface it
+                // instead of silently pretending the checklist saved.
+                errorMessage = "Couldn't save checklist changes: \((error as? LocalizedError)?.errorDescription ?? "please try again.")"
+            }
         }
     }
 

@@ -52,6 +52,7 @@ struct AttendanceView: View {
                         AttendanceRow(
                             record: $record,
                             hasNote: viewModel.notedChildIds.contains(record.childId),
+                            clearance: viewModel.clearanceMap[record.childId],
                             onNote: { noteTarget = record },
                             onChange: { viewModel.hasChanges = true }
                         )
@@ -69,13 +70,22 @@ struct AttendanceView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(justSaved ? "Saved ✓" : "Save") {
-                        viewModel.saveAll()
-                        justSaved = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { justSaved = false }
+                    HStack(spacing: 10) {
+                        NavigationLink { ChronicAbsenceView() } label: {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                        }
+                        Button(justSaved ? "Saved ✓" : "Save") {
+                            Task {
+                                let succeeded = await viewModel.saveAll()
+                                guard succeeded else { return }
+                                justSaved = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { justSaved = false }
+                            }
+                        }
+                        .fontWeight(.semibold)
+                        .disabled(viewModel.records.isEmpty)
                     }
-                    .fontWeight(.semibold)
-                    .disabled(viewModel.records.isEmpty)
                 }
             }
             .sheet(isPresented: $showMenu) { AppMenuSheet() }
@@ -85,6 +95,10 @@ struct AttendanceView: View {
                 }
             }
             .task { await viewModel.load() }
+            .refreshable { await viewModel.load() }
+            .alert("Couldn't Save", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK") { viewModel.errorMessage = nil }
+            } message: { Text(viewModel.errorMessage ?? "") }
             .overlay {
                 if viewModel.isLoading { ProgressView() }
             }
@@ -95,6 +109,10 @@ struct AttendanceView: View {
 struct AttendanceRow: View {
     @Binding var record: AttendanceRecord
     let hasNote: Bool
+    /// nil while clearance hasn't loaded yet, or if the org has no clearance
+    /// record for this child. Non-blocking — staff can still mark attendance
+    /// regardless (e.g. during an emergency).
+    var clearance: ChildClearanceStatus? = nil
     let onNote: () -> Void
     let onChange: () -> Void
 
@@ -121,6 +139,9 @@ struct AttendanceRow: View {
                     }
                 }
                 Spacer()
+                if let clearance, !clearance.cleared {
+                    ClearanceWarningBadge(childName: record.childName, blockers: clearance.blockers)
+                }
                 Button(action: onNote) {
                     Image(systemName: hasNote ? "checkmark.circle.fill" : "note.text.badge.plus")
                         .font(.system(size: 18))
@@ -194,6 +215,10 @@ class AttendanceViewModel: ObservableObject {
     @Published var notedChildIds: Set<String> = []
     @Published var hasChanges = false
     @Published var isLoading = false
+    @Published var errorMessage: String?
+    /// "Cleared to attend" status keyed by childId, org-wide — one request
+    /// instead of one per child. See ios/Sources/Networking/ParticipationClearance.swift.
+    @Published var clearanceMap: [String: ChildClearanceStatus] = [:]
 
     var presentCount: Int { records.filter { $0.status == .present || $0.status == .halfDay }.count }
     var totalCount: Int { records.count }
@@ -220,6 +245,10 @@ class AttendanceViewModel: ObservableObject {
             }
             #endif
         }
+        // Supplementary, non-blocking data — a failure here shouldn't stop
+        // attendance from loading, so it's fetched independently and swallowed
+        // on error (the warning badges just won't show for this refresh).
+        clearanceMap = (try? await APIClient.shared.getClearanceMap()) ?? clearanceMap
         isLoading = false
     }
 
@@ -234,12 +263,18 @@ class AttendanceViewModel: ObservableObject {
         Task { await load() }
     }
 
-    func saveAll() {
-        Task {
-            do {
-                try await APIClient.shared.saveAttendance(records: records)
-                hasChanges = false
-            } catch {}
+    /// Returns whether the save actually succeeded — the caller used to show
+    /// "Saved ✓" on a fixed timer regardless of the outcome, so a failed save
+    /// looked identical to a successful one.
+    @discardableResult
+    func saveAll() async -> Bool {
+        do {
+            try await APIClient.shared.saveAttendance(records: records)
+            hasChanges = false
+            return true
+        } catch {
+            errorMessage = "Attendance wasn't saved. Check your connection and try again."
+            return false
         }
     }
 
@@ -249,7 +284,9 @@ class AttendanceViewModel: ObservableObject {
             do {
                 try await APIClient.shared.addQuickNote(childId: childId, content: content)
                 notedChildIds.insert(childId)
-            } catch {}
+            } catch {
+                errorMessage = "This note wasn't saved. Check your connection and try again."
+            }
         }
     }
 }

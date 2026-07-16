@@ -1,10 +1,11 @@
-import { useMemo } from "react";
-import { Link } from "wouter";
+import { useEffect, useMemo } from "react";
+import { Link, useLocation } from "wouter";
 import { motion, useReducedMotion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from "recharts";
@@ -15,15 +16,49 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
+import { useActionItems } from "@/hooks/useActionItems";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { OnboardingChecklist } from "@/components/OnboardingChecklist";
+import { AuditReadiness } from "@/components/AuditReadiness";
+import { useOrgModules } from "@/hooks/useOrgModules";
 
-const quickActions = [
+/** Every quick action; each signed-in role sees its own six, most relevant first. */
+const QUICK_ACTION_POOL = [
   { label: "Take Attendance", href: "/attendance", icon: ClipboardCheck, color: "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200" },
   { label: "Add Child", href: "/enrollment", icon: Baby, color: "bg-green-50 text-green-700 hover:bg-green-100 border-green-200" },
   { label: "Health Records", href: "/health", icon: Heart, color: "bg-red-50 text-red-700 hover:bg-red-100 border-red-200" },
   { label: "Family Services", href: "/family-services", icon: Home, color: "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200" },
   { label: "Run Report", href: "/reports", icon: Activity, color: "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200" },
   { label: "Compliance", href: "/compliance", icon: ShieldCheck, color: "bg-[#F1F6F2] text-[#3C5E47] hover:bg-[#E7F0E9] border-[#CFE0D3]" },
+  { label: "Case Loads", href: "/caseloads", icon: Users, color: "bg-teal-50 text-teal-700 hover:bg-teal-100 border-teal-200" },
+  { label: "Meal Planning", href: "/meal-planning", icon: Activity, color: "bg-lime-50 text-lime-700 hover:bg-lime-100 border-lime-200" },
+  { label: "Lesson Planning", href: "/lesson-planning", icon: Calendar, color: "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200" },
+  { label: "Health Deadlines", href: "/health-deadlines", icon: Bell, color: "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200" },
+  { label: "Daily Reports", href: "/daily-reports", icon: Activity, color: "bg-pink-50 text-pink-700 hover:bg-pink-100 border-pink-200" },
+  { label: "Billing", href: "/billing", icon: Activity, color: "bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200" },
 ];
+
+/**
+ * §1302.91 role → the pages that role opens first every morning. Anything
+ * unlisted falls back to the generic ordering above.
+ */
+const ROLE_QUICK_PRIORITY: Record<string, string[]> = {
+  nurse: ["/health", "/health-deadlines", "/children"],
+  health_coordinator: ["/health", "/health-deadlines", "/compliance"],
+  nutritionist: ["/meal-planning", "/health", "/reports"],
+  mental_health_consultant: ["/family-services", "/children"],
+  disabilities_coordinator: ["/family-services", "/children", "/compliance"],
+  education_coordinator: ["/lesson-planning", "/daily-reports", "/reports"],
+  coach: ["/lesson-planning", "/daily-reports"],
+  family_advocate: ["/caseloads", "/family-services"],
+  family_services_manager: ["/caseloads", "/family-services"],
+  home_visitor: ["/caseloads", "/family-services"],
+  ersea_coordinator: ["/enrollment", "/attendance", "/compliance"],
+  teacher: ["/attendance", "/daily-reports", "/lesson-planning"],
+  assistant: ["/attendance", "/daily-reports"],
+  fiscal_officer: ["/billing", "/reports"],
+  director: ["/compliance", "/reports", "/caseloads"],
+};
 
 const severityColors: Record<string, string> = {
   high: "bg-red-100 text-red-700 border-red-200",
@@ -68,16 +103,56 @@ export default function Dashboard() {
   }, []);
 
   const reduced = useReducedMotion() ?? false;
-  const { data: stats, isLoading: statsLoading } = trpc.dashboard.stats.useQuery(ORGANIZATION_ID);
-  const { data: followUps } = trpc.health.followUps.useQuery({ organizationId: ORGANIZATION_ID });
-  const { data: insights } = trpc.aiInsights.list.useQuery({ organizationId: ORGANIZATION_ID });
+  const { user: authUser, loading: authLoading } = useAuth();
+  const [, setLocation] = useLocation();
+
+  // This is the staff/admin operations dashboard — every query below assumes
+  // an org-scoped staff session. Sign-in used to send every account here
+  // regardless of role, so a parent landed on a page full of staff-only
+  // queries that just fail auth and never resolve, leaving the loading
+  // skeletons on screen forever. Parents belong on /parent-portal instead.
+  const isParent = authUser?.role === "parent";
+  useEffect(() => {
+    if (!authLoading && isParent) setLocation("/parent-portal");
+  }, [authLoading, isParent, setLocation]);
+
+  const { data: stats, isLoading: statsLoading } = trpc.dashboard.stats.useQuery(ORGANIZATION_ID, { enabled: !isParent });
+  // Role-aware quick actions: the signed-in staff member's most-used pages
+  // come first (nurse sees Health, nutritionist sees Meal Planning, …).
+  const { data: myRole } = trpc.staff.myRole.useQuery(undefined, { enabled: !isParent });
+  const hasHeadStart = useOrgModules().has("head_start");
+  const quickActions = useMemo(() => {
+    // Admin-only destinations never appear as quick actions for staff.
+    const ADMIN_ONLY_ACTIONS = new Set(["/billing", "/compliance"]);
+    // These are Head Start-only pages (§1302 compliance features) — a
+    // core-only daycare would just hit a "not enabled" wall, so don't
+    // dangle them as quick actions in the first place.
+    const HEAD_START_ONLY_ACTIONS = new Set(["/family-services", "/compliance", "/caseloads", "/health-deadlines"]);
+    const pool = QUICK_ACTION_POOL
+      .filter((a) => authUser?.role === "admin" || !ADMIN_ONLY_ACTIONS.has(a.href))
+      .filter((a) => hasHeadStart || !HEAD_START_ONLY_ACTIONS.has(a.href));
+    const priority = ROLE_QUICK_PRIORITY[myRole?.role ?? ""] ?? [];
+    const rank = (href: string) => {
+      const i = priority.indexOf(href);
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    return [...pool]
+      .map((a, i) => ({ a, i }))
+      .sort((x, y) => rank(x.a.href) - rank(y.a.href) || x.i - y.i)
+      .map(({ a }) => a)
+      .slice(0, 6);
+  }, [myRole, authUser, hasHeadStart]);
+
+  // Unified action feed (shared with the Action Queue page) — health
+  // follow-ups, AI insights, documents, credentials, chronic absence.
+  const { items: actionItems } = useActionItems();
   const { data: attendanceRows } = trpc.attendance.getRange.useQuery({
     organizationId: ORGANIZATION_ID,
     start: rangeStart,
     end: rangeEnd,
-  });
-  const { data: healthRecords } = trpc.health.list.useQuery({ organizationId: ORGANIZATION_ID });
-  const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID);
+  }, { enabled: !isParent });
+  const { data: healthRecords } = trpc.health.list.useQuery({ organizationId: ORGANIZATION_ID }, { enabled: !isParent });
+  const { data: children } = trpc.children.list.useQuery(ORGANIZATION_ID, { enabled: !isParent });
 
   // ---- KPI cards (derived from dashboard.stats) ----
   const kpiCards = useMemo(() => {
@@ -164,7 +239,8 @@ export default function Dashboard() {
     if (!healthRecords) return [];
     const counts = new Map<string, number>();
     for (const rec of healthRecords) {
-      counts.set(rec.status, (counts.get(rec.status) ?? 0) + 1);
+      const status = rec.status ?? "unknown";
+      counts.set(status, (counts.get(status) ?? 0) + 1);
     }
     return Array.from(counts.entries()).map(([status, value]) => ({
       name: HEALTH_STATUS_LABELS[status] ?? formatTypeLabel(status),
@@ -173,35 +249,18 @@ export default function Dashboard() {
     }));
   }, [healthRecords]);
 
-  // ---- Alerts: health follow-ups + actionable AI insights ----
+  // ---- "Needs attention today": top open items from the unified feed ----
   const alerts = useMemo(() => {
-    const items: { id: string; message: string; severity: "high" | "medium" | "low"; time: string; href: string }[] = [];
-    for (const fu of followUps ?? []) {
-      items.push({
-        id: `health-${fu.recordId}`,
-        message: fu.message || `${formatTypeLabel(fu.type)} follow-up for ${fu.childName}`,
-        severity: fu.severity === "overdue" ? "high" : "medium",
-        time:
-          fu.severity === "overdue"
-            ? `Overdue by ${Math.abs(fu.daysUntilDue)} days`
-            : `Due in ${fu.daysUntilDue} days`,
-        // Land directly on Health pre-filtered to the slice that needs action.
-        href: fu.severity === "overdue" ? "/health?status=overdue" : "/health?status=due_soon",
-      });
-    }
-    for (const ins of insights ?? []) {
-      if (ins.actionRequired !== 1) continue;
-      items.push({
-        id: `insight-${ins.id}`,
-        message: ins.title,
-        severity: ins.priority === "critical" || ins.priority === "high" ? "high" : ins.priority === "medium" ? "medium" : "low",
-        time: new Date(ins.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-        href: "/action-queue",
-      });
-    }
-    const rank = { high: 0, medium: 1, low: 2 } as const;
-    return items.sort((a, b) => rank[a.severity] - rank[b.severity]);
-  }, [followUps, insights]);
+    return actionItems
+      .filter((item) => item.status !== "completed")
+      .map((item) => ({
+        id: item.id,
+        message: item.title,
+        severity: (item.status === "urgent" ? "high" : "medium") as "high" | "medium" | "low",
+        time: item.due,
+        href: item.href ?? "/action-queue",
+      }));
+  }, [actionItems]);
 
   // ---- Upcoming events (from dashboard.stats) ----
   const upcomingEvents = stats?.upcomingEvents ?? [];
@@ -258,10 +317,36 @@ export default function Dashboard() {
       });
   }, [healthRecords]);
 
-  if (statsLoading) {
+  if (authLoading || isParent) {
+    // Parent accounts are redirected to /parent-portal above; this staff
+    // dashboard's queries are disabled for them (`enabled: !isParent`), so
+    // `statsLoading` below would otherwise stay true forever instead of the
+    // redirect ever getting a chance to render something else.
     return (
-      <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (statsLoading) {
+    // Skeleton mirrors the real layout so the page doesn't jump when data lands.
+    return (
+      <div className="p-6 space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-44" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-24 rounded-xl" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Skeleton className="h-72 rounded-xl" />
+          <Skeleton className="h-72 rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -281,6 +366,12 @@ export default function Dashboard() {
           </Badge>
         </div>
       </div>
+
+      {/* First-run setup guide — renders only while setup is incomplete */}
+      <OnboardingChecklist />
+
+      {/* Live audit-readiness tile (Head Start orgs) */}
+      <AuditReadiness compact />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -449,9 +540,16 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
-                Action Items
+                Needs Attention Today
               </CardTitle>
-              <Badge variant="secondary">{alerts.length}</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{alerts.length}</Badge>
+                <Link href="/action-queue">
+                  <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                    View all <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -553,7 +651,10 @@ export default function Dashboard() {
               <ShieldCheck className="h-4 w-4 text-primary" />
               Compliance Overview
             </CardTitle>
-            <Link href="/compliance">
+            {/* This card is health-record completion (immunizations, physicals…)
+                — a core feature every org has, so it links to Health, not the
+                Head Start-only /compliance (PIR) page. */}
+            <Link href="/health">
               <Button variant="ghost" size="sm" className="gap-1 text-xs">
                 Full Report <ArrowRight className="h-3 w-3" />
               </Button>

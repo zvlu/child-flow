@@ -35,7 +35,9 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
       clearCookie: (name: string, options: Record<string, unknown>) => {
         clearedCookies.push({ name, options });
       },
-    } as TrpcContext["res"],
+      // Logout also sets the dev-auth bypass opt-out cookie; a no-op is fine here.
+      cookie: () => {},
+    } as unknown as TrpcContext["res"],
   };
 
   return { ctx, clearedCookies };
@@ -54,7 +56,8 @@ describe("auth.logout", () => {
     expect(clearedCookies[0]?.options).toMatchObject({
       maxAge: -1,
       secure: true,
-      sameSite: "none",
+      // CSRF-hardened: the session cookie is SameSite=Strict (see getSessionCookieOptions).
+      sameSite: "strict",
       httpOnly: true,
       path: "/",
     });

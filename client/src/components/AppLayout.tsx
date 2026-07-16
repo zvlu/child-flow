@@ -4,7 +4,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { ORGANIZATION_ID } from "@/const";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,7 +30,6 @@ import {
   Moon,
   LogOut,
   UserCircle,
-  Baby,
   BookOpen,
   Printer,
   Briefcase,
@@ -45,73 +44,20 @@ import {
   Clock,
   FileSignature,
   Layers,
-  School
+  School,
+  Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
 import { CommandPalette } from "./CommandPalette";
-
-const topNavItems = [
-  { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
-  { path: "/communication", label: "Communication", icon: MessageSquare },
-  { path: "/calendar", label: "Calendar", icon: CalendarDays },
-  { path: "/reports", label: "Reports", icon: FileText },
-  { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
-  { path: "/performance", label: "Performance Panel", icon: BarChart3 },
-  { path: "/billing", label: "Billing", icon: DollarSign },
-  { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
-  { path: "/staff-operations", label: "Staff Operations", icon: Clock },
-  { path: "/bulk-actions", label: "Bulk Actions", icon: Layers },
-];
-const TOP_NAV_PRIMARY_COUNT = 5;
-
-const sideNavSections = [
-  {
-    title: "Core",
-    items: [
-      { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { path: "/children", label: "Children", icon: Baby },
-      { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
-      { path: "/staff", label: "Staff", icon: UserCog },
-      { path: "/family-services", label: "Family Services", icon: Home },
-      { path: "/classrooms", label: "Classrooms", icon: School },
-    ],
-  },
-  {
-    title: "Operations",
-    items: [
-      { path: "/enrollment", label: "Enrollment", icon: BookOpen },
-      { path: "/health", label: "Health Records", icon: Heart },
-      { path: "/calendar", label: "Calendar", icon: CalendarDays },
-      { path: "/documents", label: "Documents", icon: FileText },
-      { path: "/digital-documents", label: "E-Signatures", icon: FileSignature },
-      { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
-      { path: "/bulk-actions", label: "Bulk Actions", icon: Layers },
-      { path: "/compliance", label: "Compliance", icon: ShieldCheck },
-    ],
-  },
-  {
-    title: "Business",
-    items: [
-      { path: "/billing", label: "Billing", icon: DollarSign },
-      { path: "/meal-planning", label: "Meal Planning", icon: UtensilsCrossed },
-      { path: "/staff-operations", label: "Staff Operations", icon: Clock },
-      { path: "/parent-portal", label: "Parent Portal", icon: Users },
-    ],
-  },
-  {
-    title: "Insights",
-    items: [
-      { path: "/performance", label: "Performance Panel", icon: BarChart3 },
-      { path: "/reports", label: "Reports", icon: FileText },
-      { path: "/report-builder", label: "Report Builder", icon: Zap },
-      { path: "/ai-insights", label: "AI Insights", icon: Zap },
-      { path: "/settings", label: "Settings", icon: Settings },
-    ],
-  },
-];
+import {
+  TOP_NAV_PRIMARY_COUNT,
+  ALL_SIDE_NAV_ITEMS,
+  applyTopNav,
+  applySideNav,
+} from "@/config/nav";
+import { useOrgModules } from "@/hooks/useOrgModules";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -119,31 +65,40 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [moreToolsOpen, setMoreToolsOpen] = useState(false);
+  // Collapsible sidebar clusters. Seeded from each section's defaultOpen and
+  // remembered per browser so the sidebar reopens the way you left it.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem("sprout.nav.sections");
+      if (saved) return JSON.parse(saved);
+    } catch { /* fresh defaults below */ }
+    return {};
+  });
+  const toggleSection = (title: string, fallback: boolean) => {
+    setOpenSections((prev) => {
+      const next = { ...prev, [title]: !(prev[title] ?? fallback) };
+      try { localStorage.setItem("sprout.nav.sections", JSON.stringify(next)); } catch { /* best effort */ }
+      return next;
+    });
+  };
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [location, navigate] = useLocation();
   const { user, logout, loading } = useAuth();
   const { theme, setTheme } = useTheme();
-  const topNavPrimaryItems = topNavItems.slice(0, TOP_NAV_PRIMARY_COUNT);
-  const topNavOverflowItems = topNavItems.slice(TOP_NAV_PRIMARY_COUNT);
-
-  const handleTopNavAction = (label: string) => {
-    toast.info(`${label} module selected`);
-  };
+  // Apply the signed-in user's saved layout (hide + reorder); falls back to
+  // app defaults when there are no preferences.
+  const navPrefs = (user as any)?.settings?.navigation ?? null;
+  const navRole = ((user as any)?.role ?? "staff") as "admin" | "staff" | "parent";
+  const isOwner = Boolean((user as any)?.isOwner);
+  const orgModules = useOrgModules();
+  const effectiveTopNav = applyTopNav(navPrefs, navRole, orgModules);
+  const effectiveSideSections = applySideNav(navPrefs, navRole, orgModules);
+  const topNavPrimaryItems = effectiveTopNav.slice(0, TOP_NAV_PRIMARY_COUNT);
+  const topNavOverflowItems = effectiveTopNav.slice(TOP_NAV_PRIMARY_COUNT);
 
   const isTopNavActive = (path: string) => location === path || location.startsWith(`${path}/`);
   const isNavItemActive = (path: string) => location === path || (path !== "/dashboard" && location.startsWith(path));
-  const allSideNavItems = sideNavSections.flatMap((section) => section.items);
-  const moreToolsItems = [
-    { path: "/bulk-actions", label: "Bulk Actions", icon: Zap },
-    { path: "/billing", label: "Billing", icon: FileText },
-    { path: "/parent-portal", label: "Parent Portal", icon: Home },
-    { path: "/meal-planning", label: "Meal Planning", icon: FileText },
-    { path: "/staff-operations", label: "Staff Ops", icon: UserCog },
-    { path: "/report-builder", label: "Report Builder", icon: BarChart3 },
-  ];
-  const activeMoreTool = moreToolsItems.some((item) => isNavItemActive(item.path));
-  const showMoreTools = moreToolsOpen || activeMoreTool;
+  const allSideNavItems = ALL_SIDE_NAV_ITEMS;
   const { data: healthFollowUps = [] } = trpc.health.followUps.useQuery(
     { organizationId: ORGANIZATION_ID, dueWithinDays: 30 },
     { refetchInterval: 60_000 }
@@ -153,6 +108,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
   // Aggregated notifications for the bell (health, attendance, absences,
   // messages, documents) — same engine as the dashboard, refreshed each minute.
   const { data: bellAlerts = [] } = trpc.dashboard.alerts.useQuery(undefined, { refetchInterval: 60_000 });
+  // Real job title (e.g. "Family Advocate", "Center Director") beats the
+  // generic access tier ("staff"/"admin") everywhere we show who's signed in.
+  const { data: myStaffRole } = trpc.staff.myRole.useQuery(undefined, { enabled: navRole !== "parent" });
+  const displayTitle =
+    myStaffRole?.position ||
+    (navRole === "admin" ? "Administrator" : navRole === "parent" ? "Parent" : "Staff");
   const alertHref = (a: { type: string; filter?: string }) => {
     switch (a.type) {
       case "health": return `/health?status=${a.filter === "Overdue" ? "overdue" : "due_soon"}`;
@@ -166,9 +127,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const alertAccent = (type: string) =>
     type === "health" || type === "attendance" ? "text-destructive"
     : type === "absence" ? "text-amber-600"
-    : type === "message" ? "text-blue-600" : "text-slate-600";
+    : type === "message" ? "text-blue-600" : "text-muted-foreground";
 
   if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    navigate("/signin");
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -187,17 +157,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-white/85 hover:text-white hover:bg-white/10 md:hidden"
+          className="h-8 w-8 text-white/85 hover:text-white hover:bg-card/10 md:hidden"
           onClick={() => setMobileNavOpen(true)}
           aria-label="Open navigation"
         >
           <Menu className="h-4 w-4" />
         </Button>
         <div className="flex items-center gap-2 mr-4">
-          <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
-            <Baby className="h-4 w-4 text-white" />
-          </div>
-          <span className="font-bold text-base tracking-tight">Sprout</span>
+          <img src="/brand/logo-mark-64.png" alt="Sprout" className="w-9 h-9 rounded-lg" />
+          <span className="font-bold text-lg tracking-tight">Sprout</span>
         </div>
         
         <nav className="hidden md:flex flex-1 items-center h-full min-w-0 overflow-x-auto no-scrollbar">
@@ -209,8 +177,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   className={cn(
                     "px-3 md:px-4 h-full flex items-center text-xs font-semibold transition-colors whitespace-nowrap border-b-2 border-transparent",
                     isActive 
-                      ? "bg-white/20 text-white border-white"
-                      : "hover:bg-white/10 text-white/85 hover:text-white"
+                      ? "bg-card/20 text-white border-white"
+                      : "hover:bg-card/10 text-white/85 hover:text-white"
                   )}
                 >
                   {item.label}
@@ -225,22 +193,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <Button
                   variant="ghost"
                   className={cn(
-                    "h-full rounded-none px-3 md:px-4 text-xs font-semibold text-white/85 hover:text-white hover:bg-white/10 border-b-2 border-transparent",
-                    topNavOverflowItems.some((item) => isTopNavActive(item.path)) && "bg-white/20 text-white border-white"
+                    "h-full rounded-none px-3 md:px-4 text-xs font-semibold text-white/85 hover:text-white hover:bg-card/10 border-b-2 border-transparent",
+                    topNavOverflowItems.some((item) => isTopNavActive(item.path)) && "bg-card/20 text-white border-white"
                   )}
                 >
                   More
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56 rounded-xl">
+              <DropdownMenuContent align="start" sideOffset={8} className="w-60 rounded-xl overflow-hidden p-1.5">
                 {topNavOverflowItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = isTopNavActive(item.path);
                   return (
-                    <DropdownMenuItem key={item.path} asChild>
+                    <DropdownMenuItem key={item.path} asChild className="rounded-lg px-2.5 py-2.5 focus:bg-primary/[0.06]">
                       <Link href={item.path} asChild>
-                        <a className={cn("flex items-center gap-2", isActive && "font-semibold")}>
-                          <Icon className="h-4 w-4" />
+                        <a className={cn(
+                          "flex items-center gap-2.5 text-sm",
+                          isActive ? "text-primary font-semibold" : "text-foreground"
+                        )}>
+                          <Icon className={cn("h-4 w-4", isActive ? "text-primary" : "text-muted-foreground")} />
                           {item.label}
                         </a>
                       </Link>
@@ -256,25 +227,50 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <div className="hidden xl:block">
             <CommandPalette />
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10" onClick={() => handleTopNavAction("Print")}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-card/10" onClick={() => window.print()}>
             <Printer className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10" onClick={() => navigate("/settings")} aria-label="Account & settings">
-            <UserCircle className="h-4 w-4" />
-          </Button>
+          {/* Account menu — identity, settings, theme, sign out. */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/10">
-                <MoreHorizontal className="h-4 w-4" />
+              <Button
+                variant="ghost"
+                className="h-9 gap-2 px-1.5 text-white/85 hover:text-white hover:bg-card/10"
+                aria-label="Account menu"
+              >
+                <Avatar className="h-7 w-7">
+                  <AvatarImage src={(user as any)?.avatarUrl ?? undefined} alt={user?.name ?? "Account"} />
+                  <AvatarFallback className="text-[11px] bg-white/15 text-white">{initials}</AvatarFallback>
+                </Avatar>
+                <span className="hidden lg:block max-w-[120px] truncate text-xs font-medium">
+                  {user?.name ?? "Account"}
+                </span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 rounded-xl">
+            <DropdownMenuContent align="end" className="w-60 rounded-xl">
+              <div className="px-3 py-2">
+                <p className="text-sm font-medium truncate">{user?.name ?? "Signed in"}</p>
+                {user?.email && (
+                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                )}
+                <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mt-1">
+                  {displayTitle}
+                </p>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate("/settings")}>
+                <UserCircle className="h-4 w-4 mr-2" />
+                Account &amp; Settings
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
                 {theme === "dark" ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
                 Toggle Theme
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => logout()}>
+              <DropdownMenuItem
+                onClick={() => logout()}
+                className="text-red-600 focus:text-red-600"
+              >
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
               </DropdownMenuItem>
@@ -319,60 +315,36 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
 
           <nav className="flex-1 overflow-y-auto py-4 px-2">
-            <div className="space-y-4">
-              {sideNavSections.map((section) => (
-                <div key={section.title}>
-                  {sidebarOpen && (
-                    <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-sidebar-foreground/40">
-                      {section.title}
-                    </p>
-                  )}
-                  <ul className="space-y-1">
-                    {section.items.map((item) => {
-                      const Icon = item.icon;
-                      const isActive = isNavItemActive(item.path);
-                      return (
-                        <li key={item.path}>
-                          <Link href={item.path} asChild>
-                            <a
-                              onClick={() => setMobileNavOpen(false)}
-                              className={cn(
-                                "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-150",
-                                isActive
-                                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                              )}
-                            >
-                              <Icon className="h-4 w-4 flex-shrink-0" />
-                              {sidebarOpen && <span className="flex-1 truncate">{item.label}</span>}
-                            </a>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
-
-              <div className="pt-1">
-                {sidebarOpen ? (
-                  <>
-                    <button
-                      onClick={() => setMoreToolsOpen(!moreToolsOpen)}
+            <div className="space-y-2">
+              {effectiveSideSections.map((section) => {
+                const sectionActive = section.items.some((item) => isNavItemActive(item.path));
+                // Collapsed rail (icons only) always shows items; a section with
+                // the current page inside stays open regardless of the toggle.
+                const isOpen = !sidebarOpen || sectionActive || (openSections[section.title] ?? section.defaultOpen ?? true);
+                return (
+                  <div key={section.title}>
+                    {sidebarOpen && (
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(section.title, section.defaultOpen ?? true)}
+                        aria-expanded={isOpen}
+                        className={cn(
+                          "w-full flex items-center gap-1.5 px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider transition-colors",
+                          sectionActive ? "text-sidebar-foreground/80" : "text-sidebar-foreground/40 hover:text-sidebar-foreground/70"
+                        )}
+                      >
+                        <ChevronRight className={cn("h-3 w-3 transition-transform duration-200", isOpen && "rotate-90")} />
+                        <span className="flex-1 text-left">{section.title}</span>
+                      </button>
+                    )}
+                    <div
                       className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-150",
-                        activeMoreTool
-                          ? "bg-sidebar-primary/15 text-sidebar-foreground"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        "grid transition-[grid-template-rows] duration-200 ease-out",
+                        isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
                       )}
                     >
-                      <Briefcase className="h-4 w-4 flex-shrink-0" />
-                      <span className="flex-1 text-left">More tools</span>
-                      <ChevronRight className={cn("h-4 w-4 transition-transform", showMoreTools && "rotate-90")} />
-                    </button>
-                    {showMoreTools && (
-                      <ul className="space-y-1 mt-1 pl-2">
-                        {moreToolsItems.map((item) => {
+                      <ul className="space-y-1 overflow-hidden">
+                        {section.items.map((item) => {
                           const Icon = item.icon;
                           const isActive = isNavItemActive(item.path);
                           return (
@@ -381,37 +353,51 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                 <a
                                   onClick={() => setMobileNavOpen(false)}
                                   className={cn(
-                                    "flex items-center gap-3 px-3 py-2 rounded-lg text-[12px] font-semibold transition-all duration-150",
+                                    "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-150",
                                     isActive
                                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                                       : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                                   )}
                                 >
                                   <Icon className="h-4 w-4 flex-shrink-0" />
-                                  <span className="flex-1 truncate">{item.label}</span>
+                                  {sidebarOpen && <span className="flex-1 truncate">{item.label}</span>}
                                 </a>
                               </Link>
                             </li>
                           );
                         })}
                       </ul>
-                    )}
-                  </>
-                ) : (
-                  <button
-                    onClick={() => setMoreToolsOpen(!moreToolsOpen)}
-                    className={cn(
-                      "w-full flex items-center justify-center px-3 py-2 rounded-lg transition-all duration-150",
-                      activeMoreTool
-                        ? "bg-sidebar-primary/15 text-sidebar-foreground"
-                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                    )}
-                    aria-label="Toggle more tools"
-                  >
-                    <Briefcase className="h-4 w-4 flex-shrink-0" />
-                  </button>
-                )}
-              </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {isOwner && (
+                <div>
+                  {sidebarOpen && (
+                    <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-sidebar-foreground/40">Platform</p>
+                  )}
+                  <ul className="space-y-1">
+                    <li>
+                      <Link href="/org-admin" asChild>
+                        <a
+                          onClick={() => setMobileNavOpen(false)}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-bold transition-all duration-150",
+                            isNavItemActive("/org-admin")
+                              ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          )}
+                        >
+                          <Building2 className="h-4 w-4 flex-shrink-0" />
+                          {sidebarOpen && <span className="flex-1 truncate">Organizations</span>}
+                        </a>
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+              )}
+
             </div>
           </nav>
 
@@ -420,14 +406,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <div className="p-3 border-t border-sidebar-border">
               <div className="flex items-center gap-3 w-full p-2 rounded-lg bg-sidebar-accent/50">
                 <Avatar className="h-8 w-8 flex-shrink-0">
+                  {(user as any)?.avatarUrl ? (
+                    <AvatarImage src={(user as any).avatarUrl} alt={user?.name || "Profile picture"} className="object-cover" />
+                  ) : null}
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <p className="text-[12px] font-bold text-sidebar-foreground truncate">{user?.name || "User"}</p>
-                  <p className="text-[10px] text-sidebar-foreground/50 truncate uppercase font-bold tracking-tighter">{user?.role || "Staff"}</p>
+                  <p className="text-[10px] text-sidebar-foreground/50 truncate uppercase font-bold tracking-tighter">{displayTitle}</p>
                 </div>
+                <button
+                  onClick={() => logout()}
+                  className="p-1.5 rounded-md text-sidebar-foreground/60 hover:text-red-500 hover:bg-sidebar-accent transition-colors flex-shrink-0"
+                  title="Sign out"
+                  aria-label="Sign out"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
               </div>
             </div>
           )}
@@ -436,23 +433,23 @@ export default function AppLayout({ children }: AppLayoutProps) {
         {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Page Header (Breadcrumb style) */}
-          <header className="h-10 border-b border-border bg-white flex items-center px-3 md:px-6 gap-3 md:gap-4 flex-shrink-0">
+          <header className="h-10 border-b border-border bg-card flex items-center px-3 md:px-6 gap-3 md:gap-4 flex-shrink-0">
             <div className="flex-1 flex items-center gap-2">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Sprout</span>
-              <ChevronRight className="h-3 w-3 text-slate-300" />
-              <h2 className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Sprout</span>
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+              <h2 className="text-[11px] font-bold text-foreground uppercase tracking-widest">
                 {allSideNavItems.find((i) => isNavItemActive(i.path))?.label || "Dashboard"}
               </h2>
             </div>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+              <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground">
                 <CalendarIcon className="h-3 w-3" />
                 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-7 w-7 relative" aria-label={`Notifications${bellAlerts.length ? `, ${bellAlerts.length} new` : ""}`}>
-                    <Bell className="h-3.5 w-3.5 text-slate-400" />
+                    <Bell className="h-3.5 w-3.5 text-muted-foreground" />
                     {bellAlerts.length > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 min-w-[15px] h-[15px] px-1 flex items-center justify-center text-[9px] font-bold text-white bg-destructive rounded-full">
                         {bellAlerts.length > 9 ? "9+" : bellAlerts.length}

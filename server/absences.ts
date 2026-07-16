@@ -201,13 +201,17 @@ export function registerAbsenceRoutes(app: Express) {
       return;
     }
 
+    if (user.organizationId == null) { res.json([]); return; }
     const statusFilter = req.query.status === "all" ? null : "pending";
     const rows = await db
       .select({ report: absenceReports, child: children, family: families })
       .from(absenceReports)
       .innerJoin(children, eq(absenceReports.childId, children.id))
       .innerJoin(families, eq(absenceReports.familyId, families.id))
-      .where(statusFilter ? eq(absenceReports.status, "pending") : undefined)
+      .where(and(
+        eq(absenceReports.organizationId, user.organizationId),
+        statusFilter ? eq(absenceReports.status, "pending") : undefined,
+      ))
       .orderBy(desc(absenceReports.createdAt))
       .limit(50);
     res.json(
@@ -235,6 +239,11 @@ export function registerAbsenceRoutes(app: Express) {
     const [report] = await db.select().from(absenceReports).where(eq(absenceReports.id, id)).limit(1);
     if (!report) {
       res.status(404).json({ error: "Report not found" });
+      return;
+    }
+    // Tenant check: only review reports from the caller's own org.
+    if (report.organizationId !== user.organizationId) {
+      res.status(403).json({ error: "You don't have access to that report." });
       return;
     }
     if (report.status !== "pending") {

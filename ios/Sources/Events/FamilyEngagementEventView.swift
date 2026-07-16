@@ -76,6 +76,7 @@ struct FamilyEngagementEventView: View {
             NewEventSheet { _ in Task { await viewModel.load() } }
         }
         .task { await viewModel.load() }
+        .refreshable { await viewModel.load() }
         .overlay { if viewModel.isLoading { ProgressView() } }
     }
 }
@@ -139,6 +140,7 @@ struct EventDetailView: View {
     @State var event: FamilyEngagementEvent
     let onUpdate: () -> Void
     @State private var selectedPhase = 0
+    @State private var errorMessage: String?
     private let phases = ["Pre-Event", "Day Of", "Post-Event"]
 
     var currentChecklist: Binding<[EventChecklistItem]> {
@@ -221,6 +223,9 @@ struct EventDetailView: View {
         }
         .navigationTitle(event.title)
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Couldn't Save Change", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") { errorMessage = nil }
+        } message: { Text(errorMessage ?? "") }
     }
 
     private func saveUpdate() {
@@ -228,7 +233,11 @@ struct EventDetailView: View {
             do {
                 _ = try await APIClient.shared.updateEvent(event: event)
                 onUpdate()
-            } catch {}
+            } catch {
+                // Previously silent — the checkbox toggled locally even when the
+                // change never reached the server, so it looked saved either way.
+                errorMessage = "This checklist change wasn't saved. Check your connection and try again."
+            }
         }
     }
 }
@@ -246,6 +255,7 @@ struct NewEventSheet: View {
     @State private var expectedAttendance = 20
     @State private var objectives: [String] = [""]
     @State private var isSaving = false
+    @State private var errorMessage: String?
 
     let defaultPreChecklist = [
         "Secure venue / room reservation",
@@ -317,6 +327,9 @@ struct NewEventSheet: View {
                     Button("Create") { save() }.disabled(title.isEmpty || isSaving)
                 }
             }
+            .alert("Couldn't Save Event", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: { Text(errorMessage ?? "") }
         }
     }
 
@@ -348,11 +361,20 @@ struct NewEventSheet: View {
         Task {
             do {
                 let saved = try await APIClient.shared.createEvent(event: event)
-                await MainActor.run { onSave(saved); dismiss() }
+                await MainActor.run {
+                    isSaving = false
+                    onSave(saved)
+                    dismiss()
+                }
             } catch {
-                await MainActor.run { onSave(event); dismiss() }
+                // Previously fell back to treating the unsaved local event as
+                // saved and dismissed anyway — a failed create looked identical
+                // to a real one. Now the sheet stays open and shows the error.
+                await MainActor.run {
+                    isSaving = false
+                    errorMessage = "This event wasn't saved. Check your connection and try again."
+                }
             }
-            isSaving = false
         }
     }
 }

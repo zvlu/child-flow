@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, Sprout, ShieldCheck, Activity, Lock } from "lucide-react";
+import { ArrowRight, ShieldCheck, Activity, Lock } from "lucide-react";
 
 /**
  * Ambient WebGL background — a slow, flowing field of sage/peach washes over
@@ -133,7 +133,7 @@ export default function Home() {
   const float = reduced ? undefined : { y: [0, -8, 0] };
 
   const stats = [
-    { icon: ShieldCheck, value: "100%", label: "PIR compliant" },
+    { icon: ShieldCheck, value: "Built-in", label: "Licensing & Head Start compliance" },
     { icon: Activity, value: "Real-time", label: "Attendance & health" },
     { icon: Lock, value: "Secure", label: "Keychain + audit log" },
   ];
@@ -143,26 +143,36 @@ export default function Home() {
       <AmbientCanvas reduced={reduced} />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-white/40 to-transparent" />
 
-      <main className="relative z-10 mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 text-center">
+      <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-10">
+        <img src="/brand/logo-horizontal-96.png" alt="Sprout" className="h-10 w-auto sm:h-12" />
+        <Link href="/dashboard" className="text-sm font-semibold text-[#5b5145] transition-colors hover:text-[#2E2A26]">
+          Sign in
+        </Link>
+      </header>
+
+      <main className="relative z-10 mx-auto flex min-h-[calc(100vh-88px)] max-w-2xl flex-col items-center justify-center px-6 text-center">
         {/* Logo mark — gentle float + spring on hover */}
         <motion.div
-          className="mb-7 inline-flex h-20 w-20 items-center justify-center rounded-3xl text-white"
-          style={{ background: "#4F7C5D", boxShadow: "0 16px 40px -12px rgba(79,124,93,0.55)" }}
+          className="mb-7 inline-flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl"
+          style={{ boxShadow: "0 16px 40px -12px rgba(79,124,93,0.55)" }}
           animate={float}
           transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
           whileHover={{ scale: 1.06, rotate: -3 }}
         >
-          <Sprout className="h-10 w-10" strokeWidth={2} />
+          <img src="/brand/app-icon-160.png" alt="Sprout" className="h-full w-full object-cover" />
         </motion.div>
 
         <h1 className="text-6xl font-extrabold tracking-tight text-[#2E2A26] sm:text-7xl">Sprout</h1>
 
         <p className="mt-4 text-xl font-medium text-[#5b5145]">
-          The childcare app so simple, it needs zero training.
+          The school & early-childhood program app so simple, it needs zero training.
         </p>
         <p className="mt-3 max-w-xl text-base leading-relaxed text-[#7c7163]">
-          Attendance, health records, family messaging, and compliance — one warm,
-          fast platform for directors, teachers, and families.
+          Attendance, health records, family messaging, billing, and lesson
+          planning — one warm, fast platform for directors, teachers, and
+          families. Running a Head Start or Early Head Start program? Turn on
+          the compliance module for PIR, ERSEA, Family Partnership Agreements,
+          and Policy Council — built right in.
         </p>
 
         <Link href="/dashboard" className="mt-9 inline-block">
@@ -184,7 +194,7 @@ export default function Home() {
             return (
               <motion.div
                 key={s.label}
-                className="rounded-2xl border border-white/60 bg-white/55 px-4 py-5 backdrop-blur-md"
+                className="rounded-xl border border-white/60 bg-card/55 px-4 py-5 backdrop-blur-md"
                 whileHover={reduced ? undefined : { y: -4 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
               >
@@ -196,6 +206,11 @@ export default function Home() {
           })}
         </div>
       </main>
+
+      <footer className="relative z-10 flex flex-col items-center gap-3 px-6 pb-10 text-center">
+        <img src="/brand/logo-horizontal-64.png" alt="Sprout" className="h-6 w-auto opacity-70" />
+        <p className="text-xs text-[#9a8f80]">© {new Date().getFullYear()} Sprout. All rights reserved.</p>
+      </footer>
     </div>
   );
 }

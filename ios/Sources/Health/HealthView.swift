@@ -51,8 +51,37 @@ struct HealthView: View {
                     .padding(.vertical, 4)
                 }
 
+                // Compliance deadline tracker — 45-day health / 90-day dental
+                Section {
+                    NavigationLink(destination: HealthComplianceView()) {
+                        HStack(spacing: 14) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.cfHealth.opacity(0.12))
+                                    .frame(width: 40, height: 40)
+                                Image(systemName: "calendar.badge.exclamationmark")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundColor(.cfHealth)
+                            }
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Compliance Deadlines")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(.cfTextPrimary)
+                                Text("45-day health · 90-day dental · Drills · MH consults")
+                                    .font(.caption)
+                                    .foregroundColor(.cfTextSecondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.cfTextSecondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+
                 // Category rows — each navigates to its record list
-                Section("Categories") {
+                Section("Records") {
                     ForEach(HealthCategory.allCases, id: \.self) { category in
                         let records = viewModel.filteredRecords(for: category)
                         let allRecords = viewModel.records(for: category)
@@ -114,9 +143,7 @@ struct HealthView: View {
             }
             .sheet(isPresented: $showMenu) { AppMenuSheet() }
             .sheet(isPresented: $showAddRecord) {
-                AddHealthRecordSheet { record in
-                    viewModel.add(record)
-                }
+                AddHealthRecordSheet(viewModel: viewModel)
             }
             .task { await viewModel.load() }
             .refreshable { await viewModel.load() }
@@ -209,9 +236,7 @@ struct HealthCategoryDetailView: View {
             }
         }
         .sheet(isPresented: $showAddRecord) {
-            AddHealthRecordSheet(defaultCategory: category) { record in
-                viewModel.add(record)
-            }
+            AddHealthRecordSheet(defaultCategory: category, viewModel: viewModel)
         }
     }
 }
@@ -284,14 +309,10 @@ struct HealthRecordDetailView: View {
         .navigationTitle(record.childName)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showMarkComplete) {
-            MarkCompleteSheet(record: record) { completedDate, nextDate in
-                viewModel.markComplete(record, completedDate: completedDate, nextDue: nextDate)
-            }
+            MarkCompleteSheet(record: record, viewModel: viewModel)
         }
         .sheet(isPresented: $showReschedule) {
-            RescheduleSheet(record: record) { newDate in
-                viewModel.reschedule(record, nextDue: newDate)
-            }
+            RescheduleSheet(record: record, viewModel: viewModel)
         }
     }
 }
@@ -300,12 +321,15 @@ struct HealthRecordDetailView: View {
 
 struct MarkCompleteSheet: View {
     let record: HealthRecord
-    let onSave: (Date, Date?) -> Void
+    @ObservedObject var viewModel: HealthViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var completedDate = Date()
     @State private var scheduleNext = true
     @State private var nextDueDate = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var notes = ""
+    @State private var isSaving = false
+    @State private var showError = false
+    @State private var errorText = ""
 
     var body: some View {
         NavigationStack {
@@ -327,13 +351,18 @@ struct MarkCompleteSheet: View {
                 }
 
                 Section {
-                    Button("Save") {
-                        onSave(completedDate, scheduleNext ? nextDueDate : nil)
-                        dismiss()
+                    Button {
+                        save()
+                    } label: {
+                        HStack {
+                            if isSaving { ProgressView().padding(.trailing, 4) }
+                            Text("Save")
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    .frame(maxWidth: .infinity, alignment: .center)
                     .foregroundColor(.cfAttendance)
                     .fontWeight(.semibold)
+                    .disabled(isSaving)
                 }
             }
             .navigationTitle("Mark as Complete")
@@ -343,6 +372,25 @@ struct MarkCompleteSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .alert("Couldn't Save", isPresented: $showError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorText)
+            }
+        }
+    }
+
+    private func save() {
+        isSaving = true
+        Task {
+            let ok = await viewModel.markComplete(record, completedDate: completedDate, nextDue: scheduleNext ? nextDueDate : nil)
+            isSaving = false
+            if ok {
+                dismiss()
+            } else {
+                errorText = viewModel.errorMessage ?? "Couldn't mark that record as completed. Check your connection and try again."
+                showError = true
+            }
         }
     }
 }
@@ -351,9 +399,12 @@ struct MarkCompleteSheet: View {
 
 struct RescheduleSheet: View {
     let record: HealthRecord
-    let onSave: (Date) -> Void
+    @ObservedObject var viewModel: HealthViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var newDate = Calendar.current.date(byAdding: .month, value: 6, to: Date()) ?? Date()
+    @State private var isSaving = false
+    @State private var showError = false
+    @State private var errorText = ""
 
     var body: some View {
         NavigationStack {
@@ -383,13 +434,18 @@ struct RescheduleSheet: View {
                 }
 
                 Section {
-                    Button("Save") {
-                        onSave(newDate)
-                        dismiss()
+                    Button {
+                        save()
+                    } label: {
+                        HStack {
+                            if isSaving { ProgressView().padding(.trailing, 4) }
+                            Text("Save")
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    .frame(maxWidth: .infinity, alignment: .center)
                     .foregroundColor(.cfPrimary)
                     .fontWeight(.semibold)
+                    .disabled(isSaving)
                 }
             }
             .navigationTitle("Reschedule")
@@ -399,6 +455,25 @@ struct RescheduleSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .alert("Couldn't Save", isPresented: $showError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorText)
+            }
+        }
+    }
+
+    private func save() {
+        isSaving = true
+        Task {
+            let ok = await viewModel.reschedule(record, nextDue: newDate)
+            isSaving = false
+            if ok {
+                dismiss()
+            } else {
+                errorText = viewModel.errorMessage ?? "Couldn't reschedule that visit. Check your connection and try again."
+                showError = true
+            }
         }
     }
 }
@@ -407,21 +482,44 @@ struct RescheduleSheet: View {
 
 struct AddHealthRecordSheet: View {
     var defaultCategory: HealthCategory? = nil
-    let onSave: (HealthRecord) -> Void
+    @ObservedObject var viewModel: HealthViewModel
     @Environment(\.dismiss) private var dismiss
-    @State private var childName = ""
+    @State private var children: [Child] = []
+    @State private var selectedChildId = ""
     @State private var selectedCategory: HealthCategory = .physical
     @State private var dueDate = Calendar.current.date(byAdding: .month, value: 3, to: Date()) ?? Date()
     @State private var isCompleted = false
     @State private var completedDate = Date()
+    @State private var isSaving = false
+    @State private var showError = false
+    @State private var errorText = ""
 
-    var canSave: Bool { !childName.trimmingCharacters(in: .whitespaces).isEmpty }
+    private var selectedChildName: String {
+        children.first { $0.id == selectedChildId }?.fullName ?? ""
+    }
+
+    var canSave: Bool { !selectedChildId.isEmpty }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Child") {
-                    TextField("Child's full name", text: $childName)
+                    Menu {
+                        ForEach(children) { child in
+                            Button(child.fullName) { selectedChildId = child.id }
+                        }
+                    } label: {
+                        HStack {
+                            Text("Child").foregroundColor(.cfTextPrimary)
+                            Spacer()
+                            Text(selectedChildName.isEmpty ? "Select…" : selectedChildName)
+                                .foregroundColor(selectedChildName.isEmpty ? .secondary : .cfPrimary)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .disabled(children.isEmpty)
                 }
 
                 Section("Record Type") {
@@ -443,30 +541,18 @@ struct AddHealthRecordSheet: View {
                 }
 
                 Section {
-                    Button("Add Record") {
-                        let name = childName.trimmingCharacters(in: .whitespaces)
-                        let status: String = {
-                            if isCompleted { return "Current" }
-                            if dueDate < Date() { return "Overdue" }
-                            if let soon = Calendar.current.date(byAdding: .day, value: 30, to: Date()), dueDate <= soon { return "Due Soon" }
-                            return "Current"
-                        }()
-                        let record = HealthRecord(
-                            id: UUID().uuidString,
-                            childId: UUID().uuidString,
-                            childName: name,
-                            category: selectedCategory.rawValue,
-                            status: status,
-                            dueDate: dueDate,
-                            completedDate: isCompleted ? completedDate : nil
-                        )
-                        onSave(record)
-                        dismiss()
+                    Button {
+                        save()
+                    } label: {
+                        HStack {
+                            if isSaving { ProgressView().padding(.trailing, 4) }
+                            Text("Add Record")
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    .frame(maxWidth: .infinity, alignment: .center)
                     .foregroundColor(canSave ? .cfPrimary : .secondary)
                     .fontWeight(.semibold)
-                    .disabled(!canSave)
+                    .disabled(!canSave || isSaving)
                 }
             }
             .navigationTitle("Add Record")
@@ -476,9 +562,36 @@ struct AddHealthRecordSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .alert("Couldn't Save", isPresented: $showError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorText)
+            }
         }
         .onAppear {
             if let cat = defaultCategory { selectedCategory = cat }
+        }
+        .task {
+            children = (try? await APIClient.shared.getChildren()) ?? []
+        }
+    }
+
+    private func save() {
+        isSaving = true
+        Task {
+            let ok = await viewModel.add(
+                childId: selectedChildId,
+                category: selectedCategory,
+                dueDate: dueDate,
+                completedDate: isCompleted ? completedDate : nil
+            )
+            isSaving = false
+            if ok {
+                dismiss()
+            } else {
+                errorText = viewModel.errorMessage ?? "Couldn't save that health record. Check your connection and try again."
+                showError = true
+            }
         }
     }
 }
@@ -658,6 +771,8 @@ class HealthViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var statusFilter: String? = nil
     @Published var isLoading = false
+    @Published var isSaving = false
+    @Published var errorMessage: String?
 
     var currentCount: Int  { allRecords.filter { $0.status == "Current" }.count }
     var dueSoonCount: Int  { allRecords.filter { $0.status == "Due Soon" }.count }
@@ -678,45 +793,67 @@ class HealthViewModel: ObservableObject {
         return base
     }
 
-    func add(_ record: HealthRecord) {
-        allRecords.insert(record, at: 0)
+    /// Creates the record on the server, then refreshes `allRecords` from
+    /// the server so status/derived fields match the backend exactly.
+    @discardableResult
+    func add(childId: String, category: HealthCategory, dueDate: Date?, completedDate: Date?) async -> Bool {
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            _ = try await APIClient.shared.createHealthRecord(
+                childId: childId,
+                category: category.rawValue,
+                completedDate: completedDate,
+                dueDate: dueDate
+            )
+            await load()
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = (error as? APIError)?.errorDescription ?? "Couldn't save that health record. Check your connection and try again."
+            return false
+        }
     }
 
-    func markComplete(_ record: HealthRecord, completedDate: Date, nextDue: Date?) {
-        guard let i = allRecords.firstIndex(where: { $0.id == record.id }) else { return }
-        allRecords[i] = HealthRecord(
-            id: record.id,
-            childId: record.childId,
-            childName: record.childName,
-            category: record.category,
-            status: "Current",
-            dueDate: nextDue ?? Calendar.current.date(byAdding: .year, value: 1, to: completedDate),
-            completedDate: completedDate
-        )
+    /// "Mark as Completed": sends completedDate (server derives status =
+    /// current) and, if the caller scheduled a follow-up, the new dueDate.
+    @discardableResult
+    func markComplete(_ record: HealthRecord, completedDate: Date, nextDue: Date?) async -> Bool {
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            _ = try await APIClient.shared.updateHealthRecord(id: record.id, completedDate: completedDate, dueDate: nextDue)
+            await load()
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = (error as? APIError)?.errorDescription ?? "Couldn't mark that record as completed. Check your connection and try again."
+            return false
+        }
     }
 
-    func reschedule(_ record: HealthRecord, nextDue: Date) {
-        guard let i = allRecords.firstIndex(where: { $0.id == record.id }) else { return }
-        let status: String = {
-            if nextDue < Date() { return "Overdue" }
-            if let soon = Calendar.current.date(byAdding: .day, value: 30, to: Date()), nextDue <= soon { return "Due Soon" }
-            return "Current"
-        }()
-        allRecords[i] = HealthRecord(
-            id: record.id,
-            childId: record.childId,
-            childName: record.childName,
-            category: record.category,
-            status: status,
-            dueDate: nextDue,
-            completedDate: record.completedDate
-        )
+    /// "Reschedule Next Visit": updates dueDate only; server recomputes status.
+    @discardableResult
+    func reschedule(_ record: HealthRecord, nextDue: Date) async -> Bool {
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            _ = try await APIClient.shared.updateHealthRecord(id: record.id, dueDate: nextDue)
+            await load()
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = (error as? APIError)?.errorDescription ?? "Couldn't reschedule that visit. Check your connection and try again."
+            return false
+        }
     }
 
     func load() async {
         isLoading = true
+        defer { isLoading = false }
         do {
             allRecords = try await APIClient.shared.getHealthRecords()
+            errorMessage = nil
         } catch {
             #if DEBUG
             let now = Date()
@@ -733,6 +870,7 @@ class HealthViewModel: ObservableObject {
                 HealthRecord(id: "h2",  childId: "c1", childName: "Sofia Martinez",    category: "dental",        status: "Due Soon", dueDate: soon, completedDate: nil),
                 HealthRecord(id: "h3",  childId: "c2", childName: "Marcus Williams",   category: "dental",        status: "Overdue",  dueDate: overdue, completedDate: nil),
                 HealthRecord(id: "h9",  childId: "c6", childName: "Aaliyah Thompson",  category: "dental",        status: "Current",  dueDate: Calendar.current.date(byAdding: .month, value: 3, to: now), completedDate: past),
+                HealthRecord(id: "h15", childId: "c5", childName: "Jason Chen",        category: "dental",        status: "Overdue",  dueDate: overdue, completedDate: nil),
                 // Vision
                 HealthRecord(id: "h4",  childId: "c2", childName: "Marcus Williams",   category: "vision",        status: "Current",  dueDate: Calendar.current.date(byAdding: .month, value: 5, to: now), completedDate: past),
                 HealthRecord(id: "h10", childId: "c4", childName: "Diego Rodriguez",   category: "vision",        status: "Due Soon", dueDate: soon, completedDate: nil),
@@ -744,8 +882,9 @@ class HealthViewModel: ObservableObject {
                 HealthRecord(id: "h13", childId: "c3", childName: "Emma Rodriguez",    category: "immunizations", status: "Overdue",  dueDate: overdue, completedDate: nil),
                 HealthRecord(id: "h14", childId: "c6", childName: "Aaliyah Thompson",  category: "immunizations", status: "Due Soon", dueDate: soon, completedDate: nil),
             ]
+            #else
+            errorMessage = (error as? APIError)?.errorDescription ?? "Couldn't load health records. Check your connection and try again."
             #endif
         }
-        isLoading = false
     }
 }

@@ -1,4 +1,5 @@
 import { eq, and, gte, lte } from "drizzle-orm";
+import { isEmptyPatch } from "./_core/patch";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users, organizations, children, staff, families, attendance,
@@ -131,8 +132,16 @@ export async function setUserPassword(openId: string, passwordHash: string | nul
   await db.update(users).set({ passwordHash }).where(eq(users.openId, openId));
 }
 
+/** Bind a user to an organization (used by self-serve signup). */
+export async function assignUserOrganization(openId: string, organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ organizationId }).where(eq(users.openId, openId));
+}
+
 /** Update a user's own editable profile fields (currently just display name). */
-export async function updateUserProfile(openId: string, data: { name?: string }) {
+export async function updateUserProfile(openId: string, data: { name?: string; avatarUrl?: string | null }) {
+  if (isEmptyPatch(data)) return;
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(users).set(data).where(eq(users.openId, openId));
@@ -150,16 +159,30 @@ export async function updateUserSettings(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const current = await getUserByOpenId(openId);
-  const merged = {
-    ...(current?.settings ?? {}),
-    ...patch,
-    notifications: {
-      ...(current?.settings?.notifications ?? {}),
-      ...(patch.notifications ?? {}),
-    },
-  };
-  // Drop the notifications key entirely if it ended up empty so we don't store {}.
-  if (Object.keys(merged.notifications).length === 0) delete (merged as any).notifications;
+  const merged: NonNullable<typeof users.$inferSelect.settings> = { ...(current?.settings ?? {}) };
+
+  if (patch.twoFactorEnabled !== undefined) merged.twoFactorEnabled = patch.twoFactorEnabled;
+
+  if (patch.preferredLanguage !== undefined) {
+    if (patch.preferredLanguage) merged.preferredLanguage = patch.preferredLanguage;
+    else delete merged.preferredLanguage;
+  }
+
+  // Notification toggles merge key-by-key so changing one preference never
+  // resets the others.
+  if (patch.notifications !== undefined) {
+    merged.notifications = { ...(current?.settings?.notifications ?? {}), ...patch.notifications };
+    if (Object.keys(merged.notifications).length === 0) delete merged.notifications;
+  }
+
+  // Navigation layout is replaced wholesale (the client always sends the full
+  // arranged set); an empty object means "reset to defaults".
+  if (patch.navigation !== undefined) {
+    const hasPrefs = patch.navigation.topNav || patch.navigation.sideNav;
+    if (hasPrefs) merged.navigation = patch.navigation;
+    else delete merged.navigation;
+  }
+
   await db.update(users).set({ settings: merged }).where(eq(users.openId, openId));
   return merged;
 }
@@ -194,10 +217,77 @@ export async function getOrganizationByAgencyId(agencyId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function getOrganizationById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(organizations).where(eq(organizations.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/** Update the editable program-profile fields of an organization. */
+export async function updateOrganization(
+  id: number,
+  data: Partial<Pick<typeof organizations.$inferInsert,
+    "name" | "director" | "directorEmail" | "phone" | "address" | "maxChildren" | "classroomCount" | "maxStaff" | "subscriptionTier" | "enabledModules">>
+) {
+  if (isEmptyPatch(data)) return;
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(organizations).set(data).where(eq(organizations.id, id));
+}
+
+/** Current enrollment/staff counts vs the org's plan limits — backs usage UI + enforcement. */
+export async function getOrganizationUsage(organizationId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+  if (!org) return null;
+  const kids = await db.select({ id: children.id }).from(children).where(eq(children.organizationId, organizationId));
+  const staffRows = await db.select({ id: staff.id }).from(staff).where(eq(staff.organizationId, organizationId));
+  return {
+    children: kids.length,
+    staff: staffRows.length,
+    maxChildren: org.maxChildren ?? null,
+    maxStaff: org.maxStaff ?? null,
+    subscriptionTier: org.subscriptionTier,
+  };
+}
+
 export async function getUserOrganizations(userId: number) {
   const db = await getDb();
   if (!db) return [];
   return await db.select().from(organizations).where(eq(organizations.ownerId, userId));
+}
+
+/** All organizations with live children/staff counts — platform-owner dashboard. */
+export async function getAllOrganizations() {
+  const db = await getDb();
+  if (!db) return [];
+  const orgs = await db.select().from(organizations).orderBy(organizations.name);
+  const kids = await db.select({ organizationId: children.organizationId, id: children.id }).from(children);
+  const staffRows = await db.select({ organizationId: staff.organizationId, id: staff.id }).from(staff);
+  const tally = (rows: { organizationId: number }[]) => {
+    const m = new Map<number, number>();
+    for (const r of rows) m.set(r.organizationId, (m.get(r.organizationId) ?? 0) + 1);
+    return m;
+  };
+  const childCount = tally(kids);
+  const staffCount = tally(staffRows);
+  return orgs.map((o) => ({ ...o, childrenCount: childCount.get(o.id) ?? 0, staffCount: staffCount.get(o.id) ?? 0 }));
+}
+
+export async function createOrganization(data: InsertOrganization) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [result] = await db.insert(organizations).values(data);
+  return { id: result.insertId };
+}
+
+export async function setOrganizationActive(id: number, isActive: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(organizations).set({ isActive }).where(eq(organizations.id, id));
+  return { success: true };
 }
 
 export async function getOrganizationChildren(organizationId: number) {
@@ -224,6 +314,15 @@ export async function createChild(data: InsertChild) {
   if (!db) throw new Error("Database not available");
   const result = await db.insert(children).values(data);
   return result;
+}
+
+/** Insert many children in one statement (CSV bulk import). Returns the count. */
+export async function bulkCreateChildren(rows: InsertChild[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  if (rows.length === 0) return { count: 0 };
+  await db.insert(children).values(rows);
+  return { count: rows.length };
 }
 
 export async function getOrganizationStaff(organizationId: number) {
@@ -376,6 +475,13 @@ export async function getCommunicationLogs(organizationId: number, recipientId?:
     );
   }
   return await db.select().from(communicationLogs).where(eq(communicationLogs.organizationId, organizationId));
+}
+
+export async function createCommunicationLog(data: typeof communicationLogs.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [result] = await db.insert(communicationLogs).values(data);
+  return { id: result.insertId };
 }
 
 export async function getEducationRecords(organizationId: number, childId?: number) {

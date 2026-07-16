@@ -33,16 +33,113 @@ struct AppMenuSheet: View {
             ScrollView {
                 VStack(spacing: 28) {
 
-                    // Families & Engagement
-                    MenuSection(title: "Families") {
+                    // Daily Reports / Moments
+                    MenuSection(title: "Daily") {
                         ModuleCard(
-                            label: "Family Services",
-                            subtitle: "Records, goals & case notes",
-                            icon: "house.fill",
+                            label: "Daily Reports",
+                            subtitle: "Log meals, naps & moments",
+                            icon: "sparkles",
                             color: .cfPrimary,
                             bgColor: .cfPrimaryLight,
-                            destination: AnyView(FamilyServicesView())
+                            destination: AnyView(DailyReportsView())
                         )
+                    }
+
+                    // Curriculum & Funding
+                    MenuSection(title: "Curriculum & Funding") {
+                        ModuleCard(
+                            label: "Lesson Planning",
+                            subtitle: "Weekly plans by classroom",
+                            icon: "book.fill",
+                            color: .cfPrimary,
+                            bgColor: .cfPrimaryLight,
+                            destination: AnyView(LessonPlanningView())
+                        )
+                        ModuleCard(
+                            label: "Assessments",
+                            subtitle: "Screenings & developmental records",
+                            icon: "checklist",
+                            color: .cfChildren,
+                            bgColor: .cfChildrenBg,
+                            destination: AnyView(AssessmentsView())
+                        )
+                        ModuleCard(
+                            label: "Portfolios",
+                            subtitle: "Each child's growth over time",
+                            icon: "folder.fill",
+                            color: .cfGoals,
+                            bgColor: Color(hex: "ECFEFF"),
+                            destination: AnyView(PortfoliosView())
+                        )
+                        ModuleCard(
+                            label: "Subsidies",
+                            subtitle: "Agency funding & co-pays",
+                            icon: "building.columns.fill",
+                            color: .cfAccent,
+                            bgColor: .cfAccentLight,
+                            destination: AnyView(SubsidiesView())
+                        )
+                        // Grant & Budget, Classroom Quality, and In-Kind
+                        // Contributions are all Head Start §1302 compliance
+                        // features — meaningless for a core-only daycare.
+                        if appState.hasModule(.headStart) {
+                            ModuleCard(
+                                label: "Grant & Budget",
+                                subtitle: "Burn rate & 20% non-federal match",
+                                icon: "chart.bar.fill",
+                                color: .cfCompliance,
+                                bgColor: .cfComplianceBg,
+                                destination: AnyView(GrantBudgetView())
+                            )
+                            ModuleCard(
+                                label: "Classroom Quality",
+                                subtitle: "CLASS® / ECERS observations",
+                                icon: "checkmark.seal.fill",
+                                color: .cfCompliance,
+                                bgColor: .cfComplianceBg,
+                                destination: AnyView(ClassroomQualityView())
+                            )
+                            ModuleCard(
+                                label: "In-Kind Contributions",
+                                subtitle: "Track the 20% non-federal match",
+                                icon: "hand.raised.fill",
+                                color: .cfAttendance,
+                                bgColor: .cfAttendanceBg,
+                                destination: AnyView(InKindView())
+                            )
+                        }
+                    }
+
+                    // Families & Engagement — Family Services (FNA/CFCR) and
+                    // Chronic Absence are Head Start compliance features;
+                    // Family Events is general and always shown.
+                    MenuSection(title: "Families") {
+                        if appState.hasModule(.headStart) {
+                            ModuleCard(
+                                label: "Family Services",
+                                subtitle: "Records, goals & case notes",
+                                icon: "house.fill",
+                                color: .cfPrimary,
+                                bgColor: .cfPrimaryLight,
+                                destination: AnyView(FamilyServicesView())
+                            )
+                            ModuleCard(
+                                label: "Chronic Absence",
+                                subtitle: "85% threshold alerts & AIP",
+                                icon: "exclamationmark.triangle.fill",
+                                color: .orange,
+                                bgColor: Color.orange.opacity(0.1),
+                                destination: AnyView(ChronicAbsenceView())
+                            )
+                            ModuleCard(
+                                label: "Disability Services",
+                                subtitle: "IEP/IFSP tracking & LEA coordination",
+                                icon: "figure.roll",
+                                color: .cfFamily,
+                                bgColor: .cfFamilyBg,
+                                destination: AnyView(DisabilityServicesView())
+                            )
+                        }
                         ModuleCard(
                             label: "Family Events",
                             subtitle: "Plan & track engagement",
@@ -71,6 +168,14 @@ struct AppMenuSheet: View {
                             bgColor: .cfFamilyBg,
                             destination: AnyView(DocumentsView())
                         )
+                        ModuleCard(
+                            label: "E-Signatures",
+                            subtitle: "Review & sign documents",
+                            icon: "signature",
+                            color: .cfPrimary,
+                            bgColor: .cfPrimaryLight,
+                            destination: AnyView(DigitalDocumentsView())
+                        )
                     }
 
                     // Enrollment
@@ -83,6 +188,20 @@ struct AppMenuSheet: View {
                             bgColor: .cfFamilyBg,
                             destination: AnyView(EnrollmentView())
                         )
+                        // ERSEA (Eligibility, Recruitment, Selection, Enrollment,
+                        // Attendance) and its FPL income-eligibility calculator are a
+                        // §1302.12 Head Start requirement — meaningless for a core-only
+                        // daycare, so gate it the same way the web app already does.
+                        if appState.hasModule(.headStart) {
+                            ModuleCard(
+                                label: "ERSEA",
+                                subtitle: "Eligibility, waitlist & selection",
+                                icon: "list.number",
+                                color: .cfGoals,
+                                bgColor: .cfGoalsBg,
+                                destination: AnyView(ERSEAView())
+                            )
+                        }
                         ModuleCard(
                             label: "Verification",
                             subtitle: "Document checklists",
@@ -91,25 +210,36 @@ struct AppMenuSheet: View {
                             bgColor: .cfChildrenBg,
                             destination: AnyView(ApplicationVerificationView())
                         )
-                        ModuleCard(
-                            label: "Attendance Plans",
-                            subtitle: "Chronic absence support",
-                            icon: "chart.line.uptrend.xyaxis",
-                            color: .cfAttendance,
-                            bgColor: .cfAttendanceBg,
-                            destination: AnyView(AttendancePlansView())
-                        )
+                        // Attendance Improvement Plans are a §1302.16 Head Start requirement.
+                        if appState.hasModule(.headStart) {
+                            ModuleCard(
+                                label: "Attendance Plans",
+                                subtitle: "Chronic absence support",
+                                icon: "chart.line.uptrend.xyaxis",
+                                color: .cfAttendance,
+                                bgColor: .cfAttendanceBg,
+                                destination: AnyView(AttendancePlansView())
+                            )
+                        }
                     }
 
                     // Health & Nutrition
                     MenuSection(title: "Health & Nutrition") {
-                        ModuleCardWide(
+                        ModuleCard(
                             label: "CACFP & Nutrition Forms",
                             subtitle: "Meal preferences, infant formula, medical statements",
                             icon: "fork.knife",
                             color: .cfAccent,
                             bgColor: .cfAccentLight,
                             destination: AnyView(NutritionFormsView())
+                        )
+                        ModuleCard(
+                            label: "Meal Plans",
+                            subtitle: "Weekly menus by classroom",
+                            icon: "carrot.fill",
+                            color: .cfAccent,
+                            bgColor: .cfAccentLight,
+                            destination: AnyView(MealsView())
                         )
                     }
 
@@ -147,13 +277,24 @@ struct AppMenuSheet: View {
                             destination: AnyView(StaffView())
                         )
                         ModuleCard(
-                            label: "Compliance",
-                            subtitle: "PIR & checklists",
-                            icon: "checkmark.seal.fill",
-                            color: .cfCompliance,
-                            bgColor: .cfComplianceBg,
-                            destination: AnyView(ComplianceView())
+                            label: "Calendar",
+                            subtitle: "Program events & holidays",
+                            icon: "calendar",
+                            color: .cfChildren,
+                            bgColor: .cfChildrenBg,
+                            destination: AnyView(CalendarView())
                         )
+                        // PIR is Head Start's federal compliance report.
+                        if appState.hasModule(.headStart) {
+                            ModuleCard(
+                                label: "Compliance",
+                                subtitle: "PIR & checklists",
+                                icon: "checkmark.seal.fill",
+                                color: .cfCompliance,
+                                bgColor: .cfComplianceBg,
+                                destination: AnyView(ComplianceView())
+                            )
+                        }
                         ModuleCard(
                             label: "Reports",
                             subtitle: "Exports & summaries",
@@ -161,6 +302,36 @@ struct AppMenuSheet: View {
                             color: .cfCompliance,
                             bgColor: .cfComplianceBg,
                             destination: AnyView(ReportsView())
+                        )
+                        // Family-advocate workload reporting is a Head Start feature (mirrors web familyServices.staffActivity).
+                        if appState.hasModule(.headStart) {
+                            ModuleCard(
+                                label: "Staff Activity",
+                                subtitle: "Advocate workload & contacts",
+                                icon: "person.2.badge.gearshape.fill",
+                                color: .cfPrimary,
+                                bgColor: .cfPrimaryLight,
+                                destination: AnyView(StaffActivityView())
+                            )
+                            // Policy Council (§1302.50-51 parent-majority governance body)
+                            ModuleCard(
+                                label: "Policy Council",
+                                subtitle: "Membership, roles & minutes",
+                                icon: "person.3.sequence.fill",
+                                color: .cfCompliance,
+                                bgColor: .cfComplianceBg,
+                                destination: AnyView(PolicyCouncilView())
+                            )
+                        }
+                        // Bulk Action Center is generic (not Head Start-specific) —
+                        // any org type can mass-mark attendance for a classroom.
+                        ModuleCard(
+                            label: "Bulk Actions",
+                            subtitle: "Mass attendance & classroom actions",
+                            icon: "square.stack.3d.up.fill",
+                            color: .cfPrimary,
+                            bgColor: .cfPrimaryLight,
+                            destination: AnyView(BulkActionCenterView())
                         )
                     }
 

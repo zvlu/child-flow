@@ -1,10 +1,13 @@
 import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
+import type { ModuleId } from '@shared/modules';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { User } from "../../drizzle/schema";
 import type { TrpcContext } from "./context";
 import { clientIpFromReq } from "./audit";
 import { insertAuditLog } from "../db";
+import { isPlatformOwner } from "./env";
+import { MODULE_DISABLED_ERR_MSG, orgHasModule } from "./modules";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -63,8 +66,115 @@ const requireRole = (roles: Array<User["role"]>) =>
     });
   });
 
+/**
+ * Tenant isolation. For org-scoped routes, the requested organization (a bare
+ * numeric input that IS the org id, or an `organizationId` field on an object
+ * input) must match the signed-in user's organization. The platform owner is
+ * exempt (manages every org). Denied attempts are audit-logged.
+ *
+ * Apply ONLY to routes whose numeric/`organizationId` input is an org id — not
+ * to routes whose bare number is a record id (childId, familyId, …).
+ */
+const enforceOrgScope = t.middleware(async ({ ctx, next, getRawInput, path }) => {
+  if (!ctx.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+  }
+  if (!isPlatformOwner(ctx.user.openId)) {
+    let requestedOrg: number | undefined;
+    try {
+      const raw = await getRawInput();
+      if (typeof raw === "number") requestedOrg = raw;
+      else if (raw && typeof raw === "object" && typeof (raw as Record<string, unknown>).organizationId === "number") {
+        requestedOrg = (raw as Record<string, number>).organizationId;
+      }
+    } catch {
+      /* no input */
+    }
+    if (requestedOrg !== undefined && ctx.user.organizationId !== requestedOrg) {
+      await insertAuditLog({
+        userId: ctx.user.id,
+        actorOpenId: ctx.user.openId,
+        action: "access_denied",
+        resourceType: "org_scope",
+        resourceId: path,
+        ipAddress: clientIpFromReq(ctx.req),
+        detail: `userOrg=${ctx.user.organizationId} requested=${requestedOrg}`,
+      });
+      throw new TRPCError({ code: "FORBIDDEN", message: "You don't have access to that organization." });
+    }
+  }
+  return next({ ctx: { ...ctx, user: ctx.user } });
+});
+
 /** Program administration: staff management, bulk operations. */
 export const adminProcedure = t.procedure.use(requireRole(["admin"]));
+
+/** Staff/admin, additionally tenant-scoped: the org in the input must be the user's. */
+export const orgStaffProcedure = t.procedure.use(requireRole(["admin", "staff"])).use(enforceOrgScope);
+
+/** Admin, additionally tenant-scoped. */
+export const orgAdminProcedure = t.procedure.use(requireRole(["admin"])).use(enforceOrgScope);
+
+// ---- Optional-module gating -------------------------------------------------
+
+/**
+ * Feature-module gate: the caller's org must have the module enabled. The
+ * platform owner is exempt (manages every org). Denied attempts are
+ * audit-logged like the role gate. Compose AFTER a role/org-scope middleware.
+ */
+const requireModule = (id: ModuleId) =>
+  t.middleware(async ({ ctx, next, path }) => {
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    }
+    if (!isPlatformOwner(ctx.user.openId)) {
+      const orgId = ctx.user.organizationId;
+      if (orgId == null || !(await orgHasModule(orgId, id))) {
+        await insertAuditLog({
+          userId: ctx.user.id,
+          actorOpenId: ctx.user.openId,
+          action: "access_denied",
+          resourceType: "module_gate",
+          resourceId: path,
+          ipAddress: clientIpFromReq(ctx.req),
+          detail: `module=${id} org=${orgId ?? "none"}`,
+        });
+        throw new TRPCError({ code: "FORBIDDEN", message: MODULE_DISABLED_ERR_MSG });
+      }
+    }
+    return next({ ctx: { ...ctx, user: ctx.user } });
+  });
+
+/** Staff/admin + tenant-scoped + Head Start module enabled. */
+export const hsStaffProcedure = orgStaffProcedure.use(requireModule("head_start"));
+
+/** Admin + tenant-scoped + Head Start module enabled. */
+export const hsAdminProcedure = orgAdminProcedure.use(requireModule("head_start"));
+
+/**
+ * Platform owner (super-admin) gate for cross-organization management. Denied
+ * attempts are audit-logged like the role gate.
+ */
+export const superAdminProcedure = t.procedure.use(
+  t.middleware(async ({ ctx, next, path }) => {
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    }
+    if (!isPlatformOwner(ctx.user.openId)) {
+      await insertAuditLog({
+        userId: ctx.user.id,
+        actorOpenId: ctx.user.openId,
+        action: "access_denied",
+        resourceType: "rbac",
+        resourceId: path,
+        ipAddress: clientIpFromReq(ctx.req),
+        detail: "required=platform_owner",
+      });
+      throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+    }
+    return next({ ctx: { ...ctx, user: ctx.user } });
+  }),
+);
 
 /**
  * Internal program staff (admin included). This is the default tier for all

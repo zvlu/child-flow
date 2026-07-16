@@ -1,0 +1,1 @@
+ALTER TABLE `education_records` ADD `domain` varchar(80);

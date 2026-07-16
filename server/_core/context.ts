@@ -2,7 +2,7 @@ import { COOKIE_NAME, WEB_SESSION_IDLE_TTL_MS } from "@shared/const";
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
 import { getSessionCookieOptions } from "./cookies";
-import { ENV } from "./env";
+import { ENV, devAuthBypassEnabled } from "./env";
 import { sdk } from "./sdk";
 import { getUserByOpenId } from "../db";
 
@@ -23,8 +23,10 @@ const DEV_MOCK_USER: User = {
   name: "Test Administrator",
   email: "admin@childflow.org",
   loginMethod: "dev",
+  avatarUrl: null,
   passwordHash: null,
   role: "admin",
+  organizationId: 1,
   familyId: null,
   settings: null,
   createdAt: new Date(),
@@ -62,21 +64,29 @@ export async function createContext(
     user = null;
   }
 
-  if (!user && ENV.allowDevAuthBypass && !ENV.isProduction) {
-    if (!warnedAboutDevBypass) {
-      console.warn(
-        "[Auth] ALLOW_DEV_AUTH_BYPASS is enabled — injecting a mock admin for " +
-          "unauthenticated requests. NEVER enable this outside local development."
-      );
-      warnedAboutDevBypass = true;
-    }
-    // Prefer the persisted row so profile/settings edits made during local dev
-    // actually round-trip (the static literal would otherwise mask every write).
-    // Fall back to the in-memory mock when the DB is unavailable or unseeded.
-    try {
-      user = (await getUserByOpenId(DEV_MOCK_USER.openId)) ?? DEV_MOCK_USER;
-    } catch {
-      user = DEV_MOCK_USER;
+  if (!user && devAuthBypassEnabled()) {
+    // When the user explicitly signs out we set a short-lived opt-out cookie so
+    // the bypass doesn't immediately re-inject a session. The cookie is cleared
+    // on the next successful sign-in (web-login / web-signup).
+    const noBypass = (opts.req.cookies as Record<string, string> | undefined)?.[
+      "__sprout_no_bypass"
+    ];
+    if (!noBypass) {
+      if (!warnedAboutDevBypass) {
+        console.warn(
+          "[Auth] ALLOW_DEV_AUTH_BYPASS is enabled — injecting a mock admin for " +
+            "unauthenticated requests. NEVER enable this outside local development."
+        );
+        warnedAboutDevBypass = true;
+      }
+      // Prefer the persisted row so profile/settings edits made during local dev
+      // actually round-trip (the static literal would otherwise mask every write).
+      // Fall back to the in-memory mock when the DB is unavailable or unseeded.
+      try {
+        user = (await getUserByOpenId(DEV_MOCK_USER.openId)) ?? DEV_MOCK_USER;
+      } catch {
+        user = DEV_MOCK_USER;
+      }
     }
   }
 

@@ -46,7 +46,7 @@ export function registerAttendanceRoutes(app: Express) {
       res.status(500).json({ error: "Database not available" });
       return;
     }
-    const [org] = await db.select().from(organizations).limit(1);
+    const org = user.organizationId != null ? { id: user.organizationId } : null;
     if (!org) {
       res.json({ records: [], classrooms: [] });
       return;
@@ -98,7 +98,7 @@ export function registerAttendanceRoutes(app: Express) {
       res.status(500).json({ error: "Database not available" });
       return;
     }
-    const [org] = await db.select().from(organizations).limit(1);
+    const org = user.organizationId != null ? { id: user.organizationId } : null;
     if (!org) {
       res.status(404).json({ error: "No organization" });
       return;
@@ -149,7 +149,7 @@ export function registerAttendanceRoutes(app: Express) {
       res.status(500).json({ error: "Database not available" });
       return;
     }
-    const [org] = await db.select().from(organizations).limit(1);
+    const org = user.organizationId != null ? { id: user.organizationId } : null;
     if (!org) {
       res.status(404).json({ error: "No organization" });
       return;
@@ -162,6 +162,19 @@ export function registerAttendanceRoutes(app: Express) {
       : "Quick note";
     if (!childId || !content) {
       res.status(400).json({ error: "childId and content are required" });
+      return;
+    }
+
+    // The childId comes straight from the URL — without this check, any
+    // signed-in staff member could attach a note to any child by guessing
+    // an ID, including one belonging to a different organization entirely.
+    const [child] = await db
+      .select({ id: children.id })
+      .from(children)
+      .where(and(eq(children.id, childId), eq(children.organizationId, org.id)))
+      .limit(1);
+    if (!child) {
+      res.status(404).json({ error: "Child not found" });
       return;
     }
 

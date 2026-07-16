@@ -72,6 +72,10 @@ export function StaffOperations() {
   const activeStaff = (staff ?? []).filter((s) => s.isActive === 1);
   const today = new Date();
 
+  const certExpiredCount = (certifications ?? []).filter((c) => c.status === "expired").length;
+  const certExpiringSoonCount = (certifications ?? []).filter((c) => c.status === "expiring_soon").length;
+  const certActiveCount = (certifications ?? []).filter((c) => c.status === "active").length;
+
   const timeByStaff = useMemo(() => {
     const map = new Map<
       number,
@@ -114,25 +118,25 @@ export function StaffOperations() {
   const isLoadingClock = staffLoading || entriesLoading;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
-            <Clock className="w-8 h-8 text-[#4F7C5D]" />
-            <h1 className="text-4xl font-bold text-slate-900">Staff Operations</h1>
+            <Clock className="w-6 h-6 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">Staff Operations</h1>
           </div>
         </div>
 
         {/* Time Clock Section */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-slate-900 mb-4">Time Clock</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-4">Time Clock</h2>
           {isLoadingClock ? (
-            <div className="flex items-center justify-center gap-2 py-12 text-slate-500">
+            <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
               <Loader2 className="w-5 h-5 animate-spin" /> Loading time clock…
             </div>
           ) : activeStaff.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-8 text-center text-muted-foreground">
               No active staff members found.
             </div>
           ) : (
@@ -145,40 +149,40 @@ export function StaffOperations() {
                 return (
                   <div
                     key={member.id}
-                    className={`rounded-2xl shadow-sm border-2 p-6 ${clockedIn ? "border-green-300 bg-green-50" : "border-slate-200 bg-white"}`}
+                    className={`rounded-xl shadow-sm border-2 p-6 ${clockedIn ? "border-green-300 bg-green-50" : "border-border bg-card"}`}
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div>
-                        <h3 className="font-semibold text-slate-900">{member.firstName} {member.lastName}</h3>
-                        <p className="text-sm text-slate-600">{member.position || member.role}</p>
+                        <h3 className="font-semibold text-foreground">{member.firstName} {member.lastName}</h3>
+                        <p className="text-sm text-muted-foreground">{member.position || member.role}</p>
                       </div>
-                      <div className={`px-3 py-1 rounded-full text-xs font-semibold ${clockedIn ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-700"}`}>
+                      <div className={`px-3 py-1 rounded-full text-xs font-semibold ${clockedIn ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>
                         {clockedIn ? "Clocked In" : "Clocked Out"}
                       </div>
                     </div>
 
                     <div className="space-y-2 mb-4">
                       <div className="flex items-center gap-2">
-                        <LogIn className="w-4 h-4 text-slate-600" />
-                        <span className="text-sm text-slate-600">
+                        <LogIn className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
                           In: {hasTodayActivity ? formatTime(displayEntry?.clockInTime) : "Not clocked in today"}
                         </span>
                       </div>
                       {displayEntry?.clockOutTime && (
                         <div className="flex items-center gap-2">
-                          <LogOut className="w-4 h-4 text-slate-600" />
-                          <span className="text-sm text-slate-600">Out: {formatTime(displayEntry.clockOutTime)}</span>
+                          <LogOut className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">Out: {formatTime(displayEntry.clockOutTime)}</span>
                         </div>
                       )}
                       {displayEntry?.hoursWorked && (
                         <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-slate-600" />
-                          <span className="text-sm text-slate-600">Hours: {parseFloat(String(displayEntry.hoursWorked)).toFixed(1)}</span>
+                          <Clock className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">Hours: {parseFloat(String(displayEntry.hoursWorked)).toFixed(1)}</span>
                         </div>
                       )}
                       <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-slate-600" />
-                        <span className="text-sm text-slate-600">
+                        <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
                           This week: {(info?.weekHours ?? 0).toFixed(1)} hrs
                         </span>
                       </div>
@@ -215,42 +219,67 @@ export function StaffOperations() {
         {/* Certifications Section */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-slate-900">Certifications & Training</h2>
+            <h2 className="text-2xl font-bold text-foreground">Certifications & Training</h2>
             {isAdmin && (
               <button
                 onClick={() => setShowCertModal(true)}
-                className="bg-[#4F7C5D] hover:bg-[#3C5E47] text-white px-4 py-2 rounded-xl transition-colors font-medium flex items-center gap-2"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-xl transition-colors font-medium flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 Add Certification
               </button>
             )}
           </div>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          {!certsLoading && (certifications ?? []).length > 0 && (
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                <div>
+                  <p className="text-xl font-bold text-foreground">{certExpiredCount}</p>
+                  <p className="text-xs text-muted-foreground">Expired</p>
+                </div>
+              </div>
+              <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0" />
+                <div>
+                  <p className="text-xl font-bold text-foreground">{certExpiringSoonCount}</p>
+                  <p className="text-xs text-muted-foreground">Expiring within 60 days</p>
+                </div>
+              </div>
+              <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                <div>
+                  <p className="text-xl font-bold text-foreground">{certActiveCount}</p>
+                  <p className="text-xs text-muted-foreground">Active</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
             {certsLoading ? (
-              <div className="flex items-center justify-center gap-2 py-12 text-slate-500">
+              <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
                 <Loader2 className="w-5 h-5 animate-spin" /> Loading certifications…
               </div>
             ) : (certifications ?? []).length === 0 ? (
-              <div className="p-8 text-center text-slate-500">No certifications on file yet.</div>
+              <div className="p-8 text-center text-muted-foreground">No certifications on file yet.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-slate-50 border-b border-slate-200">
+                  <thead className="bg-muted border-b border-border">
                     <tr>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Staff Member</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Certification</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Expires</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Status</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Days Left</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Staff Member</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Certification</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Expires</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Status</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Days Left</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(certifications ?? []).map((cert) => (
-                      <tr key={cert.id} className="border-b border-slate-200 hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4 text-sm font-medium text-slate-900">{cert.staffName}</td>
-                        <td className="px-6 py-4 text-sm text-slate-600">{cert.certificationType}</td>
-                        <td className="px-6 py-4 text-sm text-slate-600">{new Date(cert.expiryDate).toLocaleDateString()}</td>
+                      <tr key={cert.id} className="border-b border-border hover:bg-muted transition-colors">
+                        <td className="px-6 py-4 text-sm font-medium text-foreground">{cert.staffName}</td>
+                        <td className="px-6 py-4 text-sm text-muted-foreground">{cert.certificationType}</td>
+                        <td className="px-6 py-4 text-sm text-muted-foreground">{new Date(cert.expiryDate).toLocaleDateString()}</td>
                         <td className="px-6 py-4 text-sm">
                           <div className="flex items-center gap-2">
                             {cert.status === "active" && <CheckCircle2 className="w-4 h-4 text-green-600" />}
@@ -261,7 +290,7 @@ export function StaffOperations() {
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm font-semibold text-slate-900">{daysUntil(cert.expiryDate)}</td>
+                        <td className="px-6 py-4 text-sm font-semibold text-foreground">{daysUntil(cert.expiryDate)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -274,16 +303,16 @@ export function StaffOperations() {
         {/* Add Certification Modal */}
         {showCertModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-lg max-w-lg w-full p-6">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6">Add Certification</h2>
+            <div className="bg-card rounded-xl shadow-lg max-w-lg w-full p-6">
+              <h2 className="text-2xl font-bold text-foreground mb-6">Add Certification</h2>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Staff Member</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">Staff Member</label>
                   <select
                     value={certForm.staffId}
                     onChange={(e) => setCertForm((f) => ({ ...f, staffId: e.target.value }))}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Choose a staff member...</option>
                     {(staff ?? []).map((member) => (
@@ -295,58 +324,58 @@ export function StaffOperations() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Certification Type</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">Certification Type</label>
                   <input
                     type="text"
                     placeholder="e.g. CPR/First Aid, CDA"
                     value={certForm.certificationType}
                     onChange={(e) => setCertForm((f) => ({ ...f, certificationType: e.target.value }))}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Issue Date</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Issue Date</label>
                     <input
                       type="date"
                       value={certForm.issueDate}
                       onChange={(e) => setCertForm((f) => ({ ...f, issueDate: e.target.value }))}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                      className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Expiry Date</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">Expiry Date</label>
                     <input
                       type="date"
                       value={certForm.expiryDate}
                       onChange={(e) => setCertForm((f) => ({ ...f, expiryDate: e.target.value }))}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                      className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Certification Number (optional)</label>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">Certification Number (optional)</label>
                   <input
                     type="text"
                     value={certForm.certificationNumber}
                     onChange={(e) => setCertForm((f) => ({ ...f, certificationNumber: e.target.value }))}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5E8C6A]"
+                    className="w-full px-4 py-2 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
 
                 <div className="flex gap-3 pt-4">
                   <button
                     onClick={() => { setShowCertModal(false); setCertForm(emptyCertForm); }}
-                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl transition-colors font-medium"
+                    className="flex-1 bg-muted hover:bg-muted text-muted-foreground px-4 py-2 rounded-xl transition-colors font-medium"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={submitCertification}
                     disabled={createCertification.isPending}
-                    className="flex-1 bg-[#4F7C5D] hover:bg-[#3C5E47] disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium flex items-center justify-center gap-2"
+                    className="flex-1 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white px-4 py-2 rounded-xl transition-colors font-medium flex items-center justify-center gap-2"
                   >
                     {createCertification.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                     Save Certification
