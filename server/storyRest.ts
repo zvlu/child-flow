@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
 import { storyPosts, storyPostLikes, storyPostComments, staff, type User } from "../drizzle/schema";
 import { sdk } from "./_core/sdk";
@@ -174,6 +174,44 @@ export function registerStoryRoutes(app: Express) {
     }
   });
 
+  /**
+   * List comments on a post, oldest first (thread order) — previously
+   * missing entirely, so the iOS Story feed could only show a running
+   * comment count with no way to actually read what was said.
+   */
+  app.get("/api/story/posts/:id/comments", async (req: Request, res: Response) => {
+    const user = await requireStaff(req);
+    if (!user || user.organizationId == null) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const postId = Number(req.params.id);
+    const db = await getDb();
+    if (!db || !Number.isFinite(postId)) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
+    // Confirm the post belongs to this org before returning its comments.
+    const [post] = await db.select({ organizationId: storyPosts.organizationId }).from(storyPosts).where(eq(storyPosts.id, postId));
+    if (!post || post.organizationId !== user.organizationId) {
+      res.status(404).json({ error: "Post not found" });
+      return;
+    }
+    const rows = await db
+      .select()
+      .from(storyPostComments)
+      .where(eq(storyPostComments.postId, postId))
+      .orderBy(asc(storyPostComments.createdAt));
+    res.json(
+      rows.map((c) => ({
+        id: String(c.id),
+        authorName: c.authorName,
+        content: c.content,
+        postedAt: c.createdAt.toISOString(),
+      }))
+    );
+  });
+
   app.post("/api/story/posts/:id/comments", async (req: Request, res: Response) => {
     const user = await requireStaff(req);
     if (!user || user.organizationId == null) {
@@ -188,13 +226,17 @@ export function registerStoryRoutes(app: Express) {
       return;
     }
     const staffId = await resolveStaffId(user.organizationId, user.id);
-    const authorName = user.email ?? "Staff";
+    let authorName = "Staff";
+    if (staffId != null) {
+      const [s] = await db.select({ firstName: staff.firstName, lastName: staff.lastName }).from(staff).where(eq(staff.id, staffId));
+      if (s) authorName = `${s.firstName} ${s.lastName}`;
+    }
     const [result] = await db.insert(storyPostComments).values({
       postId,
       authorName,
       staffId: staffId ?? undefined,
       content,
     });
-    res.json({ id: String(result.insertId), success: true });
+    res.json({ id: String(result.insertId), authorName, content, postedAt: new Date().toISOString(), success: true });
   });
 }

@@ -1837,3 +1837,25 @@ export const storyPostComments = mysqlTable("story_post_comments", {
 
 export type StoryPostComment = typeof storyPostComments.$inferSelect;
 export type InsertStoryPostComment = typeof storyPostComments.$inferInsert;
+
+/**
+ * Per-user "archived" marker for a conversation — Communication.tsx's Inbox
+ * "Archive" action previously only hid a row in local component state (no
+ * server concept existed; `conversations.isActive` is unrelated — it marks
+ * which thread is the live one for a family, not a per-viewer archive
+ * status). Archiving is per-user, not global: one staff member archiving a
+ * thread shouldn't hide it from a colleague. A new message in the
+ * conversation clears any archive rows for it (see server/messaging.ts),
+ * so an archived thread reappears once there's new activity.
+ */
+export const conversationArchives = mysqlTable("conversation_archives", {
+  id: int("id").autoincrement().primaryKey(),
+  conversationId: int("conversationId").notNull().references(() => conversations.id),
+  userId: int("userId").notNull().references(() => users.id),
+  archivedAt: timestamp("archivedAt").defaultNow().notNull(),
+}, (t) => ({
+  convoUser: unique("conversation_archives_convo_user").on(t.conversationId, t.userId),
+}));
+
+export type ConversationArchive = typeof conversationArchives.$inferSelect;
+export type InsertConversationArchive = typeof conversationArchives.$inferInsert;

@@ -48,6 +48,7 @@ type Conversation = {
   lastMessageDate: string;
   unreadCount: number;
   isActive: boolean;
+  archived: boolean;
 };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -119,11 +120,6 @@ export default function Communication() {
     refetchInterval: 15_000,
   });
   const conversations = conversationsQuery.data ?? [];
-
-  // Archive has no backing field on `conversations` (isActive means "the
-  // family's one active thread", not per-viewer archived) — hiding locally is
-  // the honest option rather than faking server persistence.
-  const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
 
   const sendMessageMutation = trpc.messaging.send.useMutation({
     onSuccess: (data) => {
@@ -221,22 +217,42 @@ export default function Communication() {
     }
   };
 
-  const archiveConversation = (conv: Conversation) => {
-    setArchivedIds((prev) => new Set(prev).add(conv.id));
-    toast.success("Archived from this view", {
-      description: "Local only — the message still exists and will reappear in Family Chat.",
-    });
-  };
+  // Archive is per-user server state (server/messaging.ts's
+  // conversationArchives table) — archiving hides the thread from this
+  // viewer only, and a new message in the thread automatically un-archives
+  // it for everyone (the usual "reply reopens it" inbox convention).
+  const archiveMutation = useMutation({
+    mutationFn: (conversationId: string) => api(`/api/messaging/conversations/${conversationId}/archive`, { method: "POST" }),
+    onSuccess: () => {
+      toast.success("Archived");
+      invalidateConversations();
+    },
+    onError: (e: Error) => toast.error(e.message || "Could not archive conversation"),
+  });
+
+  const unarchiveMutation = useMutation({
+    mutationFn: (conversationId: string) => api(`/api/messaging/conversations/${conversationId}/unarchive`, { method: "POST" }),
+    onSuccess: () => {
+      toast.success("Moved back to Inbox");
+      invalidateConversations();
+    },
+    onError: (e: Error) => toast.error(e.message || "Could not restore conversation"),
+  });
+
+  const archiveConversation = (conv: Conversation) => archiveMutation.mutate(conv.id);
+  const unarchiveConversation = (conv: Conversation) => unarchiveMutation.mutate(conv.id);
+
+  const [showArchived, setShowArchived] = useState(false);
 
   // Filtered Data
   const filteredConversations = useMemo(() => {
     const q = searchQuery.toLowerCase();
     return conversations
-      .filter((c) => !archivedIds.has(c.id))
+      .filter((c) => (showArchived ? c.archived : !c.archived))
       .filter((c) =>
         !q || c.familyName.toLowerCase().includes(q) || c.lastMessage.toLowerCase().includes(q)
       );
-  }, [conversations, archivedIds, searchQuery]);
+  }, [conversations, searchQuery, showArchived]);
 
   const staffName = (id: number | null | undefined) => {
     if (id == null) return "Staff";
@@ -372,21 +388,34 @@ export default function Communication() {
               Family Chat
             </TabsTrigger>
             <TabsTrigger value="messages" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">
-              Inbox <Badge className="ml-2 bg-card/20 text-white border-none h-4 px-1.5">{conversations.filter(c => c.unreadCount > 0 && !archivedIds.has(c.id)).length}</Badge>
+              Inbox <Badge className="ml-2 bg-card/20 text-white border-none h-4 px-1.5">{conversations.filter(c => c.unreadCount > 0 && !c.archived).length}</Badge>
             </TabsTrigger>
             {hasHeadStart && <TabsTrigger value="logs" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Contact Logs</TabsTrigger>}
             <TabsTrigger value="history" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">History</TabsTrigger>
             <TabsTrigger value="broadcast" className="rounded-xl px-6 font-bold data-[state=active]:bg-primary data-[state=active]:text-white">Broadcasts</TabsTrigger>
           </TabsList>
 
-          <div className="relative w-full max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder={`Search ${selectedTab}...`}
-              className="pl-10 rounded-xl border-none shadow-sm bg-card focus-visible:ring-primary"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          <div className="flex items-center gap-2">
+            {selectedTab === "messages" && (
+              <Button
+                variant={showArchived ? "secondary" : "ghost"}
+                size="sm"
+                className="rounded-xl text-xs font-bold"
+                onClick={() => setShowArchived((v) => !v)}
+              >
+                <Archive className="h-3.5 w-3.5 mr-1.5" />
+                {showArchived ? "Back to Inbox" : "Show Archived"}
+              </Button>
+            )}
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={`Search ${selectedTab}...`}
+                className="pl-10 rounded-xl border-none shadow-sm bg-card focus-visible:ring-primary"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
@@ -451,9 +480,15 @@ export default function Communication() {
                               <DropdownMenuItem className="gap-2 font-medium" onClick={() => openForward(conv)}>
                                 <Forward className="h-4 w-4" /> Forward
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="gap-2 font-medium" onClick={() => archiveConversation(conv)}>
-                                <Archive className="h-4 w-4" /> Archive
-                              </DropdownMenuItem>
+                              {conv.archived ? (
+                                <DropdownMenuItem className="gap-2 font-medium" onClick={() => unarchiveConversation(conv)}>
+                                  <Archive className="h-4 w-4" /> Unarchive
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem className="gap-2 font-medium" onClick={() => archiveConversation(conv)}>
+                                  <Archive className="h-4 w-4" /> Archive
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>

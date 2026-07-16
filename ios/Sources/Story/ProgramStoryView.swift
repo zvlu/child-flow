@@ -3,10 +3,11 @@ import SwiftUI
 // MARK: - Program Story View (staff-facing)
 //
 // Backed by GET/POST /api/story/posts, POST /api/story/posts/:id/like, and
-// POST /api/story/posts/:id/comments (see ios/Sources/Networking/StoryAPI.swift
-// for the networking layer). There is no GET-comments-list endpoint yet, so
-// "Comment" posts a real comment and bumps the visible count rather than
-// opening a full thread view — see the note on ProgramStoryViewModel.addComment.
+// GET/POST /api/story/posts/:id/comments (see
+// ios/Sources/Networking/StoryAPI.swift for the networking layer). Tapping
+// "Comment" opens a full thread view (CommentThreadSheet) that fetches the
+// real comment list and lets staff post a new one, which is appended
+// locally from the POST response without a refetch.
 //
 // The server does not implement real photo upload (no field populates
 // `photoUrl` today), so this view never fakes a photo-picking experience:
@@ -48,6 +49,7 @@ struct ProgramStoryView: View {
                                     post: post,
                                     childName: viewModel.childName(for:),
                                     onLike: { viewModel.toggleLike(post) },
+                                    onLoadComments: { await viewModel.fetchComments(for: post) },
                                     onComment: { text in await viewModel.addComment(to: post, content: text) }
                                 )
                             }
@@ -72,8 +74,8 @@ struct ProgramStoryView: View {
                 }
             }
             .sheet(isPresented: $viewModel.showCompose) {
-                ComposeStoryPostSheet { caption, audience in
-                    await viewModel.createPost(caption: caption, audience: audience)
+                ComposeStoryPostSheet(children: viewModel.children) { caption, audience, taggedChildren in
+                    await viewModel.createPost(caption: caption, audience: audience, taggedChildren: taggedChildren)
                 }
             }
             .task { await viewModel.load() }
@@ -93,7 +95,8 @@ struct StoryPostCard: View {
     let post: StoryPost
     let childName: (Int) -> String
     let onLike: () -> Void
-    let onComment: (String) async -> Void
+    let onLoadComments: () async -> [StoryComment]
+    let onComment: (String) async -> StoryComment?
 
     @State private var showCommentSheet = false
 
@@ -238,60 +241,138 @@ struct StoryPostCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .cfCardShadow()
         .sheet(isPresented: $showCommentSheet) {
-            AddCommentSheet { text in
-                await onComment(text)
-            }
+            CommentThreadSheet(onLoadComments: onLoadComments, onSubmit: onComment)
         }
     }
 }
 
-// MARK: - Add Comment Sheet
+// MARK: - Comment Thread Sheet
 //
-// The server has no GET-comments-list endpoint (POST /api/story/posts/:id/comments
-// only increments the post's commentCount), so this is intentionally a
-// one-shot "post a comment" flow rather than a full comment thread view.
+// Fetches the real comment thread via GET /api/story/posts/:id/comments
+// (oldest-first) and lets staff post a new comment; the newly created
+// comment is appended locally from the POST response so the thread updates
+// immediately without a full refetch.
 
-struct AddCommentSheet: View {
-    let onSubmit: (String) async -> Void
+struct CommentThreadSheet: View {
+    let onLoadComments: () async -> [StoryComment]
+    let onSubmit: (String) async -> StoryComment?
     @Environment(\.dismiss) private var dismiss
-    @State private var text = ""
+
+    @State private var comments: [StoryComment] = []
+    @State private var isLoading = true
+    @State private var newText = ""
     @State private var isSaving = false
 
-    private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var trimmed: String { newText.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Comment") {
-                    TextEditor(text: $text)
-                        .font(.cfBody)
-                        .frame(minHeight: 100)
-                }
-            }
-            .navigationTitle("Add Comment")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        isSaving = true
-                        Task {
-                            await onSubmit(trimmed)
-                            isSaving = false
-                            dismiss()
+            VStack(spacing: 0) {
+                Group {
+                    if isLoading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if comments.isEmpty {
+                        CFEmptyState(
+                            icon: "bubble.left",
+                            title: "No Comments Yet",
+                            message: "Be the first to leave a comment on this update."
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 14) {
+                                ForEach(comments) { comment in
+                                    CommentRow(comment: comment)
+                                }
+                            }
+                            .padding(16)
                         }
-                    } label: {
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                Divider()
+
+                HStack(alignment: .bottom, spacing: 10) {
+                    TextField("Add a comment…", text: $newText, axis: .vertical)
+                        .font(.cfBody)
+                        .lineLimit(1...4)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.cfBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                    Button(action: submit) {
                         if isSaving {
                             ProgressView()
                         } else {
-                            Text("Post")
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 28))
+                                .foregroundColor(trimmed.isEmpty ? .cfTextSecondary.opacity(0.4) : .cfPrimary)
                         }
                     }
                     .disabled(trimmed.isEmpty || isSaving)
                 }
+                .padding(12)
             }
+            .background(Color.cfSurface.ignoresSafeArea(edges: .bottom))
+            .navigationTitle("Comments")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .task { await loadComments() }
+        }
+    }
+
+    private func loadComments() async {
+        isLoading = true
+        comments = await onLoadComments()
+        isLoading = false
+    }
+
+    private func submit() {
+        let text = trimmed
+        guard !text.isEmpty else { return }
+        isSaving = true
+        Task {
+            if let comment = await onSubmit(text) {
+                comments.append(comment)
+                newText = ""
+            }
+            isSaving = false
+        }
+    }
+}
+
+struct CommentRow: View {
+    let comment: StoryComment
+
+    private var postedLabel: String {
+        let diff = Date().timeIntervalSince(comment.postedAt)
+        if diff < 60 { return "Just now" }
+        if diff < 3600 { return "\(Int(diff / 60))m ago" }
+        if diff < 86400 { return "\(Int(diff / 3600))h ago" }
+        return comment.postedAt.formatted(.dateTime.month(.abbreviated).day())
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(comment.authorName)
+                    .font(.cfSubheadline.bold())
+                    .foregroundColor(.cfTextPrimary)
+                Spacer()
+                Text(postedLabel)
+                    .font(.cfCaption2)
+                    .foregroundColor(.cfTextSecondary)
+            }
+            Text(comment.content)
+                .font(.cfBody)
+                .foregroundColor(.cfTextPrimary)
         }
     }
 }
@@ -299,15 +380,35 @@ struct AddCommentSheet: View {
 // MARK: - Compose Sheet
 
 struct ComposeStoryPostSheet: View {
+    /// Children available to tag, loaded by the view model via
+    /// `APIClient.shared.getChildren()` (same source used to resolve tag
+    /// names on existing posts).
+    let children: [Child]
     /// Returns `true` on success; the sheet stays open and shows an error on failure.
-    let onPost: (String, StoryPost.Audience) async -> Bool
+    let onPost: (String, StoryPost.Audience, [Int]) async -> Bool
     @Environment(\.dismiss) private var dismiss
     @State private var caption = ""
     @State private var audience: StoryPost.Audience = .allFamilies
+    @State private var taggedChildIds: Set<Int> = []
     @State private var isPosting = false
     @State private var errorMessage: String?
 
     var canPost: Bool { !caption.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    private var sortedChildren: [(id: Int, name: String)] {
+        children.compactMap { child -> (id: Int, name: String)? in
+            guard let id = Int(child.id) else { return nil }
+            return (id, child.fullName)
+        }
+        .sorted { $0.name < $1.name }
+    }
+
+    private var taggedChildrenSummary: String {
+        if taggedChildIds.isEmpty { return "None" }
+        let names = sortedChildren.filter { taggedChildIds.contains($0.id) }.map(\.name)
+        if names.count <= 2 { return names.joined(separator: ", ") }
+        return "\(names[0]), \(names[1]) +\(names.count - 2)"
+    }
 
     var body: some View {
         NavigationStack {
@@ -350,6 +451,53 @@ struct ComposeStoryPostSheet: View {
                     .pickerStyle(.navigationLink)
                 }
 
+                if !sortedChildren.isEmpty {
+                    Section("Tag Children") {
+                        Menu {
+                            ForEach(sortedChildren, id: \.id) { child in
+                                Button {
+                                    toggleTag(child.id)
+                                } label: {
+                                    if taggedChildIds.contains(child.id) {
+                                        Label(child.name, systemImage: "checkmark")
+                                    } else {
+                                        Text(child.name)
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Tagged Children")
+                                    .foregroundColor(.cfTextPrimary)
+                                Spacer()
+                                Text(taggedChildrenSummary)
+                                    .foregroundColor(.cfTextSecondary)
+                            }
+                        }
+
+                        if !taggedChildIds.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(sortedChildren.filter { taggedChildIds.contains($0.id) }, id: \.id) { child in
+                                        HStack(spacing: 4) {
+                                            Text(child.name)
+                                                .font(.cfCaption2)
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.system(size: 11))
+                                        }
+                                        .foregroundColor(.cfChildren)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.cfChildrenBg)
+                                        .clipShape(Capsule())
+                                        .onTapGesture { toggleTag(child.id) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Section {
                     Button(action: post) {
                         HStack {
@@ -382,11 +530,19 @@ struct ComposeStoryPostSheet: View {
         }
     }
 
+    private func toggleTag(_ childId: Int) {
+        if taggedChildIds.contains(childId) {
+            taggedChildIds.remove(childId)
+        } else {
+            taggedChildIds.insert(childId)
+        }
+    }
+
     private func post() {
         isPosting = true
         errorMessage = nil
         Task {
-            let success = await onPost(caption, audience)
+            let success = await onPost(caption, audience, Array(taggedChildIds))
             isPosting = false
             if success {
                 dismiss()
@@ -465,6 +621,10 @@ final class ProgramStoryViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var showCompose = false
     @Published var errorMessage: String?
+    /// Real children, loaded via `APIClient.shared.getChildren()`. Used both
+    /// to resolve tag names on existing posts (`childName(for:)`) and to
+    /// power the tagged-children picker in `ComposeStoryPostSheet`.
+    @Published private(set) var children: [Child] = []
     @Published private var childNamesById: [Int: String] = [:]
 
     func childName(for id: Int) -> String {
@@ -477,9 +637,10 @@ final class ProgramStoryViewModel: ObservableObject {
         do {
             async let postsTask = APIClient.shared.getStoryPosts()
             async let childrenTask = APIClient.shared.getChildren()
-            let (fetchedPosts, children) = try await (postsTask, childrenTask)
+            let (fetchedPosts, fetchedChildren) = try await (postsTask, childrenTask)
             posts = fetchedPosts.sorted { $0.postedAt > $1.postedAt }
-            childNamesById = Dictionary(uniqueKeysWithValues: children.compactMap { child -> (Int, String)? in
+            children = fetchedChildren
+            childNamesById = Dictionary(uniqueKeysWithValues: fetchedChildren.compactMap { child -> (Int, String)? in
                 guard let id = Int(child.id) else { return nil }
                 return (id, child.fullName)
             })
@@ -490,9 +651,13 @@ final class ProgramStoryViewModel: ObservableObject {
     }
 
     @discardableResult
-    func createPost(caption: String, audience: StoryPost.Audience) async -> Bool {
+    func createPost(caption: String, audience: StoryPost.Audience, taggedChildren: [Int]) async -> Bool {
         do {
-            _ = try await APIClient.shared.createStoryPost(caption: caption, audience: audience.rawValue, taggedChildren: nil)
+            _ = try await APIClient.shared.createStoryPost(
+                caption: caption,
+                audience: audience.rawValue,
+                taggedChildren: taggedChildren.isEmpty ? nil : taggedChildren
+            )
             await load()
             return true
         } catch {
@@ -528,20 +693,33 @@ final class ProgramStoryViewModel: ObservableObject {
         posts[index].likeCount += posts[index].likedByMe ? 1 : -1
     }
 
-    /// Posts a real comment and bumps the visible count. There's no
-    /// GET-comments-list endpoint yet, so individual comment bodies aren't
-    /// fetched back — this can't build a full comment thread view, only
-    /// record that a comment was made.
-    func addComment(to post: StoryPost, content: String) async {
-        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+    /// Fetches the full comment thread for a post (oldest-first), used by
+    /// `CommentThreadSheet` to show real comment bodies rather than just a count.
+    func fetchComments(for post: StoryPost) async -> [StoryComment] {
         do {
-            _ = try await APIClient.shared.addStoryPostComment(postId: post.id, content: trimmed)
+            return try await APIClient.shared.getStoryPostComments(postId: post.id)
+        } catch {
+            errorMessage = (error as? APIError)?.errorDescription ?? "Couldn't load comments. Check your connection and try again."
+            return []
+        }
+    }
+
+    /// Posts a real comment, bumps the visible count, and returns the full
+    /// created comment (as echoed back by the server) so callers can append
+    /// it to a local thread list immediately without a refetch.
+    @discardableResult
+    func addComment(to post: StoryPost, content: String) async -> StoryComment? {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        do {
+            let comment = try await APIClient.shared.addStoryPostComment(postId: post.id, content: trimmed)
             if let idx = posts.firstIndex(where: { $0.id == post.id }) {
                 posts[idx].commentCount += 1
             }
+            return comment
         } catch {
             errorMessage = (error as? APIError)?.errorDescription ?? "Couldn't post that comment. Check your connection and try again."
+            return nil
         }
     }
 }

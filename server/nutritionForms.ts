@@ -34,12 +34,19 @@ async function requireStaff(req: Request): Promise<User | null> {
   }
 }
 
-/** Parses and validates the required `?childId=` query param. Returns null (and writes a 400) if missing/invalid. */
-function parseChildIdQuery(req: Request, res: Response): number | null {
+/**
+ * Parses the optional `?childId=` query param. Returns `undefined` when
+ * omitted (the list screens browse ALL children's forms, not one child's —
+ * this used to be required, which made every list-view load 400 since the
+ * iOS list view models call these routes with no child selected yet) or
+ * `null` (writing a 400) if present but not a valid positive number.
+ */
+function parseChildIdQuery(req: Request, res: Response): number | null | undefined {
   const raw = req.query.childId;
+  if (raw === undefined || raw === "") return undefined;
   const childId = typeof raw === "string" ? Number(raw) : NaN;
-  if (!raw || !Number.isFinite(childId) || childId <= 0) {
-    res.status(400).json({ error: "childId is required" });
+  if (!Number.isFinite(childId) || childId <= 0) {
+    res.status(400).json({ error: "childId, if provided, must be a positive number" });
     return null;
   }
   return childId;
@@ -89,7 +96,7 @@ export function registerNutritionFormRoutes(app: Express) {
       return;
     }
     const childId = parseChildIdQuery(req, res);
-    if (childId == null) return;
+    if (childId === null) return;
 
     const rows = await db
       .select({
@@ -105,7 +112,11 @@ export function registerNutritionFormRoutes(app: Express) {
       })
       .from(nutritionPreferenceForms)
       .innerJoin(children, eq(children.id, nutritionPreferenceForms.childId))
-      .where(and(eq(nutritionPreferenceForms.organizationId, org.id), eq(nutritionPreferenceForms.childId, childId)))
+      .where(
+        childId === undefined
+          ? eq(nutritionPreferenceForms.organizationId, org.id)
+          : and(eq(nutritionPreferenceForms.organizationId, org.id), eq(nutritionPreferenceForms.childId, childId))
+      )
       .orderBy(desc(nutritionPreferenceForms.completedDate));
 
     res.json(
@@ -195,7 +206,7 @@ export function registerNutritionFormRoutes(app: Express) {
       return;
     }
     const childId = parseChildIdQuery(req, res);
-    if (childId == null) return;
+    if (childId === null) return;
 
     const rows = await db
       .select({
@@ -214,7 +225,11 @@ export function registerNutritionFormRoutes(app: Express) {
       })
       .from(nutritionInfantFormulaForms)
       .innerJoin(children, eq(children.id, nutritionInfantFormulaForms.childId))
-      .where(and(eq(nutritionInfantFormulaForms.organizationId, org.id), eq(nutritionInfantFormulaForms.childId, childId)))
+      .where(
+        childId === undefined
+          ? eq(nutritionInfantFormulaForms.organizationId, org.id)
+          : and(eq(nutritionInfantFormulaForms.organizationId, org.id), eq(nutritionInfantFormulaForms.childId, childId))
+      )
       .orderBy(desc(nutritionInfantFormulaForms.completedDate));
 
     res.json(
@@ -308,7 +323,7 @@ export function registerNutritionFormRoutes(app: Express) {
       return;
     }
     const childId = parseChildIdQuery(req, res);
-    if (childId == null) return;
+    if (childId === null) return;
 
     const rows = await db
       .select({
@@ -327,7 +342,11 @@ export function registerNutritionFormRoutes(app: Express) {
       })
       .from(nutritionMedicalStatements)
       .innerJoin(children, eq(children.id, nutritionMedicalStatements.childId))
-      .where(and(eq(nutritionMedicalStatements.organizationId, org.id), eq(nutritionMedicalStatements.childId, childId)))
+      .where(
+        childId === undefined
+          ? eq(nutritionMedicalStatements.organizationId, org.id)
+          : and(eq(nutritionMedicalStatements.organizationId, org.id), eq(nutritionMedicalStatements.childId, childId))
+      )
       .orderBy(desc(nutritionMedicalStatements.signedDate));
 
     res.json(

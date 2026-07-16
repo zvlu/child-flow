@@ -5,6 +5,7 @@ import {
   children,
   childClassroomAssignments,
   classrooms,
+  conversationArchives,
   conversations,
   families,
   users,
@@ -62,7 +63,7 @@ function canAccess(viewer: Viewer, conversation: Conversation): boolean {
 }
 
 /** Serialize a conversation the way the iOS apps decode it. */
-async function serializeConversation(conversation: Conversation, viewer: Viewer) {
+async function serializeConversation(conversation: Conversation, viewer: Viewer, archivedByMe = false) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -108,6 +109,7 @@ async function serializeConversation(conversation: Conversation, viewer: Viewer)
     lastMessageDate: (latest?.sentAt ?? conversation.createdAt).toISOString(),
     unreadCount,
     isActive: conversation.isActive === 1,
+    archived: archivedByMe,
   };
 }
 
@@ -185,7 +187,65 @@ export function registerMessagingRoutes(app: Express) {
             .where(eq(conversations.familyId, viewer.familyId!))
             .orderBy(desc(conversations.updatedAt));
 
-    res.json(await Promise.all(rows.map(c => serializeConversation(c, viewer))));
+    // Per-viewer archive state (see drizzle/schema.ts's
+    // conversationArchives) — archiving is per-user, so a staff member
+    // archiving a thread doesn't hide it from a colleague or the family.
+    const archives = await db
+      .select({ conversationId: conversationArchives.conversationId })
+      .from(conversationArchives)
+      .where(eq(conversationArchives.userId, viewer.user.id));
+    const archivedIds = new Set(archives.map(a => a.conversationId));
+    const includeArchived = req.query.includeArchived === "true";
+
+    const visible = includeArchived ? rows : rows.filter(c => !archivedIds.has(c.id));
+    res.json(await Promise.all(visible.map(c => serializeConversation(c, viewer, archivedIds.has(c.id)))));
+  });
+
+  /** Archive a conversation for the caller only (not global). */
+  app.post("/api/messaging/conversations/:id/archive", async (req: Request, res: Response) => {
+    const viewer = await requireViewer(req);
+    if (!viewer) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const conversationId = Number(req.params.id);
+    const [conversation] = await db.select().from(conversations).where(eq(conversations.id, conversationId)).limit(1);
+    if (!conversation || !canAccess(viewer, conversation)) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+    const existing = await db
+      .select({ id: conversationArchives.id })
+      .from(conversationArchives)
+      .where(and(eq(conversationArchives.conversationId, conversationId), eq(conversationArchives.userId, viewer.user.id)));
+    if (existing.length === 0) {
+      await db.insert(conversationArchives).values({ conversationId, userId: viewer.user.id });
+    }
+    res.json({ archived: true });
+  });
+
+  /** Un-archive a conversation for the caller. */
+  app.post("/api/messaging/conversations/:id/unarchive", async (req: Request, res: Response) => {
+    const viewer = await requireViewer(req);
+    if (!viewer) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Database not available" });
+      return;
+    }
+    const conversationId = Number(req.params.id);
+    await db
+      .delete(conversationArchives)
+      .where(and(eq(conversationArchives.conversationId, conversationId), eq(conversationArchives.userId, viewer.user.id)));
+    res.json({ archived: false });
   });
 
   /** Fetch a thread; marks the viewer's side as read. */
@@ -306,6 +366,9 @@ export function registerMessagingRoutes(app: Express) {
           : { familyLastReadAt: new Date() }
       )
       .where(eq(conversations.id, conversationId));
+    // New activity un-archives the thread for everyone who'd archived it
+    // (the usual "reply reopens it" inbox convention).
+    await db.delete(conversationArchives).where(eq(conversationArchives.conversationId, conversationId));
 
     const [saved] = await db
       .select()

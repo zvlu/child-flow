@@ -3,16 +3,15 @@ import Foundation
 // MARK: - Program Story (staff-facing "moments" feed)
 //
 // Mirrors the server's story REST endpoints:
-//   GET  /api/story/posts                    -> [StoryPost]
-//   POST /api/story/posts                     -> { id, success }
-//   POST /api/story/posts/:id/like            -> { liked }
-//   POST /api/story/posts/:id/comments        -> { id, success }
+//   GET  /api/story/posts                       -> [StoryPost]
+//   POST /api/story/posts                        -> { id, success }
+//   POST /api/story/posts/:id/like               -> { liked }
+//   GET  /api/story/posts/:id/comments           -> [{ id, authorName, content, postedAt }]
+//   POST /api/story/posts/:id/comments           -> { id, authorName, content, postedAt, success }
 //
-// Note: there is no GET-comments-list endpoint yet. Individual comment
-// bodies are not fetched back — posting a comment only increments the
-// post's commentCount. ProgramStoryView therefore offers an "Add Comment"
-// flow (post a comment, bump the visible count) rather than a full
-// comment-thread view, which isn't buildable against the current backend.
+// The GET comments endpoint returns the thread oldest-first. The POST
+// endpoint now echoes back the full created comment (not just its id), so
+// callers can append it straight to a local thread without a refetch.
 //
 // Also note: the server does not implement real photo upload. `photoUrl`
 // exists on the wire model but nothing populates it yet, so the UI only
@@ -21,15 +20,16 @@ import Foundation
 
 // MARK: - APIClient extension
 //
-// getStoryPosts / createStoryPost / toggleStoryPostLike / addStoryPostComment
-// follow the same call ergonomics as every other APIClient method (`try
-// await APIClient.shared.foo(...)`), but this feature must not modify the
-// shared ios/Sources/Networking/APIClient.swift file. APIClient's
-// `get`/`post` helpers are `private` to that file (Swift's `private` is
-// file-scoped, so an extension declared here cannot call them) — so this
-// does its own minimal request/response cycle instead, using the same base
-// URL, auth header, and date encode/decode conventions as APIClient.swift,
-// just duplicated locally (see ios/Sources/InKind/InKindView.swift and
+// getStoryPosts / createStoryPost / toggleStoryPostLike / addStoryPostComment /
+// getStoryPostComments follow the same call ergonomics as every other
+// APIClient method (`try await APIClient.shared.foo(...)`), but this
+// feature must not modify the shared ios/Sources/Networking/APIClient.swift
+// file. APIClient's `get`/`post` helpers are `private` to that file
+// (Swift's `private` is file-scoped, so an extension declared here cannot
+// call them) — so this does its own minimal request/response cycle
+// instead, using the same base URL, auth header, and date encode/decode
+// conventions as APIClient.swift, just duplicated locally (see
+// ios/Sources/InKind/InKindView.swift and
 // ios/Sources/Networking/ParticipationClearance.swift for the same
 // pattern). If APIClient.swift's base URL or date handling ever changes,
 // keep this block in sync.
@@ -62,15 +62,29 @@ extension APIClient {
         return response.liked
     }
 
+    /// Posts a new comment and returns the full created comment (author
+    /// name, content, and timestamp) as reported by the server, so callers
+    /// can append it directly to a local thread without a refetch.
     @discardableResult
-    func addStoryPostComment(postId: Int, content: String) async throws -> Int {
+    func addStoryPostComment(postId: Int, content: String) async throws -> StoryComment {
         struct Body: Encodable { let content: String }
-        struct Response: Decodable { let id: Int; let success: Bool }
+        struct Response: Decodable {
+            let id: Int
+            let authorName: String
+            let content: String
+            let postedAt: Date
+            let success: Bool
+        }
         let response: Response = try await storyPost(
             "story/posts/\(postId)/comments",
             body: Body(content: content)
         )
-        return response.id
+        return StoryComment(id: response.id, authorName: response.authorName, content: response.content, postedAt: response.postedAt)
+    }
+
+    /// Fetches the full comment thread for a post, oldest-first.
+    func getStoryPostComments(postId: Int) async throws -> [StoryComment] {
+        try await storyGet("story/posts/\(postId)/comments")
     }
 
     // MARK: Self-contained networking (see note above)
@@ -150,4 +164,16 @@ extension APIClient {
         try storyValidate(response)
         return try Self.storyDecoder.decode(T.self, from: data)
     }
+}
+
+// MARK: - StoryComment model
+
+/// A single comment on a story post, as returned by
+/// `GET /api/story/posts/:id/comments` (thread, oldest-first) and echoed
+/// back in full by `POST /api/story/posts/:id/comments`.
+struct StoryComment: Decodable, Identifiable {
+    let id: Int
+    let authorName: String
+    let content: String
+    let postedAt: Date
 }
