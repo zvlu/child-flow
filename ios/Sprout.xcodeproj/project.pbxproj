@@ -91,6 +91,8 @@
 		FA0739C3365AF3805B807042 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24C466DC685D97AE46E695D8 /* LoginView.swift */; };
 		FACF871315F37C55E3AA1523 /* PushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E4266DC035767246225E8A /* PushNotifications.swift */; };
 		FE0CECEF6F3323A3C87A451C /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF70278ECDA1C3120A3478AC /* AppState.swift */; };
+		CAFE0001AA11BB22CC33DD01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9D9048B9300AA03800161A4C /* Assets.xcassets */; };
+		CAFE0001AA11BB22CC33DD02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9D9048B9300AA03800161A4C /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -148,6 +150,7 @@
 		93506B6A71C7A4CC29B6C996 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		97BA3FD9DF0C8D6AD1B5FBF8 /* ParticipationClearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticipationClearance.swift; sourceTree = "<group>"; };
 		989ED9CA5811AAB1A43926C0 /* FamilyProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyProfileView.swift; sourceTree = "<group>"; };
+		9D9048B9300AA03800161A4C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1D3379951A97462A414673D /* MealsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsView.swift; sourceTree = "<group>"; };
 		A1FE3642753661630AB2BB3C /* Sprout.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Sprout.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A391C57ACEA9241F266C5818 /* StaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffView.swift; sourceTree = "<group>"; };
@@ -167,7 +170,7 @@
 		D282E0278E01839F5C630915 /* FamilyOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyOnboardingView.swift; sourceTree = "<group>"; };
 		D6793384ECBDC5F62FC7B486 /* DocumentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentsView.swift; sourceTree = "<group>"; };
 		DB9B2DC3BC477C878D1DD08C /* SproutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SproutTests.swift; sourceTree = "<group>"; };
-		DD8023DFC1F4C7D966B0A84B /* SproutFamily.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SproutFamily.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DD8023DFC1F4C7D966B0A84B /* SproutFamily.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; name = SproutFamily.app; path = Sprout.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE114A6EF56FEFA6DE1934D5 /* StoryAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryAPI.swift; sourceTree = "<group>"; };
 		DECBB9A993DBA322E5AA82A3 /* GrantBudgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrantBudgetView.swift; sourceTree = "<group>"; };
 		DF00056D3C1220DF7611B6EA /* ClassroomQualityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassroomQualityView.swift; sourceTree = "<group>"; };
@@ -225,7 +228,6 @@
 			children = (
 				FDF346697D678DB8DA4632D6 /* Models.swift */,
 			);
-			name = Models;
 			path = Models;
 			sourceTree = "<group>";
 		};
@@ -354,6 +356,7 @@
 		6629E5CDD2AF72FA59CCAA13 = {
 			isa = PBXGroup;
 			children = (
+				9D9048B9300AA03800161A4C /* Assets.xcassets */,
 				11C2D12D0AA2921942D594FE /* FamilySources */,
 				F8CBA3189F2A4AAD59AF7436 /* Sources */,
 				2127EA4CFCB6B0D10FC2650B /* Tests */,
@@ -441,7 +444,6 @@
 				82D4C441E49751379B7D52C1 /* StaffManagement.swift */,
 				DE114A6EF56FEFA6DE1934D5 /* StoryAPI.swift */,
 			);
-			name = Networking;
 			path = Networking;
 			sourceTree = "<group>";
 		};
@@ -627,6 +629,7 @@
 			buildConfigurationList = 5A3DBF56E848E02A3E7C4439 /* Build configuration list for PBXNativeTarget "Sprout" */;
 			buildPhases = (
 				8CCCDC17F05818BF2CB7DA8C /* Sources */,
+				CAFE0001AA11BB22CC33DD03 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -644,6 +647,7 @@
 			buildConfigurationList = 729FD1AE74E9DC117D26D1DF /* Build configuration list for PBXNativeTarget "SproutFamily" */;
 			buildPhases = (
 				5EDF5792D7DC2C628573EF1E /* Sources */,
+				CAFE0001AA11BB22CC33DD04 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -693,6 +697,25 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CAFE0001AA11BB22CC33DD03 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CAFE0001AA11BB22CC33DD01 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CAFE0001AA11BB22CC33DD04 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CAFE0001AA11BB22CC33DD02 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		5EDF5792D7DC2C628573EF1E /* Sources */ = {
@@ -833,6 +856,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = "";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -850,6 +874,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -933,6 +958,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = "";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				INFOPLIST_FILE = FamilyResources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -952,6 +978,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = "";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -971,6 +998,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = "";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				INFOPLIST_FILE = FamilyResources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -988,6 +1016,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
