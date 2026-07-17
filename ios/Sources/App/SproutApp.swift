@@ -33,6 +33,10 @@ struct SproutApp: App {
                     LoginView()
                 }
             }
+            // Brand: sage green everywhere .accentColor / tint is used (the
+            // generated project never set a global accent, so SwiftUI was
+            // falling back to system blue).
+            .tint(.cfPrimary)
             .environmentObject(appState)
             .onChange(of: appState.isAuthenticated) { _, isAuth in
                 if isAuth { requestPushAuthorization() }

@@ -68,12 +68,15 @@ struct WelcomeView: View {
             Spacer()
 
             VStack(spacing: 16) {
-                Image(systemName: "figure.2.and.child.holdinghands")
-                    .font(.system(size: 72))
-                    .foregroundColor(.accentColor)
+                Image("LaunchLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 110, height: 110)
+                    .accessibilityHidden(true)
 
                 Text("Sprout")
                     .font(.largeTitle.bold())
+                    .foregroundColor(.cfPrimary)
 
                 Text(L(.appTagline))
                     .font(.subheadline)
@@ -404,12 +407,15 @@ struct FamilySignInView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 32) {
-                VStack(spacing: 8) {
-                    Image(systemName: "figure.2.and.child.holdinghands")
-                        .font(.system(size: 60))
-                        .foregroundColor(.accentColor)
+                VStack(spacing: 12) {
+                    Image("LaunchLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 88, height: 88)
+                        .accessibilityHidden(true)
                     Text(L(.welcomeBack))
                         .font(.title2.bold())
+                        .foregroundColor(.cfPrimary)
                 }
                 .padding(.top, 32)
 

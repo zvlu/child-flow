@@ -32,12 +32,15 @@ struct LoginView: View {
                 Spacer().frame(height: 80)
 
                 // Logo
-                VStack(spacing: 8) {
-                    Image(systemName: "figure.2.and.child.holdinghands")
-                        .font(.system(size: 60))
-                        .foregroundColor(.accentColor)
+                VStack(spacing: 12) {
+                    Image("LaunchLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 96, height: 96)
+                        .accessibilityHidden(true)
                     Text("Sprout")
                         .font(.largeTitle.bold())
+                        .foregroundColor(.cfPrimary)
                     Text("Head Start Management")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
