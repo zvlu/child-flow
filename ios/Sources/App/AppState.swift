@@ -46,6 +46,37 @@ class AppState: ObservableObject {
     /// timesheet approval. The server enforces every permission regardless.
     var isAdmin: Bool { currentUser?.role == "admin" }
 
+    /// Groups the §1302.91 functional roles into the experience each one
+    /// should lead with. Presentation only — the server enforces access.
+    enum RoleGroup {
+        case leadership      // directors, fiscal, ERSEA, admins
+        case teaching        // teachers, assistants, education staff
+        case health          // nurses, nutritionists, health/disability staff
+        case familyServices  // advocates, home visitors, family services
+        case operations      // cooks, bus drivers, everyone else
+    }
+
+    var roleGroup: RoleGroup {
+        if isAdmin { return .leadership }
+        switch currentUser?.staffRole {
+        case "director", "fiscal_officer", "ersea_coordinator", "coordinator":
+            return .leadership
+        case "teacher", "assistant", "education_coordinator", "coach":
+            return .teaching
+        case "health_coordinator", "nurse", "nutritionist",
+             "mental_health_consultant", "disabilities_coordinator":
+            return .health
+        case "family_services_manager", "family_advocate", "home_visitor":
+            return .familyServices
+        case "cook", "bus_driver":
+            return .operations
+        default:
+            // No staff record / unknown role: teachers are the most common
+            // default (matches the schema default).
+            return .teaching
+        }
+    }
+
     /// Whether the signed-in user's org has a feature module enabled (e.g.
     /// Head Start compliance). Presentation only — the server enforces access
     /// independently on every gated route.
