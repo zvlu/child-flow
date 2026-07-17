@@ -5,6 +5,15 @@ class AppState: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var currentUser: User?
 
+    /// Non-nil when the signed-in account is a FAMILY (parent) account.
+    /// The same login screen serves every role; parents get the family
+    /// experience, staff get the staff experience.
+    @Published var familyState: FamilyAppState?
+
+    /// Persisted so a cold launch knows which kind of session the stored
+    /// Keychain token belongs to ("staff" or "family").
+    private static let sessionKindKey = "cf_session_kind"
+
     /// Lock the UI after this long in the background. The Keychain token is
     /// kept, so Face ID / Touch ID re-unlocks without re-entering a password.
     static let autoLockAfter: TimeInterval = 15 * 60
@@ -48,16 +57,45 @@ class AppState: ObservableObject {
     /// the user's profile (name + role) so the UI can gate admin functions.
     func checkAuth() async {
         let hasToken = await APIClient.shared.loadStoredToken()
+        let kind = UserDefaults.standard.string(forKey: Self.sessionKindKey)
+
+        if hasToken && kind == "family" {
+            // The stored token belongs to a parent account — restore the
+            // family experience instead of treating it as a staff session.
+            await MainActor.run {
+                let fam = FamilyAppState()
+                fam.phase = .authenticated
+                familyState = fam
+            }
+            return
+        }
+
         await MainActor.run { isAuthenticated = hasToken }
         if hasToken { await loadProfile() }
     }
 
     func login(token: String) {
+        UserDefaults.standard.set("staff", forKey: Self.sessionKindKey)
         Task {
             await APIClient.shared.setToken(token)
             await MainActor.run { isAuthenticated = true }
             await loadProfile()
         }
+    }
+
+    /// Sign-in resolved to a FAMILY (parent) account.
+    func loginFamily(profile: FamilyProfile, token: String) {
+        UserDefaults.standard.set("family", forKey: Self.sessionKindKey)
+        let fam = FamilyAppState()
+        fam.completeOnboarding(profile: profile, token: token)
+        familyState = fam
+    }
+
+    /// Called when the family experience signs out (its phase returns to
+    /// .onboarding) so the container falls back to the shared login screen.
+    func endFamilySession() {
+        UserDefaults.standard.removeObject(forKey: Self.sessionKindKey)
+        familyState = nil
     }
 
     private func loadProfile() async {
@@ -67,11 +105,13 @@ class AppState: ObservableObject {
     }
 
     func logout() {
+        UserDefaults.standard.removeObject(forKey: Self.sessionKindKey)
         Task {
             await APIClient.shared.clearToken()
             await MainActor.run {
                 currentUser = nil
                 isAuthenticated = false
+                familyState = nil
             }
         }
     }

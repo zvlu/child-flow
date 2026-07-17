@@ -93,6 +93,15 @@
 		FE0CECEF6F3323A3C87A451C /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF70278ECDA1C3120A3478AC /* AppState.swift */; };
 		CAFE0001AA11BB22CC33DD01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9D9048B9300AA03800161A4C /* Assets.xcassets */; };
 		CAFE0001AA11BB22CC33DD02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9D9048B9300AA03800161A4C /* Assets.xcassets */; };
+		736E29255BF3CF5CD43DCC6A /* FamilyAppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F493872C5D86E112F5C04B /* FamilyAppState.swift */; };
+		653400E95216F65426F0315F /* FamilyHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08D2EE06FE588969F1E4B45C /* FamilyHomeView.swift */; };
+		625703E1D0C626BE7A7B8C1B /* FamilyL10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37850FC58C15A2C7BB2D7FD9 /* FamilyL10n.swift */; };
+		AEF35247206EF9A771611AB1 /* FamilyMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C45DBE05D2BC46E3BA4622 /* FamilyMessagesView.swift */; };
+		329FB343906D053A7BDA2038 /* FamilyOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D282E0278E01839F5C630915 /* FamilyOnboardingView.swift */; };
+		454E774509512E4A0618B1C0 /* FamilyProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 989ED9CA5811AAB1A43926C0 /* FamilyProfileView.swift */; };
+		A693B97F7C75338CE4D3CAF8 /* FamilyProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 582CBC887B97A0DA34065DB5 /* FamilyProgressView.swift */; };
+		5C9292CADD51E7DA35DA8C25 /* FamilyTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E7DB787F4DBCA0FEDBFCA5 /* FamilyTabView.swift */; };
+		C7DFAD57EE4D2BF7B3097946 /* FamilyTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2EF15EFD4166C8CAF9BB7AC /* FamilyTodayView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -820,6 +829,15 @@
 				7D55DAB29736FA1DDA1EA124 /* StoryAPI.swift in Sources */,
 				14302802C7F917EE8737FE86 /* SubsidiesView.swift in Sources */,
 				1C0736AF3E3A71619E3C1B32 /* TimesheetView.swift in Sources */,
+				736E29255BF3CF5CD43DCC6A /* FamilyAppState.swift in Sources */,
+				653400E95216F65426F0315F /* FamilyHomeView.swift in Sources */,
+				625703E1D0C626BE7A7B8C1B /* FamilyL10n.swift in Sources */,
+				AEF35247206EF9A771611AB1 /* FamilyMessagesView.swift in Sources */,
+				329FB343906D053A7BDA2038 /* FamilyOnboardingView.swift in Sources */,
+				454E774509512E4A0618B1C0 /* FamilyProfileView.swift in Sources */,
+				A693B97F7C75338CE4D3CAF8 /* FamilyProgressView.swift in Sources */,
+				5C9292CADD51E7DA35DA8C25 /* FamilyTabView.swift in Sources */,
+				C7DFAD57EE4D2BF7B3097946 /* FamilyTodayView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

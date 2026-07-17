@@ -29,6 +29,12 @@ targets:
     platform: iOS
     sources:
       - Sources
+      # One app, every role: the family (parent) experience is compiled in
+      # and reached from the same login screen. Exclude the family app's
+      # own @main entry point.
+      - path: FamilySources
+        excludes:
+          - "App/SproutFamilyApp.swift"
     resources:
       - Resources
     settings:

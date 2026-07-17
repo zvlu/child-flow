@@ -175,9 +175,20 @@ struct LoginView: View {
                     isLoading = false
                 }
             } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    isLoading = false
+                // One login for every role: if the credentials don't match a
+                // staff account, try the family (parent) account endpoint
+                // before surfacing an error.
+                do {
+                    let result = try await APIClient.shared.familyLogin(email: email, password: password)
+                    await MainActor.run {
+                        appState.loginFamily(profile: result.profile, token: result.token)
+                        isLoading = false
+                    }
+                } catch {
+                    await MainActor.run {
+                        errorMessage = "Email or password doesn't match a staff or family account."
+                        isLoading = false
+                    }
                 }
             }
         }
