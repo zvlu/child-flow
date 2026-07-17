@@ -91,7 +91,7 @@ struct LoginView: View {
                         Spacer()
                         Button("Forgot Password?") { showForgotPassword = true }
                             .font(.footnote)
-                            .foregroundColor(.accentColor)
+                            .foregroundColor(.cfPrimary)
                     }
 
                     // Error
@@ -150,7 +150,7 @@ struct LoginView: View {
                     Link("Contact your program administrator",
                          destination: URL(string: "mailto:support@sprout.org")!)
                         .font(.caption)
-                        .foregroundColor(.accentColor)
+                        .foregroundColor(.cfPrimary)
                 }
 
                 Spacer().frame(height: 32)

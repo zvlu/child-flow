@@ -140,7 +140,7 @@ struct InviteCodeView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "envelope.open.fill")
                         .font(.system(size: 52))
-                        .foregroundColor(.accentColor)
+                        .foregroundColor(.cfPrimary)
                     Text(L(.enterInviteTitle))
                         .font(.title2.bold())
                     Text(L(.enterInviteSubtitle))
@@ -188,7 +188,7 @@ struct InviteCodeView: View {
                         showWhereFindHelp = true
                     }
                     .font(.footnote)
-                    .foregroundColor(.accentColor)
+                    .foregroundColor(.cfPrimary)
                 }
                 .padding(.horizontal, 32)
             }
@@ -467,7 +467,7 @@ struct FamilySignInView: View {
 
                     Button(L(.noAccountSignUp)) { onBack() }
                         .font(.footnote)
-                        .foregroundColor(.accentColor)
+                        .foregroundColor(.cfPrimary)
                 }
                 .padding(.horizontal, 32)
             }
