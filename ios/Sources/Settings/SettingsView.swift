@@ -135,7 +135,7 @@ struct AboutView: View {
         List {
             Section {
                 LabeledContent("App", value: "Sprout")
-                LabeledContent("Purpose", value: "Head Start Management")
+                LabeledContent("Purpose", value: "Child Care Management")
             }
             Section("Contact") {
                 Link("support@sprout.org", destination: URL(string: "mailto:support@sprout.org")!)

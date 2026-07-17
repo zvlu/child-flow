@@ -41,7 +41,7 @@ struct LoginView: View {
                     Text("Sprout")
                         .font(.largeTitle.bold())
                         .foregroundColor(.cfPrimary)
-                    Text("Head Start Management")
+                    Text("Child Care Management")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }

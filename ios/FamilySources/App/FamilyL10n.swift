@@ -221,7 +221,7 @@ extension FamilyL10n {
 
     // ───────────────────────── English ─────────────────────────
     static let en: [L10nKey: String] = [
-        .appTagline: "Stay connected with your child's\nHead Start program",
+        .appTagline: "Stay connected with\nyour child's program",
         .getStarted: "Get Started",
         .haveAccount: "I already have an account",
         .inviteNeeded: "You need an invitation from your program to sign up.",
@@ -304,7 +304,7 @@ extension FamilyL10n {
 
     // ───────────────────────── Spanish ─────────────────────────
     static let es: [L10nKey: String] = [
-        .appTagline: "Manténgase conectado con el programa\nHead Start de su hijo",
+        .appTagline: "Manténgase conectado con\nel programa de su hijo",
         .getStarted: "Comenzar",
         .haveAccount: "Ya tengo una cuenta",
         .inviteNeeded: "Necesita una invitación de su programa para registrarse.",
@@ -387,7 +387,7 @@ extension FamilyL10n {
 
     // ───────────────────── Haitian Creole ─────────────────────
     static let ht: [L10nKey: String] = [
-        .appTagline: "Rete konekte ak pwogram\nHead Start pitit ou a",
+        .appTagline: "Rete konekte ak\npwogram pitit ou a",
         .getStarted: "Kòmanse",
         .haveAccount: "Mwen deja gen yon kont",
         .inviteNeeded: "Ou bezwen yon envitasyon nan men pwogram ou an pou enskri.",
@@ -470,7 +470,7 @@ extension FamilyL10n {
 
     // ──────────────── Chinese (Simplified) ────────────────
     static let zh: [L10nKey: String] = [
-        .appTagline: "与孩子的 Head Start 项目\n保持联系",
+        .appTagline: "与孩子的项目\n保持联系",
         .getStarted: "开始使用",
         .haveAccount: "我已有账户",
         .inviteNeeded: "您需要项目发出的邀请才能注册。",
@@ -553,7 +553,7 @@ extension FamilyL10n {
 
     // ───────────────────── Vietnamese ─────────────────────
     static let vi: [L10nKey: String] = [
-        .appTagline: "Luôn kết nối với chương trình\nHead Start của con bạn",
+        .appTagline: "Luôn kết nối với\nchương trình của con bạn",
         .getStarted: "Bắt đầu",
         .haveAccount: "Tôi đã có tài khoản",
         .inviteNeeded: "Bạn cần thư mời từ chương trình để đăng ký.",
@@ -636,7 +636,7 @@ extension FamilyL10n {
 
     // ───────────────────────── Arabic ─────────────────────────
     static let ar: [L10nKey: String] = [
-        .appTagline: "ابقَ على تواصل مع برنامج\nهيد ستارت الخاص بطفلك",
+        .appTagline: "ابقَ على تواصل مع\nبرنامج طفلك",
         .getStarted: "ابدأ الآن",
         .haveAccount: "لديّ حساب بالفعل",
         .inviteNeeded: "تحتاج إلى دعوة من برنامجك للتسجيل.",
