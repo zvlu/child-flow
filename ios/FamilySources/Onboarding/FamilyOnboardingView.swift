@@ -92,7 +92,7 @@ struct WelcomeView: View {
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accentColor)
+                        .background(Color.cfPrimary)
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
@@ -175,7 +175,7 @@ struct InviteCodeView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(code.isEmpty ? Color.accentColor.opacity(0.4) : Color.accentColor)
+                        .background(code.isEmpty ? Color.cfPrimary.opacity(0.4) : Color.cfPrimary)
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
@@ -347,7 +347,7 @@ struct FamilyRegistrationView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(canSubmit ? Color.accentColor : Color.accentColor.opacity(0.4))
+                        .background(canSubmit ? Color.cfPrimary : Color.cfPrimary.opacity(0.4))
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
@@ -459,7 +459,7 @@ struct FamilySignInView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(email.isEmpty || password.isEmpty ? Color.accentColor.opacity(0.4) : Color.accentColor)
+                        .background(email.isEmpty || password.isEmpty ? Color.cfPrimary.opacity(0.4) : Color.cfPrimary)
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
