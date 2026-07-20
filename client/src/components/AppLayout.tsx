@@ -152,8 +152,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden flex-col">
-      {/* Top Navigation Bar - Matching ChildPlus Style */}
-      <header className="h-14 bg-[#2E4034] text-white flex items-center px-3 md:px-4 gap-2 flex-shrink-0 shadow-md z-20">
+      {/* Top Navigation Bar — uses the sidebar token (deep green in light,
+          near-black in dark) so it matches the side menu and darkens with
+          the theme instead of staying a fixed green. */}
+      <header className="h-14 bg-sidebar text-white flex items-center px-3 md:px-4 gap-2 flex-shrink-0 shadow-md z-20">
         <Button
           variant="ghost"
           size="icon"
@@ -496,8 +498,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </div>
           </header>
 
-          {/* Page content */}
-          <main className="flex-1 overflow-y-auto bg-[#FBF6EE]">
+          {/* Page content — themed background so dark mode is actually dark
+              (was hardcoded cream #FBF6EE, which kept the main area light
+              while sidebar/cards went dark). */}
+          <main className="flex-1 overflow-y-auto bg-background">
             {children}
           </main>
         </div>
