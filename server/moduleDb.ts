@@ -299,12 +299,69 @@ export async function getStaffInOrg(organizationId: number, staffId: number) {
   return rows[0] ?? null;
 }
 
+/** Minimal supervisor graph for an org: every staff id → its supervisorId. */
+async function getSupervisorGraph(organizationId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ id: staff.id, supervisorId: staff.supervisorId })
+    .from(staff)
+    .where(eq(staff.organizationId, organizationId));
+  // childrenOf: supervisorId → [staffId, …]
+  const childrenOf = new Map<number, number[]>();
+  const supervisorOf = new Map<number, number | null>();
+  for (const r of rows) {
+    supervisorOf.set(r.id, r.supervisorId ?? null);
+    if (r.supervisorId != null) {
+      const list = childrenOf.get(r.supervisorId) ?? [];
+      list.push(r.id);
+      childrenOf.set(r.supervisorId, list);
+    }
+  }
+  return { childrenOf, supervisorOf };
+}
+
+/**
+ * Every staff id beneath `rootStaffId` in the reporting tree (direct AND
+ * indirect reports), so a director who supervises coordinators can also
+ * manage the advocates beneath them. Excludes the root. Cycle-safe.
+ */
+export async function getStaffDescendants(
+  organizationId: number,
+  rootStaffId: number,
+): Promise<Set<number>> {
+  const { childrenOf } = await getSupervisorGraph(organizationId);
+  const out = new Set<number>();
+  const queue = [...(childrenOf.get(rootStaffId) ?? [])];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (out.has(id)) continue; // guard against pre-existing bad cycles
+    out.add(id);
+    for (const child of childrenOf.get(id) ?? []) queue.push(child);
+  }
+  return out;
+}
+
+/**
+ * Would setting `staffId`'s supervisor to `newSupervisorId` create a loop?
+ * True if the proposed supervisor is the staff member itself or already sits
+ * somewhere beneath it in the tree.
+ */
+export async function wouldCreateSupervisorCycle(
+  organizationId: number,
+  staffId: number,
+  newSupervisorId: number,
+): Promise<boolean> {
+  if (staffId === newSupervisorId) return true;
+  const descendants = await getStaffDescendants(organizationId, staffId);
+  return descendants.has(newSupervisorId);
+}
+
 /**
  * Can `userId` manage staff in `organizationId`, and if `targetStaffId` is
  * given, that specific employee? Admin tier → yes, org-wide. Manager-tier
- * functional role → only employees whose supervisorId is the manager's own
- * staff id. Returns the actor's staffId so callers can default new hires'
- * supervisor to the creating manager.
+ * functional role → any employee in their reporting subtree (direct or
+ * indirect report). Returns the actor's staffId so callers can default new
+ * hires' supervisor to the creating manager.
  */
 export async function resolveStaffManagement(opts: {
   organizationId: number;
@@ -323,12 +380,54 @@ export async function resolveStaffManagement(opts: {
     return { allowed: false, actorStaffId, isAdmin };
   }
   // Managing the org in general (e.g. creating a new hire) is allowed for
-  // managers; a specific target must report to them.
+  // managers; a specific target must be somewhere in their subtree.
   if (opts.targetStaffId == null) return { allowed: true, actorStaffId, isAdmin };
+  if (actorStaffId == null) return { allowed: false, actorStaffId, isAdmin };
 
-  const target = await getStaffInOrg(opts.organizationId, opts.targetStaffId);
-  const allowed = target != null && target.supervisorId === actorStaffId;
-  return { allowed, actorStaffId, isAdmin };
+  const descendants = await getStaffDescendants(opts.organizationId, actorStaffId);
+  return { allowed: descendants.has(opts.targetStaffId), actorStaffId, isAdmin };
+}
+
+/**
+ * When a supervisor is deactivated, their direct reports would be orphaned.
+ * Re-parent them to the deactivated supervisor's own supervisor (their
+ * grand-supervisor), keeping the chain intact. Returns the number moved.
+ */
+export async function reparentReportsOnDeactivate(
+  organizationId: number,
+  deactivatedStaffId: number,
+): Promise<number> {
+  const db = await requireDb();
+  const target = await getStaffInOrg(organizationId, deactivatedStaffId);
+  if (!target) return 0;
+  const newSupervisor = target.supervisorId ?? null; // may be null (top of org)
+  const reports = await db
+    .select({ id: staff.id })
+    .from(staff)
+    .where(and(eq(staff.organizationId, organizationId), eq(staff.supervisorId, deactivatedStaffId)));
+  if (!reports.length) return 0;
+  await db
+    .update(staff)
+    .set({ supervisorId: newSupervisor })
+    .where(and(eq(staff.organizationId, organizationId), eq(staff.supervisorId, deactivatedStaffId)));
+  return reports.length;
+}
+
+/** Org chart rows: id, name, position, role, supervisorId, active. */
+export async function getStaffOrgChart(organizationId: number) {
+  const db = await requireDb();
+  return db
+    .select({
+      id: staff.id,
+      firstName: staff.firstName,
+      lastName: staff.lastName,
+      position: staff.position,
+      role: staff.role,
+      supervisorId: staff.supervisorId,
+      isActive: staff.isActive,
+    })
+    .from(staff)
+    .where(eq(staff.organizationId, organizationId));
 }
 
 export async function createStaff(data: InsertStaff) {

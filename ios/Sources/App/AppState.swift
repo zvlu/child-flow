@@ -56,6 +56,21 @@ class AppState: ObservableObject {
         case operations      // cooks, bus drivers, everyone else
     }
 
+    /// Admins, plus supervisory functional roles, may manage staff. The
+    /// server enforces the exact boundary (admins org-wide; managers only
+    /// their reporting subtree) — this just reveals the management UI.
+    var canManageStaff: Bool {
+        if isAdmin { return true }
+        switch currentUser?.staffRole {
+        case "director", "education_coordinator", "health_coordinator",
+             "disabilities_coordinator", "ersea_coordinator",
+             "family_services_manager":
+            return true
+        default:
+            return false
+        }
+    }
+
     var roleGroup: RoleGroup {
         if isAdmin { return .leadership }
         switch currentUser?.staffRole {

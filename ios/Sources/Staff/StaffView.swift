@@ -36,7 +36,7 @@ struct StaffView: View {
         .toolbar {
             // Managing staff accounts is admin-only (the server enforces this
             // on staff.create too).
-            if appState.isAdmin {
+            if appState.canManageStaff {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showAddStaff = true } label: {
                         Image(systemName: "person.badge.plus")
@@ -212,7 +212,7 @@ struct StaffDetailView: View {
             Section("Assignment") {
                 if let classroom = liveMember.classroom {
                     LabeledContent("Classroom", value: classroom)
-                    if appState.isAdmin {
+                    if appState.canManageStaff {
                         Button("Change Assignment") { showEditClassroom = true }
                             .foregroundColor(.cfPrimary)
                     }
@@ -221,7 +221,7 @@ struct StaffDetailView: View {
                         Text("No classroom assigned")
                             .foregroundColor(.secondary)
                         Spacer()
-                        if appState.isAdmin {
+                        if appState.canManageStaff {
                             Button("Assign") { showEditClassroom = true }
                                 .font(.cfCaption.bold())
                                 .foregroundColor(.cfPrimary)
@@ -236,7 +236,7 @@ struct StaffDetailView: View {
                         .foregroundColor(.cfPrimary)
                 }
                 // Timesheet review is admin-only.
-                if appState.isAdmin {
+                if appState.canManageStaff {
                     NavigationLink(destination: TimesheetView()) {
                         Label("View Timesheet", systemImage: "clock.fill")
                             .foregroundColor(.cfChildren)

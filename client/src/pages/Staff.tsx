@@ -356,9 +356,19 @@ export default function Staff() {
       <Tabs defaultValue="directory">
         <TabsList>
           <TabsTrigger value="directory">Staff Directory</TabsTrigger>
+          <TabsTrigger value="orgchart">Org Chart</TabsTrigger>
           <TabsTrigger value="training">Training & Development</TabsTrigger>
           <TabsTrigger value="certifications">Certifications</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="orgchart" className="mt-4">
+          <OrgChart
+            staff={staffList}
+            myStaffId={myStaffId}
+            canManage={canManage}
+            onEdit={openEdit}
+          />
+        </TabsContent>
 
         <TabsContent value="directory" className="mt-4 space-y-4">
           <div className="flex items-center gap-3">
@@ -621,5 +631,111 @@ export default function Staff() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Org Chart — renders the reporting hierarchy as an indented tree. Roots are
+// staff with no supervisor (or whose supervisor isn't in the list). Managers
+// can edit anyone in their own subtree inline.
+// ─────────────────────────────────────────────────────────────────────────
+
+type OrgStaff = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  position?: string | null;
+  role?: string | null;
+  isActive?: number | null;
+  supervisorId?: number | null;
+};
+
+function OrgChart<T extends OrgStaff>({
+  staff,
+  myStaffId,
+  canManage,
+  onEdit,
+}: {
+  staff: T[];
+  myStaffId: number | null;
+  canManage: (m: T) => boolean;
+  onEdit: (m: T) => void;
+}) {
+  const { roots, childrenOf } = useMemo(() => {
+    const ids = new Set(staff.map((s) => s.id));
+    const childrenOf = new Map<number, T[]>();
+    const roots: T[] = [];
+    for (const s of staff) {
+      const sup = s.supervisorId ?? null;
+      if (sup == null || !ids.has(sup)) {
+        roots.push(s);
+      } else {
+        const list = childrenOf.get(sup) ?? [];
+        list.push(s);
+        childrenOf.set(sup, list);
+      }
+    }
+    const byName = (a: OrgStaff, b: OrgStaff) =>
+      `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`);
+    roots.sort(byName);
+    Array.from(childrenOf.values()).forEach((list) => list.sort(byName));
+    return { roots, childrenOf };
+  }, [staff]);
+
+  if (staff.length === 0) {
+    return (
+      <div className="text-center py-12 text-muted-foreground text-sm">
+        No staff to chart yet.
+      </div>
+    );
+  }
+
+  const renderNode = (member: T, depth: number): React.ReactNode => {
+    const reports = childrenOf.get(member.id) ?? [];
+    const isMe = member.id === myStaffId;
+    return (
+      <div key={member.id}>
+        <div
+          className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-2.5 mb-2 hover:shadow-sm transition-shadow"
+          style={{ marginLeft: depth * 24 }}
+        >
+          <Avatar className="h-9 w-9 flex-shrink-0">
+            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+              {initials(member.firstName, member.lastName)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm text-foreground truncate">
+                {member.firstName} {member.lastName}
+              </span>
+              {isMe && <Badge variant="outline" className="text-[10px]">You</Badge>}
+              {member.isActive !== 1 && (
+                <Badge variant="outline" className="text-[10px] text-muted-foreground">Inactive</Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground truncate">
+              {member.position || roleLabels[member.role ?? "teacher"] || member.role}
+              {reports.length > 0 && ` · ${reports.length} report${reports.length === 1 ? "" : "s"}`}
+            </p>
+          </div>
+          {canManage(member) && (
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onEdit(member)}>
+              Edit
+            </Button>
+          )}
+        </div>
+        {reports.map((r) => renderNode(r, depth + 1))}
+      </div>
+    );
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Reporting structure</CardTitle>
+      </CardHeader>
+      <CardContent>{roots.map((r) => renderNode(r, 0))}</CardContent>
+    </Card>
   );
 }

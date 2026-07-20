@@ -875,8 +875,51 @@ export const appRouter = router({
         // Only admins may reassign who an employee reports to; a manager
         // editing their report can't hand them to someone else.
         if (!mgmt.isAdmin && "supervisorId" in data) delete (data as Record<string, unknown>).supervisorId;
+        // Prevent reporting-line loops (A reports to B reports to A).
+        if (mgmt.isAdmin && data.supervisorId != null) {
+          if (await mod.wouldCreateSupervisorCycle(organizationId, id, data.supervisorId)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "That would create a reporting loop — a person can't report to someone who reports to them.",
+            });
+          }
+        }
         await auditAccess(ctx, { action: "update", resourceType: "staff", resourceId: id });
-        return mod.updateStaff(id, data);
+        const result = await mod.updateStaff(id, data);
+        // Deactivating a supervisor would strand their reports — move them up
+        // to the deactivated person's own supervisor so the chain holds.
+        if (data.isActive === 0) {
+          const moved = await mod.reparentReportsOnDeactivate(organizationId, id);
+          if (moved > 0) {
+            await auditAccess(ctx, {
+              action: "update",
+              resourceType: "staff",
+              resourceId: id,
+              detail: `reparented ${moved} report(s) on deactivate`,
+            });
+          }
+        }
+        return result;
+      }),
+
+    // A manager's team (their whole reporting subtree) — or, for admins,
+    // the full staff list. Drives the "My Team" view and manager scoping.
+    team: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const all = await getOrganizationStaff(input.organizationId);
+        if (ctx.user.role === "admin") return all;
+        const self = await mod.getStaffSelf(input.organizationId, ctx.user.id);
+        if (!self || !mod.STAFF_MANAGER_ROLES.has(self.role ?? "")) return [];
+        const ids = await mod.getStaffDescendants(input.organizationId, self.id);
+        return all.filter((m) => ids.has(m.id));
+      }),
+
+    // Full reporting hierarchy for the org chart (managers + admins).
+    orgChart: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => {
+        return mod.getStaffOrgChart(input.organizationId);
       }),
   }),
 
