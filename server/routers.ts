@@ -13,7 +13,7 @@ import { SUPPORTED_LANGUAGES } from "./translation";
 import { rateLimit } from "./_core/rateLimit";
 import { computeAuditReadiness } from "./auditReadiness";
 import { getBillingPlans, createBillingPlan, setBillingPlanActive, generateDueInvoices, getArAging } from "./billingPlans";
-import { auditAccess } from "./_core/audit";
+import { auditAccess, clientIpFromReq } from "./_core/audit";
 import { hashPassword, verifyPassword } from "./_core/password";
 import { persistMediaDataUrl } from "./storage";
 import { notifyMomentPosted } from "./_core/push";
@@ -47,6 +47,7 @@ import {
   createCommunicationLog,
   getEducationRecords,
   getPirData,
+  insertAuditLog,
 } from "./db";
 import * as mod from "./moduleDb";
 import { importRoster } from "./dataImport";
@@ -920,6 +921,109 @@ export const appRouter = router({
       .input(z.object({ organizationId: z.number() }))
       .query(async ({ input }) => {
         return mod.getStaffOrgChart(input.organizationId);
+      }),
+  }),
+
+  // ── Staff activity oversight ──────────────────────────────────────────
+  // Admins see anyone in the org; managers see only their reporting subtree
+  // (same boundary as staff management). Backed by the audit_logs table:
+  // logins/logouts, page views, and record actions.
+  activity: router({
+    // Client calls this on each screen change to record "what they see".
+    track: protectedProcedure
+      .input(z.object({ path: z.string().max(200), label: z.string().max(120).optional() }))
+      .mutation(async ({ input, ctx }) => {
+        await insertAuditLog({
+          userId: ctx.user.id,
+          actorOpenId: ctx.user.openId,
+          action: "view",
+          resourceType: "page",
+          resourceId: input.path.slice(0, 64),
+          ipAddress: clientIpFromReq(ctx.req),
+          detail: input.label ?? null,
+        });
+        return { ok: true };
+      }),
+
+    // Explicit sign-out event (login is already logged server-side).
+    logout: protectedProcedure.mutation(async ({ ctx }) => {
+      await insertAuditLog({
+        userId: ctx.user.id,
+        actorOpenId: ctx.user.openId,
+        action: "logout",
+        resourceType: "auth",
+        ipAddress: clientIpFromReq(ctx.req),
+      });
+      return { ok: true };
+    }),
+
+    // Full activity timeline for one employee (guarded by management scope).
+    forStaff: orgStaffProcedure
+      .input(z.object({ organizationId: z.number(), staffId: z.number(), limit: z.number().max(500).optional() }))
+      .query(async ({ input, ctx }) => {
+        const mgmt = await mod.resolveStaffManagement({
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          accessTier: ctx.user.role,
+          targetStaffId: input.staffId,
+        });
+        if (!mgmt.allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You can only view activity for staff who report to you." });
+        }
+        const targetUserId = await mod.getStaffUserId(input.organizationId, input.staffId);
+        if (targetUserId == null) return [];
+        return mod.getActivityForUser(targetUserId, input.limit ?? 200);
+      }),
+
+    // Team overview: for everyone the caller manages, last login / last
+    // active / today's page-view count, plus a simple "active now" flag.
+    teamOverview: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const all = await getOrganizationStaff(input.organizationId);
+        let scoped = all;
+        if (ctx.user.role !== "admin") {
+          const self = await mod.getStaffSelf(input.organizationId, ctx.user.id);
+          if (!self || !mod.STAFF_MANAGER_ROLES.has(self.role ?? "")) return [];
+          const ids = await mod.getStaffDescendants(input.organizationId, self.id);
+          scoped = all.filter((m) => ids.has(m.id));
+        }
+        const withUser = scoped.filter((m) => m.userId != null);
+        const userIds = withUser.map((m) => m.userId as number);
+        const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // last 7 days
+        const rows = await mod.getActivityForUsers(userIds, since);
+
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const activeCutoff = Date.now() - 5 * 60 * 1000;
+
+        const byUser = new Map<number, typeof rows>();
+        for (const r of rows) {
+          if (r.userId == null) continue;
+          const list = byUser.get(r.userId) ?? [];
+          list.push(r);
+          byUser.set(r.userId, list);
+        }
+
+        return withUser.map((m) => {
+          const events = byUser.get(m.userId as number) ?? [];
+          const lastLogin = events.find((e) => e.action === "login")?.createdAt ?? null;
+          const lastActive = events[0]?.createdAt ?? null;
+          const viewsToday = events.filter(
+            (e) => e.action === "view" && e.createdAt >= startOfToday,
+          ).length;
+          const onlineNow = lastActive != null && lastActive.getTime() >= activeCutoff;
+          return {
+            staffId: m.id,
+            name: `${m.firstName} ${m.lastName}`,
+            role: m.role,
+            position: m.position,
+            lastLoginAt: lastLogin,
+            lastActiveAt: lastActive,
+            viewsToday,
+            onlineNow,
+          };
+        });
       }),
   }),
 

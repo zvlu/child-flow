@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { ORGANIZATION_ID } from "@/const";
@@ -89,6 +89,24 @@ export default function AppLayout({ children }: AppLayoutProps) {
   // app defaults when there are no preferences.
   const navPrefs = (user as any)?.settings?.navigation ?? null;
   const navRole = ((user as any)?.role ?? "staff") as "admin" | "staff" | "parent";
+
+  // Activity oversight: record each screen the user opens (deduped by path)
+  // so supervisors can review it. Fire-and-forget; never blocks navigation.
+  const trackActivity = trpc.activity.track.useMutation();
+  const logActivityLogout = trpc.activity.logout.useMutation();
+  const signOut = () => {
+    // Best-effort logout event, then clear the session.
+    try { logActivityLogout.mutate(); } catch { /* non-blocking */ }
+    logout();
+  };
+  const lastTrackedPath = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user || location === lastTrackedPath.current) return;
+    lastTrackedPath.current = location;
+    const label = location.split("/").filter(Boolean)[0] ?? "dashboard";
+    trackActivity.mutate({ path: location, label });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location, user]);
   const isOwner = Boolean((user as any)?.isOwner);
   const orgModules = useOrgModules();
   const effectiveTopNav = applyTopNav(navPrefs, navRole, orgModules);
@@ -270,7 +288,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => logout()}
+                onClick={() => signOut()}
                 className="text-red-600 focus:text-red-600"
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -420,7 +438,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   <p className="text-[10px] text-sidebar-foreground/50 truncate uppercase font-bold tracking-tighter">{displayTitle}</p>
                 </div>
                 <button
-                  onClick={() => logout()}
+                  onClick={() => signOut()}
                   className="p-1.5 rounded-md text-sidebar-foreground/60 hover:text-red-500 hover:bg-sidebar-accent transition-colors flex-shrink-0"
                   title="Sign out"
                   aria-label="Sign out"

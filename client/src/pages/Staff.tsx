@@ -357,9 +357,16 @@ export default function Staff() {
         <TabsList>
           <TabsTrigger value="directory">Staff Directory</TabsTrigger>
           <TabsTrigger value="orgchart">Org Chart</TabsTrigger>
+          {isManager && <TabsTrigger value="activity">Activity</TabsTrigger>}
           <TabsTrigger value="training">Training & Development</TabsTrigger>
           <TabsTrigger value="certifications">Certifications</TabsTrigger>
         </TabsList>
+
+        {isManager && (
+          <TabsContent value="activity" className="mt-4">
+            <StaffActivity />
+          </TabsContent>
+        )}
 
         <TabsContent value="orgchart" className="mt-4">
           <OrgChart
@@ -737,5 +744,134 @@ function OrgChart<T extends OrgStaff>({
       </CardHeader>
       <CardContent>{roots.map((r) => renderNode(r, 0))}</CardContent>
     </Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Staff Activity — team overview (who's active, last seen, screens today)
+// plus a per-employee timeline. Scoped server-side: admins see everyone,
+// managers see only their reporting subtree.
+// ─────────────────────────────────────────────────────────────────────────
+
+function relativeTime(d: Date | string | null): string {
+  if (!d) return "—";
+  const t = typeof d === "string" ? new Date(d) : d;
+  const secs = Math.round((Date.now() - t.getTime()) / 1000);
+  if (secs < 60) return "just now";
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return `${Math.floor(secs / 86400)}d ago`;
+}
+
+function activityLabel(row: { action: string; resourceType: string; resourceId?: string | null; detail?: string | null }): string {
+  switch (row.action) {
+    case "login": return "Signed in";
+    case "logout": return "Signed out";
+    case "login_failed": return "Failed sign-in attempt";
+    case "view": return `Viewed ${row.detail || row.resourceId || "a page"}`;
+    case "create": return `Created ${row.resourceType}`;
+    case "update": return `Updated ${row.resourceType}${row.resourceId ? ` #${row.resourceId}` : ""}`;
+    case "delete": return `Deleted ${row.resourceType}`;
+    case "read": return `Opened ${row.resourceType}`;
+    case "check_in": return "Checked in a child";
+    case "access_denied": return `Blocked from ${row.resourceType}`;
+    default: return `${row.action} ${row.resourceType}`;
+  }
+}
+
+function StaffActivity() {
+  const [selected, setSelected] = useState<{ id: number; name: string } | null>(null);
+  const { data: team, isLoading } = trpc.activity.teamOverview.useQuery(
+    { organizationId: ORGANIZATION_ID },
+    { refetchInterval: 30_000 },
+  );
+  const { data: timeline, isLoading: timelineLoading } = trpc.activity.forStaff.useQuery(
+    { organizationId: ORGANIZATION_ID, staffId: selected?.id ?? 0 },
+    { enabled: selected !== null },
+  );
+
+  const rows = team ?? [];
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Team activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center gap-2 py-8 text-muted-foreground text-sm justify-center">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading activity…
+            </div>
+          ) : rows.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No one reports to you yet, or no activity has been recorded.
+            </p>
+          ) : (
+            <div className="divide-y divide-border">
+              {rows.map((m) => (
+                <button
+                  key={m.staffId}
+                  type="button"
+                  onClick={() => setSelected({ id: m.staffId, name: m.name })}
+                  className="flex w-full items-center gap-3 py-3 text-left hover:bg-muted/50 -mx-2 px-2 rounded-md transition-colors"
+                >
+                  <span className="relative flex h-2.5 w-2.5 shrink-0">
+                    {m.onlineNow && (
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-60" />
+                    )}
+                    <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${m.onlineNow ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {m.position || roleLabels[m.role ?? "teacher"] || m.role}
+                    </p>
+                  </div>
+                  <div className="hidden sm:block text-right">
+                    <p className="text-xs text-foreground">
+                      {m.onlineNow ? "Active now" : `Last seen ${relativeTime(m.lastActiveAt)}`}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {m.viewsToday} screen{m.viewsToday === 1 ? "" : "s"} today · signed in {relativeTime(m.lastLoginAt)}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={selected !== null} onOpenChange={(o) => { if (!o) setSelected(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{selected?.name} · activity</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {timelineLoading ? (
+              <div className="flex items-center gap-2 py-8 text-muted-foreground text-sm justify-center">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+              </div>
+            ) : (timeline ?? []).length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No recorded activity.</p>
+            ) : (
+              <ol className="relative space-y-3 border-l border-border pl-4">
+                {(timeline ?? []).map((row) => (
+                  <li key={row.id} className="relative">
+                    <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-primary/60" />
+                    <p className="text-sm text-foreground">{activityLabel(row)}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {formatDate(row.createdAt)} · {relativeTime(row.createdAt)}
+                      {row.ipAddress ? ` · ${row.ipAddress}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

@@ -27,6 +27,7 @@ import {
   programRequests, InsertProgramRequest, organizations, InsertOrganization,
   disabilityServices,
   familyGoals, familyReferrals, familyHomeVisits, cfcrRecords, familyCaseNotes, attendancePlans,
+  auditLogs,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 import { isEmptyPatch } from "./_core/patch";
@@ -428,6 +429,46 @@ export async function getStaffOrgChart(organizationId: number) {
     })
     .from(staff)
     .where(eq(staff.organizationId, organizationId));
+}
+
+// ==================== STAFF ACTIVITY (audit-log-backed) ====================
+
+/** A staff row's linked login userId (null if the staff has no account). */
+export async function getStaffUserId(organizationId: number, staffId: number): Promise<number | null> {
+  const row = await getStaffInOrg(organizationId, staffId);
+  return row?.userId ?? null;
+}
+
+/** Recent activity events for one user, newest first. */
+export async function getActivityForUser(userId: number, limit = 200) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(auditLogs)
+    .where(eq(auditLogs.userId, userId))
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(limit);
+}
+
+/**
+ * Activity for a set of users since a cutoff — used to build the team
+ * overview (last login, last active, today's page views) in one query.
+ */
+export async function getActivityForUsers(userIds: number[], since: Date) {
+  if (userIds.length === 0) return [];
+  const db = await requireDb();
+  return db
+    .select({
+      userId: auditLogs.userId,
+      action: auditLogs.action,
+      resourceType: auditLogs.resourceType,
+      resourceId: auditLogs.resourceId,
+      detail: auditLogs.detail,
+      createdAt: auditLogs.createdAt,
+    })
+    .from(auditLogs)
+    .where(and(inArray(auditLogs.userId, userIds), gte(auditLogs.createdAt, since)))
+    .orderBy(desc(auditLogs.createdAt));
 }
 
 export async function createStaff(data: InsertStaff) {
