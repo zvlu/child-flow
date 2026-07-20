@@ -790,7 +790,11 @@ export const appRouter = router({
       return me ? { staffId: me.id, role: me.role, position: me.position } : null;
     }),
     // Creating/modifying staff and their roles is an administrative action.
-    create: orgAdminProcedure
+    // Admins manage everyone in the org; supervisory functional roles
+    // (director, coordinators, family services manager) manage only the
+    // employees who report to them. orgStaffProcedure lets both tiers in;
+    // resolveStaffManagement enforces the actual boundary below.
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -799,6 +803,7 @@ export const appRouter = router({
           email: z.string().optional(),
           phone: z.string().optional(),
           position: z.string().optional(),
+          supervisorId: z.number().optional(),
           role: z.enum([
             "admin", "director", "fiscal_officer",
             "education_coordinator", "coach",
@@ -813,20 +818,34 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        const mgmt = await mod.resolveStaffManagement({
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          accessTier: ctx.user.role,
+        });
+        if (!mgmt.allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have permission to add staff." });
+        }
         await assertStaffCapacity(input.organizationId, 1);
-        const result = await mod.createStaff(input);
+        // A manager (non-admin) can only create people who report to them —
+        // force the new hire's supervisor to the creating manager. Admins
+        // may set any supervisor (or none).
+        const supervisorId = mgmt.isAdmin ? input.supervisorId : (mgmt.actorStaffId ?? undefined);
+        const result = await mod.createStaff({ ...input, supervisorId });
         await auditAccess(ctx, { action: "create", resourceType: "staff", detail: `org:${input.organizationId}` });
         return result;
       }),
-    update: orgAdminProcedure
+    update: orgStaffProcedure
       .input(
         z.object({
           id: z.number(),
+          organizationId: z.number(),
           firstName: z.string().min(1).optional(),
           lastName: z.string().min(1).optional(),
           email: z.string().optional(),
           phone: z.string().optional(),
           position: z.string().optional(),
+          supervisorId: z.number().nullable().optional(),
           role: z.enum([
             "admin", "director", "fiscal_officer",
             "education_coordinator", "coach",
@@ -842,8 +861,20 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const { id, ...data } = input;
+        const { id, organizationId, ...data } = input;
         await assertRecordInOrg(ctx.user, "staff", id);
+        const mgmt = await mod.resolveStaffManagement({
+          organizationId,
+          userId: ctx.user.id,
+          accessTier: ctx.user.role,
+          targetStaffId: id,
+        });
+        if (!mgmt.allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You can only manage staff who report to you." });
+        }
+        // Only admins may reassign who an employee reports to; a manager
+        // editing their report can't hand them to someone else.
+        if (!mgmt.isAdmin && "supervisorId" in data) delete (data as Record<string, unknown>).supervisorId;
         await auditAccess(ctx, { action: "update", resourceType: "staff", resourceId: id });
         return mod.updateStaff(id, data);
       }),

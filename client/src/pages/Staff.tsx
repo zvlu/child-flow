@@ -87,6 +87,7 @@ type StaffFormState = {
   phone: string;
   position: string;
   role: StaffRole;
+  supervisorId: number | null;
 };
 
 const emptyForm: StaffFormState = {
@@ -96,7 +97,19 @@ const emptyForm: StaffFormState = {
   phone: "",
   position: "",
   role: "teacher",
+  supervisorId: null,
 };
+
+// Functional roles that may manage the employees who report to them (mirrors
+// STAFF_MANAGER_ROLES on the server). Admin access tier can manage everyone.
+const MANAGER_ROLES = new Set<string>([
+  "director",
+  "education_coordinator",
+  "health_coordinator",
+  "disabilities_coordinator",
+  "ersea_coordinator",
+  "family_services_manager",
+]);
 
 function initials(first: string, last: string) {
   return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
@@ -115,6 +128,11 @@ export default function Staff() {
   const { data: certifications, isLoading: certsLoading } = trpc.staffOps.certifications.useQuery(ORGANIZATION_ID);
 
   const isAdmin = useIsAdmin();
+  // The signed-in user's own staff record — a manager-tier functional role
+  // may manage their direct reports even without the admin access tier.
+  const { data: myRole } = trpc.staff.myRole.useQuery();
+  const isManager = isAdmin || MANAGER_ROLES.has(myRole?.role ?? "");
+  const myStaffId = myRole?.staffId ?? null;
   const createStaff = trpc.staff.create.useMutation({
     onSuccess: () => {
       utils.staff.list.invalidate();
@@ -183,6 +201,12 @@ export default function Staff() {
     toast.success(`Exported ${rows.length} staff member${rows.length === 1 ? "" : "s"} to CSV`);
   };
 
+  // Who the current user may manage: admins → everyone; a manager → only
+  // the employees whose supervisorId is their own staff id. (The server
+  // enforces this independently; this just shapes the UI.)
+  const canManage = (member: (typeof staffList)[number]) =>
+    isAdmin || (isManager && member.supervisorId === myStaffId);
+
   const openEdit = (member: (typeof staffList)[number]) => {
     setForm({
       firstName: member.firstName ?? "",
@@ -191,6 +215,7 @@ export default function Staff() {
       phone: member.phone ?? "",
       position: member.position ?? "",
       role: member.role ?? "teacher",
+      supervisorId: (member as { supervisorId?: number | null }).supervisorId ?? null,
     });
     setEditId(member.id);
   };
@@ -207,13 +232,23 @@ export default function Staff() {
       phone: form.phone.trim() || undefined,
       position: form.position.trim() || undefined,
       role: form.role,
+      // Only admins set the reporting line; managers' new hires are auto-
+      // assigned to them on the server.
+      ...(isAdmin ? { supervisorId: form.supervisorId ?? undefined } : {}),
     };
     if (editId !== null) {
-      updateStaff.mutate({ id: editId, ...payload });
+      updateStaff.mutate({ id: editId, organizationId: ORGANIZATION_ID, ...payload });
     } else {
       createStaff.mutate({ organizationId: ORGANIZATION_ID, ...payload });
     }
   };
+
+  // Name lookup for rendering "reports to" and the supervisor picker.
+  const staffById = useMemo(() => {
+    const m = new Map<number, (typeof staffList)[number]>();
+    for (const s of staffList) m.set(s.id, s);
+    return m;
+  }, [staffList]);
 
   const staffFormFields = (
     <div className="space-y-3">
@@ -254,6 +289,31 @@ export default function Staff() {
           </Select>
         </div>
       </div>
+      {/* Reporting line — admins choose who this employee reports to. A
+          manager adding their own staff has them assigned automatically. */}
+      {isAdmin && (
+        <div className="space-y-1.5">
+          <Label>Reports to</Label>
+          <Select
+            value={form.supervisorId != null ? String(form.supervisorId) : "none"}
+            onValueChange={(v) => setForm(f => ({ ...f, supervisorId: v === "none" ? null : Number(v) }))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="No supervisor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No supervisor</SelectItem>
+              {staffList
+                .filter((s) => s.id !== editId && (s.role === "admin" || MANAGER_ROLES.has(s.role ?? "")))
+                .map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>
+                    {s.firstName} {s.lastName}{s.position ? ` · ${s.position}` : ""}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   );
 
@@ -268,7 +328,7 @@ export default function Staff() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-2" onClick={exportCsv}><Download className="h-4 w-4" />Export</Button>
-          {isAdmin && (
+          {isManager && (
             <Button size="sm" className="gap-2" onClick={() => { setForm(emptyForm); setAddOpen(true); }}>
               <Plus className="h-4 w-4" />Add Staff
             </Button>
@@ -345,7 +405,7 @@ export default function Staff() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <h3 className="font-semibold text-foreground">{fullName}</h3>
-                            {isAdmin && (
+                            {canManage(member) && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -355,7 +415,7 @@ export default function Staff() {
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={() => openEdit(member)}>Edit</DropdownMenuItem>
                                   <DropdownMenuItem
-                                    onClick={() => updateStaff.mutate({ id: member.id, isActive: member.isActive === 1 ? 0 : 1 })}
+                                    onClick={() => updateStaff.mutate({ id: member.id, organizationId: ORGANIZATION_ID, isActive: member.isActive === 1 ? 0 : 1 })}
                                   >
                                     {member.isActive === 1 ? "Deactivate" : "Activate"}
                                   </DropdownMenuItem>
@@ -371,6 +431,13 @@ export default function Staff() {
                               <Badge variant="outline" className="text-xs text-muted-foreground">Inactive</Badge>
                             )}
                           </div>
+                          {(member as { supervisorId?: number | null }).supervisorId != null &&
+                            staffById.get((member as { supervisorId?: number | null }).supervisorId!) && (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Reports to {staffById.get((member as { supervisorId?: number | null }).supervisorId!)!.firstName}{" "}
+                                {staffById.get((member as { supervisorId?: number | null }).supervisorId!)!.lastName}
+                              </p>
+                            )}
                           <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                             {classroom && <p>Classroom: {classroom}</p>}
                             {member.email && <div className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{member.email}</div>}

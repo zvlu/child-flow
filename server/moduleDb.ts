@@ -261,6 +261,76 @@ export async function getAttendanceRange(organizationId: number, start: Date, en
 
 // ==================== STAFF ====================
 
+/**
+ * Functional roles that may manage the employees who report to them. The
+ * users.role ACCESS tier ("admin") always can, org-wide; these functional
+ * (staff.role) titles can manage only their direct reports.
+ */
+export const STAFF_MANAGER_ROLES = new Set<string>([
+  "director",
+  "education_coordinator",
+  "health_coordinator",
+  "disabilities_coordinator",
+  "ersea_coordinator",
+  "family_services_manager",
+]);
+
+/** A staff member's own functional role + id, for permission checks. */
+export async function getStaffSelf(organizationId: number, userId: number) {
+  const staffId = await resolveStaffId(organizationId, userId);
+  if (staffId == null) return null;
+  const db = await requireDb();
+  const rows = await db
+    .select({ id: staff.id, role: staff.role })
+    .from(staff)
+    .where(eq(staff.id, staffId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Look up a single staff row scoped to an org (null if not in that org). */
+export async function getStaffInOrg(organizationId: number, staffId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(staff)
+    .where(and(eq(staff.id, staffId), eq(staff.organizationId, organizationId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Can `userId` manage staff in `organizationId`, and if `targetStaffId` is
+ * given, that specific employee? Admin tier → yes, org-wide. Manager-tier
+ * functional role → only employees whose supervisorId is the manager's own
+ * staff id. Returns the actor's staffId so callers can default new hires'
+ * supervisor to the creating manager.
+ */
+export async function resolveStaffManagement(opts: {
+  organizationId: number;
+  userId: number;
+  accessTier: string; // users.role
+  targetStaffId?: number;
+}): Promise<{ allowed: boolean; actorStaffId: number | null; isAdmin: boolean }> {
+  const isAdmin = opts.accessTier === "admin";
+  const self = await getStaffSelf(opts.organizationId, opts.userId);
+  const actorStaffId = self?.id ?? null;
+
+  if (isAdmin) return { allowed: true, actorStaffId, isAdmin };
+
+  // Non-admins must hold a manager-tier functional role.
+  if (!self || !STAFF_MANAGER_ROLES.has(self.role ?? "")) {
+    return { allowed: false, actorStaffId, isAdmin };
+  }
+  // Managing the org in general (e.g. creating a new hire) is allowed for
+  // managers; a specific target must report to them.
+  if (opts.targetStaffId == null) return { allowed: true, actorStaffId, isAdmin };
+
+  const target = await getStaffInOrg(opts.organizationId, opts.targetStaffId);
+  const allowed = target != null && target.supervisorId === actorStaffId;
+  return { allowed, actorStaffId, isAdmin };
+}
+
 export async function createStaff(data: InsertStaff) {
   const db = await requireDb();
   const [result] = await db.insert(staff).values(data);
