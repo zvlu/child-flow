@@ -341,10 +341,12 @@ struct ClassroomQualityView: View {
                 .listRowBackground(Color.clear)
 
                 if viewModel.classAssessments.count >= 2 {
-                    Section("CLASS® Trend") {
+                    Section {
                         ForEach(viewModel.classAssessments.sorted { $0.assessmentDate < $1.assessmentDate }) { a in
                             TrendRow(assessment: a)
                         }
+                    } header: {
+                        Text("CLASS® Trend")
                     } footer: {
                         Text("Dashed thresholds on the web trend chart: ES/CO 6.0 · IS 3.0")
                             .font(.cfCaption2)

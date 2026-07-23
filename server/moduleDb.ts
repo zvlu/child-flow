@@ -27,6 +27,7 @@ import {
   programRequests, InsertProgramRequest, organizations, InsertOrganization,
   disabilityServices,
   familyGoals, familyReferrals, familyHomeVisits, cfcrRecords, familyCaseNotes, attendancePlans,
+  auditLogs,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 import { isEmptyPatch } from "./_core/patch";
@@ -260,6 +261,215 @@ export async function getAttendanceRange(organizationId: number, start: Date, en
 }
 
 // ==================== STAFF ====================
+
+/**
+ * Functional roles that may manage the employees who report to them. The
+ * users.role ACCESS tier ("admin") always can, org-wide; these functional
+ * (staff.role) titles can manage only their direct reports.
+ */
+export const STAFF_MANAGER_ROLES = new Set<string>([
+  "director",
+  "education_coordinator",
+  "health_coordinator",
+  "disabilities_coordinator",
+  "ersea_coordinator",
+  "family_services_manager",
+]);
+
+/** A staff member's own functional role + id, for permission checks. */
+export async function getStaffSelf(organizationId: number, userId: number) {
+  const staffId = await resolveStaffId(organizationId, userId);
+  if (staffId == null) return null;
+  const db = await requireDb();
+  const rows = await db
+    .select({ id: staff.id, role: staff.role })
+    .from(staff)
+    .where(eq(staff.id, staffId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Look up a single staff row scoped to an org (null if not in that org). */
+export async function getStaffInOrg(organizationId: number, staffId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(staff)
+    .where(and(eq(staff.id, staffId), eq(staff.organizationId, organizationId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Minimal supervisor graph for an org: every staff id → its supervisorId. */
+async function getSupervisorGraph(organizationId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ id: staff.id, supervisorId: staff.supervisorId })
+    .from(staff)
+    .where(eq(staff.organizationId, organizationId));
+  // childrenOf: supervisorId → [staffId, …]
+  const childrenOf = new Map<number, number[]>();
+  const supervisorOf = new Map<number, number | null>();
+  for (const r of rows) {
+    supervisorOf.set(r.id, r.supervisorId ?? null);
+    if (r.supervisorId != null) {
+      const list = childrenOf.get(r.supervisorId) ?? [];
+      list.push(r.id);
+      childrenOf.set(r.supervisorId, list);
+    }
+  }
+  return { childrenOf, supervisorOf };
+}
+
+/**
+ * Every staff id beneath `rootStaffId` in the reporting tree (direct AND
+ * indirect reports), so a director who supervises coordinators can also
+ * manage the advocates beneath them. Excludes the root. Cycle-safe.
+ */
+export async function getStaffDescendants(
+  organizationId: number,
+  rootStaffId: number,
+): Promise<Set<number>> {
+  const { childrenOf } = await getSupervisorGraph(organizationId);
+  const out = new Set<number>();
+  const queue = [...(childrenOf.get(rootStaffId) ?? [])];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (out.has(id)) continue; // guard against pre-existing bad cycles
+    out.add(id);
+    for (const child of childrenOf.get(id) ?? []) queue.push(child);
+  }
+  return out;
+}
+
+/**
+ * Would setting `staffId`'s supervisor to `newSupervisorId` create a loop?
+ * True if the proposed supervisor is the staff member itself or already sits
+ * somewhere beneath it in the tree.
+ */
+export async function wouldCreateSupervisorCycle(
+  organizationId: number,
+  staffId: number,
+  newSupervisorId: number,
+): Promise<boolean> {
+  if (staffId === newSupervisorId) return true;
+  const descendants = await getStaffDescendants(organizationId, staffId);
+  return descendants.has(newSupervisorId);
+}
+
+/**
+ * Can `userId` manage staff in `organizationId`, and if `targetStaffId` is
+ * given, that specific employee? Admin tier → yes, org-wide. Manager-tier
+ * functional role → any employee in their reporting subtree (direct or
+ * indirect report). Returns the actor's staffId so callers can default new
+ * hires' supervisor to the creating manager.
+ */
+export async function resolveStaffManagement(opts: {
+  organizationId: number;
+  userId: number;
+  accessTier: string; // users.role
+  targetStaffId?: number;
+}): Promise<{ allowed: boolean; actorStaffId: number | null; isAdmin: boolean }> {
+  const isAdmin = opts.accessTier === "admin";
+  const self = await getStaffSelf(opts.organizationId, opts.userId);
+  const actorStaffId = self?.id ?? null;
+
+  if (isAdmin) return { allowed: true, actorStaffId, isAdmin };
+
+  // Non-admins must hold a manager-tier functional role.
+  if (!self || !STAFF_MANAGER_ROLES.has(self.role ?? "")) {
+    return { allowed: false, actorStaffId, isAdmin };
+  }
+  // Managing the org in general (e.g. creating a new hire) is allowed for
+  // managers; a specific target must be somewhere in their subtree.
+  if (opts.targetStaffId == null) return { allowed: true, actorStaffId, isAdmin };
+  if (actorStaffId == null) return { allowed: false, actorStaffId, isAdmin };
+
+  const descendants = await getStaffDescendants(opts.organizationId, actorStaffId);
+  return { allowed: descendants.has(opts.targetStaffId), actorStaffId, isAdmin };
+}
+
+/**
+ * When a supervisor is deactivated, their direct reports would be orphaned.
+ * Re-parent them to the deactivated supervisor's own supervisor (their
+ * grand-supervisor), keeping the chain intact. Returns the number moved.
+ */
+export async function reparentReportsOnDeactivate(
+  organizationId: number,
+  deactivatedStaffId: number,
+): Promise<number> {
+  const db = await requireDb();
+  const target = await getStaffInOrg(organizationId, deactivatedStaffId);
+  if (!target) return 0;
+  const newSupervisor = target.supervisorId ?? null; // may be null (top of org)
+  const reports = await db
+    .select({ id: staff.id })
+    .from(staff)
+    .where(and(eq(staff.organizationId, organizationId), eq(staff.supervisorId, deactivatedStaffId)));
+  if (!reports.length) return 0;
+  await db
+    .update(staff)
+    .set({ supervisorId: newSupervisor })
+    .where(and(eq(staff.organizationId, organizationId), eq(staff.supervisorId, deactivatedStaffId)));
+  return reports.length;
+}
+
+/** Org chart rows: id, name, position, role, supervisorId, active. */
+export async function getStaffOrgChart(organizationId: number) {
+  const db = await requireDb();
+  return db
+    .select({
+      id: staff.id,
+      firstName: staff.firstName,
+      lastName: staff.lastName,
+      position: staff.position,
+      role: staff.role,
+      supervisorId: staff.supervisorId,
+      isActive: staff.isActive,
+    })
+    .from(staff)
+    .where(eq(staff.organizationId, organizationId));
+}
+
+// ==================== STAFF ACTIVITY (audit-log-backed) ====================
+
+/** A staff row's linked login userId (null if the staff has no account). */
+export async function getStaffUserId(organizationId: number, staffId: number): Promise<number | null> {
+  const row = await getStaffInOrg(organizationId, staffId);
+  return row?.userId ?? null;
+}
+
+/** Recent activity events for one user, newest first. */
+export async function getActivityForUser(userId: number, limit = 200) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(auditLogs)
+    .where(eq(auditLogs.userId, userId))
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(limit);
+}
+
+/**
+ * Activity for a set of users since a cutoff — used to build the team
+ * overview (last login, last active, today's page views) in one query.
+ */
+export async function getActivityForUsers(userIds: number[], since: Date) {
+  if (userIds.length === 0) return [];
+  const db = await requireDb();
+  return db
+    .select({
+      userId: auditLogs.userId,
+      action: auditLogs.action,
+      resourceType: auditLogs.resourceType,
+      resourceId: auditLogs.resourceId,
+      detail: auditLogs.detail,
+      createdAt: auditLogs.createdAt,
+    })
+    .from(auditLogs)
+    .where(and(inArray(auditLogs.userId, userIds), gte(auditLogs.createdAt, since)))
+    .orderBy(desc(auditLogs.createdAt));
+}
 
 export async function createStaff(data: InsertStaff) {
   const db = await requireDb();

@@ -68,12 +68,15 @@ struct WelcomeView: View {
             Spacer()
 
             VStack(spacing: 16) {
-                Image(systemName: "figure.2.and.child.holdinghands")
-                    .font(.system(size: 72))
-                    .foregroundColor(.accentColor)
+                Image("LaunchLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 110, height: 110)
+                    .accessibilityHidden(true)
 
                 Text("Sprout")
                     .font(.largeTitle.bold())
+                    .foregroundColor(.cfPrimary)
 
                 Text(L(.appTagline))
                     .font(.subheadline)
@@ -89,7 +92,7 @@ struct WelcomeView: View {
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.accentColor)
+                        .background(Color.cfPrimary)
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
@@ -137,7 +140,7 @@ struct InviteCodeView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "envelope.open.fill")
                         .font(.system(size: 52))
-                        .foregroundColor(.accentColor)
+                        .foregroundColor(.cfPrimary)
                     Text(L(.enterInviteTitle))
                         .font(.title2.bold())
                     Text(L(.enterInviteSubtitle))
@@ -172,7 +175,7 @@ struct InviteCodeView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(code.isEmpty ? Color.accentColor.opacity(0.4) : Color.accentColor)
+                        .background(code.isEmpty ? Color.cfPrimary.opacity(0.4) : Color.cfPrimary)
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
@@ -185,7 +188,7 @@ struct InviteCodeView: View {
                         showWhereFindHelp = true
                     }
                     .font(.footnote)
-                    .foregroundColor(.accentColor)
+                    .foregroundColor(.cfPrimary)
                 }
                 .padding(.horizontal, 32)
             }
@@ -344,7 +347,7 @@ struct FamilyRegistrationView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(canSubmit ? Color.accentColor : Color.accentColor.opacity(0.4))
+                        .background(canSubmit ? Color.cfPrimary : Color.cfPrimary.opacity(0.4))
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
@@ -404,12 +407,15 @@ struct FamilySignInView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 32) {
-                VStack(spacing: 8) {
-                    Image(systemName: "figure.2.and.child.holdinghands")
-                        .font(.system(size: 60))
-                        .foregroundColor(.accentColor)
+                VStack(spacing: 12) {
+                    Image("LaunchLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 88, height: 88)
+                        .accessibilityHidden(true)
                     Text(L(.welcomeBack))
                         .font(.title2.bold())
+                        .foregroundColor(.cfPrimary)
                 }
                 .padding(.top, 32)
 
@@ -453,7 +459,7 @@ struct FamilySignInView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(email.isEmpty || password.isEmpty ? Color.accentColor.opacity(0.4) : Color.accentColor)
+                        .background(email.isEmpty || password.isEmpty ? Color.cfPrimary.opacity(0.4) : Color.cfPrimary)
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
@@ -461,7 +467,7 @@ struct FamilySignInView: View {
 
                     Button(L(.noAccountSignUp)) { onBack() }
                         .font(.footnote)
-                        .foregroundColor(.accentColor)
+                        .foregroundColor(.cfPrimary)
                 }
                 .padding(.horizontal, 32)
             }

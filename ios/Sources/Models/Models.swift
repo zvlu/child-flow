@@ -10,6 +10,9 @@ struct User: Codable, Identifiable {
     /// "Center Director") — distinct from `role`, which is just the admin/staff
     /// access tier. nil for parents or staff with no position on file.
     var position: String?
+    /// The §1302.91 functional role enum (teacher, nurse, family_advocate…)
+    /// from the staff record — shapes which tabs the app leads with.
+    var staffRole: String?
     /// Optional feature modules enabled for this user's org, e.g. ["head_start"].
     /// Absent in older/mocked payloads, so default to empty rather than fail decoding.
     var enabledModules: [String] = []

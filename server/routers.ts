@@ -13,7 +13,7 @@ import { SUPPORTED_LANGUAGES } from "./translation";
 import { rateLimit } from "./_core/rateLimit";
 import { computeAuditReadiness } from "./auditReadiness";
 import { getBillingPlans, createBillingPlan, setBillingPlanActive, generateDueInvoices, getArAging } from "./billingPlans";
-import { auditAccess } from "./_core/audit";
+import { auditAccess, clientIpFromReq } from "./_core/audit";
 import { hashPassword, verifyPassword } from "./_core/password";
 import { persistMediaDataUrl } from "./storage";
 import { notifyMomentPosted } from "./_core/push";
@@ -47,6 +47,7 @@ import {
   createCommunicationLog,
   getEducationRecords,
   getPirData,
+  insertAuditLog,
 } from "./db";
 import * as mod from "./moduleDb";
 import { importRoster } from "./dataImport";
@@ -790,7 +791,11 @@ export const appRouter = router({
       return me ? { staffId: me.id, role: me.role, position: me.position } : null;
     }),
     // Creating/modifying staff and their roles is an administrative action.
-    create: orgAdminProcedure
+    // Admins manage everyone in the org; supervisory functional roles
+    // (director, coordinators, family services manager) manage only the
+    // employees who report to them. orgStaffProcedure lets both tiers in;
+    // resolveStaffManagement enforces the actual boundary below.
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -799,6 +804,7 @@ export const appRouter = router({
           email: z.string().optional(),
           phone: z.string().optional(),
           position: z.string().optional(),
+          supervisorId: z.number().optional(),
           role: z.enum([
             "admin", "director", "fiscal_officer",
             "education_coordinator", "coach",
@@ -813,20 +819,34 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        const mgmt = await mod.resolveStaffManagement({
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          accessTier: ctx.user.role,
+        });
+        if (!mgmt.allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have permission to add staff." });
+        }
         await assertStaffCapacity(input.organizationId, 1);
-        const result = await mod.createStaff(input);
+        // A manager (non-admin) can only create people who report to them —
+        // force the new hire's supervisor to the creating manager. Admins
+        // may set any supervisor (or none).
+        const supervisorId = mgmt.isAdmin ? input.supervisorId : (mgmt.actorStaffId ?? undefined);
+        const result = await mod.createStaff({ ...input, supervisorId });
         await auditAccess(ctx, { action: "create", resourceType: "staff", detail: `org:${input.organizationId}` });
         return result;
       }),
-    update: orgAdminProcedure
+    update: orgStaffProcedure
       .input(
         z.object({
           id: z.number(),
+          organizationId: z.number(),
           firstName: z.string().min(1).optional(),
           lastName: z.string().min(1).optional(),
           email: z.string().optional(),
           phone: z.string().optional(),
           position: z.string().optional(),
+          supervisorId: z.number().nullable().optional(),
           role: z.enum([
             "admin", "director", "fiscal_officer",
             "education_coordinator", "coach",
@@ -842,10 +862,168 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const { id, ...data } = input;
+        const { id, organizationId, ...data } = input;
         await assertRecordInOrg(ctx.user, "staff", id);
+        const mgmt = await mod.resolveStaffManagement({
+          organizationId,
+          userId: ctx.user.id,
+          accessTier: ctx.user.role,
+          targetStaffId: id,
+        });
+        if (!mgmt.allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You can only manage staff who report to you." });
+        }
+        // Only admins may reassign who an employee reports to; a manager
+        // editing their report can't hand them to someone else.
+        if (!mgmt.isAdmin && "supervisorId" in data) delete (data as Record<string, unknown>).supervisorId;
+        // Prevent reporting-line loops (A reports to B reports to A).
+        if (mgmt.isAdmin && data.supervisorId != null) {
+          if (await mod.wouldCreateSupervisorCycle(organizationId, id, data.supervisorId)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "That would create a reporting loop — a person can't report to someone who reports to them.",
+            });
+          }
+        }
         await auditAccess(ctx, { action: "update", resourceType: "staff", resourceId: id });
-        return mod.updateStaff(id, data);
+        const result = await mod.updateStaff(id, data);
+        // Deactivating a supervisor would strand their reports — move them up
+        // to the deactivated person's own supervisor so the chain holds.
+        if (data.isActive === 0) {
+          const moved = await mod.reparentReportsOnDeactivate(organizationId, id);
+          if (moved > 0) {
+            await auditAccess(ctx, {
+              action: "update",
+              resourceType: "staff",
+              resourceId: id,
+              detail: `reparented ${moved} report(s) on deactivate`,
+            });
+          }
+        }
+        return result;
+      }),
+
+    // A manager's team (their whole reporting subtree) — or, for admins,
+    // the full staff list. Drives the "My Team" view and manager scoping.
+    team: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const all = await getOrganizationStaff(input.organizationId);
+        if (ctx.user.role === "admin") return all;
+        const self = await mod.getStaffSelf(input.organizationId, ctx.user.id);
+        if (!self || !mod.STAFF_MANAGER_ROLES.has(self.role ?? "")) return [];
+        const ids = await mod.getStaffDescendants(input.organizationId, self.id);
+        return all.filter((m) => ids.has(m.id));
+      }),
+
+    // Full reporting hierarchy for the org chart (managers + admins).
+    orgChart: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => {
+        return mod.getStaffOrgChart(input.organizationId);
+      }),
+  }),
+
+  // ── Staff activity oversight ──────────────────────────────────────────
+  // Admins see anyone in the org; managers see only their reporting subtree
+  // (same boundary as staff management). Backed by the audit_logs table:
+  // logins/logouts, page views, and record actions.
+  activity: router({
+    // Client calls this on each screen change to record "what they see".
+    track: protectedProcedure
+      .input(z.object({ path: z.string().max(200), label: z.string().max(120).optional() }))
+      .mutation(async ({ input, ctx }) => {
+        await insertAuditLog({
+          userId: ctx.user.id,
+          actorOpenId: ctx.user.openId,
+          action: "view",
+          resourceType: "page",
+          resourceId: input.path.slice(0, 64),
+          ipAddress: clientIpFromReq(ctx.req),
+          detail: input.label ?? null,
+        });
+        return { ok: true };
+      }),
+
+    // Explicit sign-out event (login is already logged server-side).
+    logout: protectedProcedure.mutation(async ({ ctx }) => {
+      await insertAuditLog({
+        userId: ctx.user.id,
+        actorOpenId: ctx.user.openId,
+        action: "logout",
+        resourceType: "auth",
+        ipAddress: clientIpFromReq(ctx.req),
+      });
+      return { ok: true };
+    }),
+
+    // Full activity timeline for one employee (guarded by management scope).
+    forStaff: orgStaffProcedure
+      .input(z.object({ organizationId: z.number(), staffId: z.number(), limit: z.number().max(500).optional() }))
+      .query(async ({ input, ctx }) => {
+        const mgmt = await mod.resolveStaffManagement({
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          accessTier: ctx.user.role,
+          targetStaffId: input.staffId,
+        });
+        if (!mgmt.allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You can only view activity for staff who report to you." });
+        }
+        const targetUserId = await mod.getStaffUserId(input.organizationId, input.staffId);
+        if (targetUserId == null) return [];
+        return mod.getActivityForUser(targetUserId, input.limit ?? 200);
+      }),
+
+    // Team overview: for everyone the caller manages, last login / last
+    // active / today's page-view count, plus a simple "active now" flag.
+    teamOverview: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const all = await getOrganizationStaff(input.organizationId);
+        let scoped = all;
+        if (ctx.user.role !== "admin") {
+          const self = await mod.getStaffSelf(input.organizationId, ctx.user.id);
+          if (!self || !mod.STAFF_MANAGER_ROLES.has(self.role ?? "")) return [];
+          const ids = await mod.getStaffDescendants(input.organizationId, self.id);
+          scoped = all.filter((m) => ids.has(m.id));
+        }
+        const withUser = scoped.filter((m) => m.userId != null);
+        const userIds = withUser.map((m) => m.userId as number);
+        const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // last 7 days
+        const rows = await mod.getActivityForUsers(userIds, since);
+
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const activeCutoff = Date.now() - 5 * 60 * 1000;
+
+        const byUser = new Map<number, typeof rows>();
+        for (const r of rows) {
+          if (r.userId == null) continue;
+          const list = byUser.get(r.userId) ?? [];
+          list.push(r);
+          byUser.set(r.userId, list);
+        }
+
+        return withUser.map((m) => {
+          const events = byUser.get(m.userId as number) ?? [];
+          const lastLogin = events.find((e) => e.action === "login")?.createdAt ?? null;
+          const lastActive = events[0]?.createdAt ?? null;
+          const viewsToday = events.filter(
+            (e) => e.action === "view" && e.createdAt >= startOfToday,
+          ).length;
+          const onlineNow = lastActive != null && lastActive.getTime() >= activeCutoff;
+          return {
+            staffId: m.id,
+            name: `${m.firstName} ${m.lastName}`,
+            role: m.role,
+            position: m.position,
+            lastLoginAt: lastLogin,
+            lastActiveAt: lastActive,
+            viewsToday,
+            onlineNow,
+          };
+        });
       }),
   }),
 

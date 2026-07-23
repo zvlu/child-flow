@@ -316,6 +316,20 @@
       "when": 1784209455678,
       "tag": "0044_dusty_silhouette",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "5",
+      "when": 1784577114329,
+      "tag": "0045_large_husk",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "5",
+      "when": 1784578346038,
+      "tag": "0046_left_vulcan",
+      "breakpoints": true
     }
   ]
 }

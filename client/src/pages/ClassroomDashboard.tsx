@@ -313,14 +313,14 @@ export default function ClassroomDashboard() {
 
   if (isLoading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[400px] bg-[#FBF6EE]">
+      <div className="p-6 flex items-center justify-center min-h-[400px] bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 bg-[#FBF6EE] min-h-full">
+    <div className="p-6 space-y-6 bg-background min-h-full">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">

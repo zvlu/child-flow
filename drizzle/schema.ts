@@ -1,4 +1,4 @@
-import { date, decimal, int, json, mediumtext, mysqlEnum, mysqlTable, text, timestamp, unique, varchar } from "drizzle-orm/mysql-core";
+import { date, decimal, foreignKey, int, json, mediumtext, mysqlEnum, mysqlTable, text, timestamp, unique, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -186,6 +186,13 @@ export const staff = mysqlTable("staff", {
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 20 }),
   position: varchar("position", { length: 100 }),
+  /**
+   * Who this employee reports to (another staff member in the same org).
+   * Supervisory roles (director, coordinators, family services manager) may
+   * manage the staff who report to them; admins manage everyone. Nullable —
+   * top-of-org and unassigned staff have no supervisor.
+   */
+  supervisorId: int("supervisorId"),
   /**
    * Program role, grounded in the §1302.91 staffing taxonomy. Original four
    * values kept for data compatibility; "coordinator" remains as the legacy
@@ -1672,8 +1679,11 @@ export type InsertNutritionPreferenceForm = typeof nutritionPreferenceForms.$inf
 
 export const nutritionInfantFormulaForms = mysqlTable("nutrition_infant_formula_forms", {
   id: int("id").autoincrement().primaryKey(),
-  organizationId: int("organizationId").notNull().references(() => organizations.id),
-  childId: int("childId").notNull().references(() => children.id),
+  // FK constraints named explicitly: the auto-generated
+  // "nutrition_infant_formula_forms_organizationId_organizations_id_fk" is
+  // 65 chars, over MySQL's 64-char identifier limit.
+  organizationId: int("organizationId").notNull(),
+  childId: int("childId").notNull(),
   classroom: varchar("classroom", { length: 200 }),
   completedDate: timestamp("completedDate").notNull(),
   parentName: varchar("parentName", { length: 200 }),
@@ -1684,7 +1694,10 @@ export const nutritionInfantFormulaForms = mysqlTable("nutrition_infant_formula_
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (t) => ({
+  orgFk: foreignKey({ columns: [t.organizationId], foreignColumns: [organizations.id], name: "nif_forms_org_fk" }),
+  childFk: foreignKey({ columns: [t.childId], foreignColumns: [children.id], name: "nif_forms_child_fk" }),
+}));
 
 export type NutritionInfantFormulaForm = typeof nutritionInfantFormulaForms.$inferSelect;
 export type InsertNutritionInfantFormulaForm = typeof nutritionInfantFormulaForms.$inferInsert;

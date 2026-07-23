@@ -32,13 +32,16 @@ struct LoginView: View {
                 Spacer().frame(height: 80)
 
                 // Logo
-                VStack(spacing: 8) {
-                    Image(systemName: "figure.2.and.child.holdinghands")
-                        .font(.system(size: 60))
-                        .foregroundColor(.accentColor)
+                VStack(spacing: 12) {
+                    Image("LaunchLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 96, height: 96)
+                        .accessibilityHidden(true)
                     Text("Sprout")
                         .font(.largeTitle.bold())
-                    Text("Head Start Management")
+                        .foregroundColor(.cfPrimary)
+                    Text("Child Care Management")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -88,7 +91,7 @@ struct LoginView: View {
                         Spacer()
                         Button("Forgot Password?") { showForgotPassword = true }
                             .font(.footnote)
-                            .foregroundColor(.accentColor)
+                            .foregroundColor(.cfPrimary)
                     }
 
                     // Error
@@ -147,7 +150,7 @@ struct LoginView: View {
                     Link("Contact your program administrator",
                          destination: URL(string: "mailto:support@sprout.org")!)
                         .font(.caption)
-                        .foregroundColor(.accentColor)
+                        .foregroundColor(.cfPrimary)
                 }
 
                 Spacer().frame(height: 32)
@@ -172,9 +175,20 @@ struct LoginView: View {
                     isLoading = false
                 }
             } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    isLoading = false
+                // One login for every role: if the credentials don't match a
+                // staff account, try the family (parent) account endpoint
+                // before surfacing an error.
+                do {
+                    let result = try await APIClient.shared.familyLogin(email: email, password: password)
+                    await MainActor.run {
+                        appState.loginFamily(profile: result.profile, token: result.token)
+                        isLoading = false
+                    }
+                } catch {
+                    await MainActor.run {
+                        errorMessage = "Email or password doesn't match a staff or family account."
+                        isLoading = false
+                    }
                 }
             }
         }
