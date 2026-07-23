@@ -61,6 +61,13 @@ targets:
         name: Models
       - path: Sources/Networking
         name: Networking
+        # StoryAPI is the staff-only "moments" feed client. It references
+        # StoryPost, whose type lives in Sources/Story/ProgramStoryView.swift
+        # (a staff-only file not compiled into this target). The family app
+        # has no story UI and never calls it, so exclude it here rather than
+        # hoisting a view-coupled staff model into the shared layer.
+        excludes:
+          - "StoryAPI.swift"
       # Shared design tokens (programmatic colors/fonts; no asset-catalog deps)
       - path: Sources/App/DesignSystem.swift
         name: DesignSystem

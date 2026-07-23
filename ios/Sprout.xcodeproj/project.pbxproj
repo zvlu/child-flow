@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		007134D1A66AA874D0978E98 /* FamilyTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2EF15EFD4166C8CAF9BB7AC /* FamilyTodayView.swift */; };
 		09E64C386675C501F29FBE38 /* NutritionFormsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77D50A071799AC85F38203A5 /* NutritionFormsView.swift */; };
 		0F4492FECDECBC8A6FCF6741 /* HealthRecordsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF253E6583C20F46AD69F34C /* HealthRecordsAPI.swift */; };
 		13B2D859B9499FD0471EC17A /* InKindView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A643A74824235F40DCA7EFA2 /* InKindView.swift */; };
@@ -31,8 +32,8 @@
 		2BBB9EE39FFF2B7EBB2A8EC0 /* InviteFamiliesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D6A97218AD855BC03422C35 /* InviteFamiliesView.swift */; };
 		2C77396969058907CC52449A /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF346697D678DB8DA4632D6 /* Models.swift */; };
 		300A1D3FD9A082F4B4426878 /* FamilyServicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCC6F8B66949AE604187CF7 /* FamilyServicesView.swift */; };
+		307949DB5049BB5BFA1E57B6 /* FamilyProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 989ED9CA5811AAB1A43926C0 /* FamilyProfileView.swift */; };
 		37DA47D944FC18831C74A723 /* FamilyProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 989ED9CA5811AAB1A43926C0 /* FamilyProfileView.swift */; };
-		3977DA46AEF8CE8CC62B317D /* StoryAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE114A6EF56FEFA6DE1934D5 /* StoryAPI.swift */; };
 		3AACE272D7FE3BC4A8EB56D1 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93506B6A71C7A4CC29B6C996 /* DesignSystem.swift */; };
 		3D7F4362550221AE8DABB007 /* DisabilityServicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE5C97DC756C2FDC9C857928 /* DisabilityServicesView.swift */; };
 		3DA102AF720C73311E04877F /* DigitalDocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 550BE1544327EEAEE259B95F /* DigitalDocumentsView.swift */; };
@@ -43,9 +44,11 @@
 		430F1F851A4F94D6F118DF34 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4400A734F7A4506011ECF2D1 /* MainTabView.swift */; };
 		434D8D4586C3D0E4EDFC2DC1 /* AssessmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DCA00F0A8C87DBC8403B49 /* AssessmentsView.swift */; };
 		49D81A83A5775E0CC276E38C /* ApplicationVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 033C0C29DD81AFB7E40E1F33 /* ApplicationVerificationView.swift */; };
+		4B2A68E73CE63E067825B443 /* FamilyOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D282E0278E01839F5C630915 /* FamilyOnboardingView.swift */; };
 		4E23AACF1945126CE667D263 /* SproutFamilyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAD9B4ED73F9FD6C4D9BAC4C /* SproutFamilyApp.swift */; };
 		4FF35EA7764B9CC087D7C93C /* FamilyProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 582CBC887B97A0DA34065DB5 /* FamilyProgressView.swift */; };
 		55D9315329DBB360B4CF917F /* ClassroomQualityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF00056D3C1220DF7611B6EA /* ClassroomQualityView.swift */; };
+		57AF1331C1DF2141FF0E9829 /* FamilyMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C45DBE05D2BC46E3BA4622 /* FamilyMessagesView.swift */; };
 		58D0872F5B464DFB74FCEC9D /* ComplianceChecklistAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20E632C924EBB7DD31C20312 /* ComplianceChecklistAPI.swift */; };
 		5B39117CB65F74131ACEEC0D /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 261EC0C07163484F36AC17E2 /* DashboardView.swift */; };
 		5D36A378460BC9174D38964E /* ConversationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5618DBB10822780B4646D530 /* ConversationViewModel.swift */; };
@@ -53,6 +56,7 @@
 		6508D3A37EE0B41F5754FCF6 /* PushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E4266DC035767246225E8A /* PushNotifications.swift */; };
 		6CFD3F398824D18839D0936D /* DocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6793384ECBDC5F62FC7B486 /* DocumentsView.swift */; };
 		709C32022179EF80E1C26E11 /* HealthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 913837B6F20D4803A77B577A /* HealthView.swift */; };
+		71F0A363C49892B0C174BA62 /* FamilyL10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37850FC58C15A2C7BB2D7FD9 /* FamilyL10n.swift */; };
 		77A3116E39A369402F8C4287 /* StaffManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D4C441E49751379B7D52C1 /* StaffManagement.swift */; };
 		7918B6469C29D1F02C6C82B7 /* AbsenceReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4005813DCF2008E399B226 /* AbsenceReportsView.swift */; };
 		79C21C8CC3BA9356A7D37C95 /* NutritionFormsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5CB98E53DF425469AE8B6E /* NutritionFormsAPI.swift */; };
@@ -64,6 +68,7 @@
 		8814DCCACA384503A109CF86 /* ParticipationClearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97BA3FD9DF0C8D6AD1B5FBF8 /* ParticipationClearance.swift */; };
 		899D035CE5CF4AA064B57006 /* ProgramStoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B10CBC506F7E9159947202C /* ProgramStoryView.swift */; };
 		8BB3755EE8D456FBDC69B694 /* FamilyTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2EF15EFD4166C8CAF9BB7AC /* FamilyTodayView.swift */; };
+		8C74EF5C1BEA37022DE6E40F /* FamilyProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 582CBC887B97A0DA34065DB5 /* FamilyProgressView.swift */; };
 		8D860A9287E63BBFF539CFF7 /* BulkActionCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569092EC670A514B3B32DB63 /* BulkActionCenterView.swift */; };
 		8F0FF2E799424C790436AD6D /* ParticipationClearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97BA3FD9DF0C8D6AD1B5FBF8 /* ParticipationClearance.swift */; };
 		90C3B394FCA36C4FD93B2AA1 /* PortfoliosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9106EAE490369CD580BC194 /* PortfoliosView.swift */; };
@@ -79,8 +84,11 @@
 		BAF1D6756A2AB627C683D7A3 /* MealsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D3379951A97462A414673D /* MealsView.swift */; };
 		BB8817A4E9D47B7BC277CB27 /* ClockInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87781B04447BEA7645F8D42B /* ClockInView.swift */; };
 		C7921EE915021F7368E8BEC7 /* FamilyPartnershipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2433634BF2C8DA4D1102B610 /* FamilyPartnershipView.swift */; };
+		D1C3BA3A0A302BA45D69E6BC /* FamilyHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08D2EE06FE588969F1E4B45C /* FamilyHomeView.swift */; };
 		D490C839ECAFE3D202977A81 /* HeadStartGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E78CDB8FCEE10E8198EA4E2 /* HeadStartGate.swift */; };
+		DCC69E3282C80BA47C09C635 /* FamilyTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E7DB787F4DBCA0FEDBFCA5 /* FamilyTabView.swift */; };
 		DF29C9E5549CA9FDC39DA628 /* ComplianceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E8DAD38174B9B2B74734E61 /* ComplianceView.swift */; };
+		E87B75AC40C3777422381DC1 /* FamilyAppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F493872C5D86E112F5C04B /* FamilyAppState.swift */; };
 		ECC8F210FC51B1676DF484E4 /* GlobalSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD29B811DD7186D6C8978C57 /* GlobalSearchView.swift */; };
 		F119CF04C56E1D4B56670A5E /* FamilyHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08D2EE06FE588969F1E4B45C /* FamilyHomeView.swift */; };
 		F25FB414E720F50961E5B3DF /* LessonPlanningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61E96B9610A2736D05AF547A /* LessonPlanningView.swift */; };
@@ -91,17 +99,6 @@
 		FA0739C3365AF3805B807042 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24C466DC685D97AE46E695D8 /* LoginView.swift */; };
 		FACF871315F37C55E3AA1523 /* PushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E4266DC035767246225E8A /* PushNotifications.swift */; };
 		FE0CECEF6F3323A3C87A451C /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF70278ECDA1C3120A3478AC /* AppState.swift */; };
-		CAFE0001AA11BB22CC33DD01 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9D9048B9300AA03800161A4C /* Assets.xcassets */; };
-		CAFE0001AA11BB22CC33DD02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9D9048B9300AA03800161A4C /* Assets.xcassets */; };
-		736E29255BF3CF5CD43DCC6A /* FamilyAppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F493872C5D86E112F5C04B /* FamilyAppState.swift */; };
-		653400E95216F65426F0315F /* FamilyHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08D2EE06FE588969F1E4B45C /* FamilyHomeView.swift */; };
-		625703E1D0C626BE7A7B8C1B /* FamilyL10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37850FC58C15A2C7BB2D7FD9 /* FamilyL10n.swift */; };
-		AEF35247206EF9A771611AB1 /* FamilyMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C45DBE05D2BC46E3BA4622 /* FamilyMessagesView.swift */; };
-		329FB343906D053A7BDA2038 /* FamilyOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D282E0278E01839F5C630915 /* FamilyOnboardingView.swift */; };
-		454E774509512E4A0618B1C0 /* FamilyProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 989ED9CA5811AAB1A43926C0 /* FamilyProfileView.swift */; };
-		A693B97F7C75338CE4D3CAF8 /* FamilyProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 582CBC887B97A0DA34065DB5 /* FamilyProgressView.swift */; };
-		5C9292CADD51E7DA35DA8C25 /* FamilyTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E7DB787F4DBCA0FEDBFCA5 /* FamilyTabView.swift */; };
-		C7DFAD57EE4D2BF7B3097946 /* FamilyTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2EF15EFD4166C8CAF9BB7AC /* FamilyTodayView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -159,7 +156,6 @@
 		93506B6A71C7A4CC29B6C996 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		97BA3FD9DF0C8D6AD1B5FBF8 /* ParticipationClearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticipationClearance.swift; sourceTree = "<group>"; };
 		989ED9CA5811AAB1A43926C0 /* FamilyProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyProfileView.swift; sourceTree = "<group>"; };
-		9D9048B9300AA03800161A4C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1D3379951A97462A414673D /* MealsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsView.swift; sourceTree = "<group>"; };
 		A1FE3642753661630AB2BB3C /* Sprout.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Sprout.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A391C57ACEA9241F266C5818 /* StaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffView.swift; sourceTree = "<group>"; };
@@ -179,7 +175,7 @@
 		D282E0278E01839F5C630915 /* FamilyOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyOnboardingView.swift; sourceTree = "<group>"; };
 		D6793384ECBDC5F62FC7B486 /* DocumentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentsView.swift; sourceTree = "<group>"; };
 		DB9B2DC3BC477C878D1DD08C /* SproutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SproutTests.swift; sourceTree = "<group>"; };
-		DD8023DFC1F4C7D966B0A84B /* SproutFamily.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; name = SproutFamily.app; path = Sprout.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DD8023DFC1F4C7D966B0A84B /* SproutFamily.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SproutFamily.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE114A6EF56FEFA6DE1934D5 /* StoryAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryAPI.swift; sourceTree = "<group>"; };
 		DECBB9A993DBA322E5AA82A3 /* GrantBudgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrantBudgetView.swift; sourceTree = "<group>"; };
 		DF00056D3C1220DF7611B6EA /* ClassroomQualityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassroomQualityView.swift; sourceTree = "<group>"; };
@@ -237,6 +233,7 @@
 			children = (
 				FDF346697D678DB8DA4632D6 /* Models.swift */,
 			);
+			name = Models;
 			path = Models;
 			sourceTree = "<group>";
 		};
@@ -365,7 +362,6 @@
 		6629E5CDD2AF72FA59CCAA13 = {
 			isa = PBXGroup;
 			children = (
-				9D9048B9300AA03800161A4C /* Assets.xcassets */,
 				11C2D12D0AA2921942D594FE /* FamilySources */,
 				F8CBA3189F2A4AAD59AF7436 /* Sources */,
 				2127EA4CFCB6B0D10FC2650B /* Tests */,
@@ -453,6 +449,7 @@
 				82D4C441E49751379B7D52C1 /* StaffManagement.swift */,
 				DE114A6EF56FEFA6DE1934D5 /* StoryAPI.swift */,
 			);
+			name = Networking;
 			path = Networking;
 			sourceTree = "<group>";
 		};
@@ -638,7 +635,6 @@
 			buildConfigurationList = 5A3DBF56E848E02A3E7C4439 /* Build configuration list for PBXNativeTarget "Sprout" */;
 			buildPhases = (
 				8CCCDC17F05818BF2CB7DA8C /* Sources */,
-				CAFE0001AA11BB22CC33DD03 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -656,7 +652,6 @@
 			buildConfigurationList = 729FD1AE74E9DC117D26D1DF /* Build configuration list for PBXNativeTarget "SproutFamily" */;
 			buildPhases = (
 				5EDF5792D7DC2C628573EF1E /* Sources */,
-				CAFE0001AA11BB22CC33DD04 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -707,25 +702,6 @@
 		};
 /* End PBXProject section */
 
-/* Begin PBXResourcesBuildPhase section */
-		CAFE0001AA11BB22CC33DD03 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				CAFE0001AA11BB22CC33DD01 /* Assets.xcassets in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		CAFE0001AA11BB22CC33DD04 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				CAFE0001AA11BB22CC33DD02 /* Assets.xcassets in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
-
 /* Begin PBXSourcesBuildPhase section */
 		5EDF5792D7DC2C628573EF1E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -752,7 +728,6 @@
 				6508D3A37EE0B41F5754FCF6 /* PushNotifications.swift in Sources */,
 				4E23AACF1945126CE667D263 /* SproutFamilyApp.swift in Sources */,
 				77A3116E39A369402F8C4287 /* StaffManagement.swift in Sources */,
-				3977DA46AEF8CE8CC62B317D /* StoryAPI.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -792,9 +767,18 @@
 				6CFD3F398824D18839D0936D /* DocumentsView.swift in Sources */,
 				1A3BCC16B7C1FE5B50E4C95E /* ERSEAView.swift in Sources */,
 				276966339FFF2F48D2547853 /* EnrollmentView.swift in Sources */,
+				E87B75AC40C3777422381DC1 /* FamilyAppState.swift in Sources */,
 				7B61E61D89F12954474030D6 /* FamilyEngagementEventView.swift in Sources */,
+				D1C3BA3A0A302BA45D69E6BC /* FamilyHomeView.swift in Sources */,
+				71F0A363C49892B0C174BA62 /* FamilyL10n.swift in Sources */,
+				57AF1331C1DF2141FF0E9829 /* FamilyMessagesView.swift in Sources */,
+				4B2A68E73CE63E067825B443 /* FamilyOnboardingView.swift in Sources */,
 				C7921EE915021F7368E8BEC7 /* FamilyPartnershipView.swift in Sources */,
+				307949DB5049BB5BFA1E57B6 /* FamilyProfileView.swift in Sources */,
+				8C74EF5C1BEA37022DE6E40F /* FamilyProgressView.swift in Sources */,
 				300A1D3FD9A082F4B4426878 /* FamilyServicesView.swift in Sources */,
+				DCC69E3282C80BA47C09C635 /* FamilyTabView.swift in Sources */,
+				007134D1A66AA874D0978E98 /* FamilyTodayView.swift in Sources */,
 				ECC8F210FC51B1676DF484E4 /* GlobalSearchView.swift in Sources */,
 				B6A625F4C2133D7FE6733968 /* GrantBudgetView.swift in Sources */,
 				D490C839ECAFE3D202977A81 /* HeadStartGate.swift in Sources */,
@@ -829,15 +813,6 @@
 				7D55DAB29736FA1DDA1EA124 /* StoryAPI.swift in Sources */,
 				14302802C7F917EE8737FE86 /* SubsidiesView.swift in Sources */,
 				1C0736AF3E3A71619E3C1B32 /* TimesheetView.swift in Sources */,
-				736E29255BF3CF5CD43DCC6A /* FamilyAppState.swift in Sources */,
-				653400E95216F65426F0315F /* FamilyHomeView.swift in Sources */,
-				625703E1D0C626BE7A7B8C1B /* FamilyL10n.swift in Sources */,
-				AEF35247206EF9A771611AB1 /* FamilyMessagesView.swift in Sources */,
-				329FB343906D053A7BDA2038 /* FamilyOnboardingView.swift in Sources */,
-				454E774509512E4A0618B1C0 /* FamilyProfileView.swift in Sources */,
-				A693B97F7C75338CE4D3CAF8 /* FamilyProgressView.swift in Sources */,
-				5C9292CADD51E7DA35DA8C25 /* FamilyTabView.swift in Sources */,
-				C7DFAD57EE4D2BF7B3097946 /* FamilyTodayView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -874,7 +849,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = "";
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -976,7 +950,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = "";
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				INFOPLIST_FILE = FamilyResources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -996,7 +969,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = "";
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1016,7 +988,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = "";
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				INFOPLIST_FILE = FamilyResources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
