@@ -5,6 +5,7 @@ import { ORGANIZATION_ID } from "@/const";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { QuickNoteButton } from "@/components/QuickNoteButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -466,6 +467,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <CalendarIcon className="h-3 w-3" />
                 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
+              <QuickNoteButton />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-7 w-7 relative" aria-label={`Notifications${bellAlerts.length ? `, ${bellAlerts.length} new` : ""}`}>
