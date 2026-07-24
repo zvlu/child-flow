@@ -393,6 +393,26 @@ export async function resolveStaffManagement(opts: {
 }
 
 /**
+ * Who may view a staff member's app-activity timeline. Deliberately based on
+ * the REPORTING LINE, not job title: an admin sees anyone; otherwise only
+ * people ABOVE the employee in the supervisor tree (their manager, their
+ * manager's manager, … all the way up) may look. Peers and reports cannot.
+ * (The viewer's own record is excluded — this is an oversight view.)
+ */
+export async function canViewStaffActivity(opts: {
+  organizationId: number;
+  userId: number;
+  accessTier: string; // users.role
+  targetStaffId: number;
+}): Promise<boolean> {
+  if (opts.accessTier === "admin") return true;
+  const self = await getStaffSelf(opts.organizationId, opts.userId);
+  if (!self) return false;
+  const descendants = await getStaffDescendants(opts.organizationId, self.id);
+  return descendants.has(opts.targetStaffId);
+}
+
+/**
  * When a supervisor is deactivated, their direct reports would be orphaned.
  * Re-parent them to the deactivated supervisor's own supervisor (their
  * grand-supervisor), keeping the chain intact. Returns the number moved.

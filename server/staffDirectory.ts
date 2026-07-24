@@ -4,7 +4,26 @@ import { classrooms, staff, staffTrainingLogs, type User } from "../drizzle/sche
 import { sdk } from "./_core/sdk";
 import { clientIpFromReq } from "./_core/audit";
 import { getDb, getOrganizationUsage, insertAuditLog } from "./db";
-import { createStaff, updateStaff, getCustomRoles, resolveStaffManagement, createApprovalRequest } from "./moduleDb";
+import {
+  createStaff, updateStaff, getCustomRoles, resolveStaffManagement, createApprovalRequest,
+  canViewStaffActivity, getStaffUserId, getActivityForUser,
+} from "./moduleDb";
+
+/** One-line, human-readable label for an audit-log activity row (mirrors the
+ *  web StaffDetail's activityLabel so both surfaces read the same). */
+function activityText(a: { action: string; resourceType: string; resourceId?: string | null; detail?: string | null }): string {
+  const what = a.detail || a.resourceId || a.resourceType;
+  switch (a.action) {
+    case "view": return `Viewed ${what}`;
+    case "login": return "Signed in";
+    case "logout": return "Signed out";
+    case "create": return `Created ${a.resourceType}${a.resourceId ? ` #${a.resourceId}` : ""}`;
+    case "update": return `Updated ${a.resourceType}${a.resourceId ? ` #${a.resourceId}` : ""}`;
+    case "delete": return `Deleted ${a.resourceType}${a.resourceId ? ` #${a.resourceId}` : ""}`;
+    case "access_denied": return `Blocked from ${what}`;
+    default: return `${a.action} ${a.resourceType}`;
+  }
+}
 
 /**
  * REST backing for the iOS staff app's "Staff Directory" screen
@@ -235,6 +254,46 @@ export function registerStaffDirectoryRoutes(app: Express) {
       ipAddress: clientIpFromReq(req),
     });
     res.json({ success: true });
+  });
+
+  /**
+   * One employee's app-activity timeline (iOS staff detail). Visible only along
+   * the reporting line — an admin, or someone above the employee in the
+   * supervisor tree. A staffer with no reports sees no one's activity. Mirrors
+   * the web tRPC activity.forStaff guard exactly (canViewStaffActivity).
+   */
+  app.get("/api/staff/:id/activity", async (req: Request, res: Response) => {
+    const user = await requireStaff(req);
+    if (!user || user.organizationId == null) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const staffId = Number(req.params.id);
+    if (!Number.isFinite(staffId)) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
+    const allowed = await canViewStaffActivity({
+      organizationId: user.organizationId,
+      userId: user.id,
+      accessTier: user.role,
+      targetStaffId: staffId,
+    });
+    if (!allowed) {
+      res.status(403).json({ error: "Activity is visible only to this employee's supervisors." });
+      return;
+    }
+    const targetUserId = await getStaffUserId(user.organizationId, staffId);
+    if (targetUserId == null) {
+      res.json([]);
+      return;
+    }
+    const rows = await getActivityForUser(targetUserId, 100);
+    res.json(rows.map((r) => ({
+      id: String(r.id),
+      label: activityText(r),
+      at: r.createdAt ? r.createdAt.toISOString() : null,
+    })));
   });
 
   /**

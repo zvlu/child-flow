@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +19,7 @@ import { formatDate } from "@/lib/date";
 import { objectsToCsv, downloadCsv } from "@/lib/csv";
 
 /** §1302.91 staffing taxonomy — grouped roughly by service area. */
-const roleLabels: Record<string, string> = {
+export const roleLabels: Record<string, string> = {
   director: "Head Start Director",
   admin: "Administrator",
   fiscal_officer: "Fiscal Officer",
@@ -50,7 +51,7 @@ const roleLabels: Record<string, string> = {
   substitute: "Substitute / Floater",
 };
 
-const roleColors: Record<string, string> = {
+export const roleColors: Record<string, string> = {
   admin: "bg-amber-100 text-amber-700 border-amber-200",
   teacher: "bg-blue-100 text-blue-700 border-blue-200",
   assistant: "bg-green-100 text-green-700 border-green-200",
@@ -141,6 +142,7 @@ export default function Staff() {
   const [form, setForm] = useState<StaffFormState>(emptyForm);
 
   const utils = trpc.useUtils();
+  const [, navigate] = useLocation();
   const { data: staff, isLoading: staffLoading } = trpc.staff.list.useQuery(ORGANIZATION_ID);
   const { data: classrooms } = trpc.classrooms.list.useQuery(ORGANIZATION_ID);
   const { data: certifications, isLoading: certsLoading } = trpc.staffOps.certifications.useQuery(ORGANIZATION_ID);
@@ -456,7 +458,14 @@ export default function Staff() {
                 const classroom = classroomByStaffName.get(fullName);
                 const memberCerts = certsByStaffId.get(member.id) ?? [];
                 return (
-                  <Card key={member.id} className="hover:shadow-md transition-shadow">
+                  <Card
+                    key={member.id}
+                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => navigate(`/staff/${member.id}`)}
+                    onKeyDown={(e) => { if (e.key === "Enter") navigate(`/staff/${member.id}`); }}
+                  >
                     <CardContent className="p-5">
                       <div className="flex items-start gap-4">
                         <Avatar className="h-12 w-12 flex-shrink-0">
@@ -469,7 +478,7 @@ export default function Staff() {
                             <h3 className="font-semibold text-foreground">{fullName}</h3>
                             {canManage(member) && (
                               <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
+                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                   <Button variant="ghost" size="icon" className="h-7 w-7">
                                     <MoreHorizontal className="h-4 w-4" />
                                   </Button>

@@ -988,18 +988,21 @@ export const appRouter = router({
       return { ok: true };
     }),
 
-    // Full activity timeline for one employee (guarded by management scope).
+    // Full activity timeline for one employee. Visible only along the
+    // reporting line: an admin, or someone above the employee in the supervisor
+    // tree (their manager, that manager's manager, and so on up). Peers and the
+    // employee's own reports cannot see it.
     forStaff: orgStaffProcedure
       .input(z.object({ organizationId: z.number(), staffId: z.number(), limit: z.number().max(500).optional() }))
       .query(async ({ input, ctx }) => {
-        const mgmt = await mod.resolveStaffManagement({
+        const allowed = await mod.canViewStaffActivity({
           organizationId: input.organizationId,
           userId: ctx.user.id,
           accessTier: ctx.user.role,
           targetStaffId: input.staffId,
         });
-        if (!mgmt.allowed) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "You can only view activity for staff who report to you." });
+        if (!allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Activity is visible only to this employee's supervisors." });
         }
         const targetUserId = await mod.getStaffUserId(input.organizationId, input.staffId);
         if (targetUserId == null) return [];

@@ -125,8 +125,24 @@ struct StaffDetailView: View {
     @EnvironmentObject var appState: AppState
     @State private var showLogTraining = false
     @State private var showEditClassroom = false
+    // App-activity oversight: hidden entirely unless the server (reporting-line
+    // guard) returns it. A 403 means this viewer isn't above the employee.
+    @State private var activity: [StaffActivityItem] = []
+    @State private var activityDenied = false
+    @State private var activityLoaded = false
 
     var roleColor: Color { StaffRole(rawValue: member.roleKey)?.color ?? .cfTextSecondary }
+
+    private static func formatActivityDate(_ iso: String) -> String {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        guard let date = fractional.date(from: iso) ?? plain.date(from: iso) else { return iso }
+        let out = DateFormatter()
+        out.dateStyle = .medium
+        out.timeStyle = .short
+        return out.string(from: date)
+    }
 
     // Pull the live version of this member from the viewModel
     var liveMember: StaffMember {
@@ -230,6 +246,32 @@ struct StaffDetailView: View {
                 }
             }
 
+            if !activityDenied {
+                Section("App Activity") {
+                    if !activityLoaded {
+                        HStack { Spacer(); ProgressView(); Spacer() }
+                    } else if activity.isEmpty {
+                        Text("No recent activity recorded.")
+                            .font(.cfCaption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(activity.prefix(50)) { item in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.label)
+                                    .font(.cfSubheadline)
+                                    .foregroundColor(.cfTextPrimary)
+                                if let at = item.at {
+                                    Text(Self.formatActivityDate(at))
+                                        .font(.cfCaption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                }
+            }
+
             Section("Actions") {
                 NavigationLink(destination: MessagingView()) {
                     Label("Send Message", systemImage: "bubble.left.fill")
@@ -246,6 +288,15 @@ struct StaffDetailView: View {
         }
         .navigationTitle(liveMember.fullName)
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            do {
+                activity = try await APIClient.shared.getStaffActivity(staffId: member.id)
+            } catch {
+                // 403 = not in this employee's reporting line → hide the section.
+                if case APIError.httpError(403) = error { activityDenied = true }
+            }
+            activityLoaded = true
+        }
         .sheet(isPresented: $showLogTraining) {
             LogTrainingSheet(member: liveMember) { hours, trainingType, date, notes in
                 Task { await viewModel.logTraining(member: liveMember, trainingName: trainingType, hours: hours, date: date, notes: notes) }

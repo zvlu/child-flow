@@ -28,6 +28,7 @@ import Health from "./pages/Health";
 import HealthDeadlines from "./pages/HealthDeadlines";
 import FamilyServices from "./pages/FamilyServices";
 import Staff from "./pages/Staff";
+import StaffDetail from "./pages/StaffDetail";
 import Approvals from "./pages/Approvals";
 import Reports from "./pages/Reports";
 import Enrollment from "./pages/Enrollment";
@@ -283,6 +284,13 @@ function Router() {
         {() => (
           <AppLayout>
             <Staff />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/staff/:id">
+        {(params: { id: string }) => (
+          <AppLayout>
+            <StaffDetail id={params.id} />
           </AppLayout>
         )}
       </Route>

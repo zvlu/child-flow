@@ -30,6 +30,14 @@ struct LogTrainingResponse: Decodable {
     let success: Bool
 }
 
+/// One entry in an employee's app-activity timeline (GET /api/staff/:id/activity).
+struct StaffActivityItem: Decodable, Identifiable {
+    let id: String
+    let label: String
+    /// ISO-8601 timestamp string, or nil.
+    let at: String?
+}
+
 extension APIClient {
     /// Admins create the staff row directly; manager-tier staff (director,
     /// coordinators) may add people too, but the hire is parked as a pending
@@ -94,6 +102,13 @@ extension APIClient {
         )
     }
 
+    /// One employee's app-activity timeline. Server restricts this to the
+    /// reporting line (admins, or supervisors above the employee); a 403 means
+    /// the caller isn't allowed to see it. See server/staffDirectory.ts.
+    func getStaffActivity(staffId: String) async throws -> [StaffActivityItem] {
+        try await staffMgmtGet("staff/\(staffId)/activity")
+    }
+
     // MARK: Self-contained networking (see note above)
 
     private static let staffMgmtBaseURL = URL(string: "http://localhost:3000/api")!
@@ -148,6 +163,16 @@ extension APIClient {
             }
             throw APIError.httpError(http.statusCode)
         }
+    }
+
+    private func staffMgmtGet<T: Decodable>(_ path: String) async throws -> T {
+        let url = staffMgmtMakeURL(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        staffMgmtAddAuthHeader(&request)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try staffMgmtValidate(response)
+        return try Self.staffMgmtDecoder.decode(T.self, from: data)
     }
 
     private func staffMgmtPost<Body: Encodable, T: Decodable>(_ path: String, body: Body) async throws -> T {
