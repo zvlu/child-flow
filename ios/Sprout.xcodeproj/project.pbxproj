@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		007134D1A66AA874D0978E98 /* FamilyTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2EF15EFD4166C8CAF9BB7AC /* FamilyTodayView.swift */; };
+		02ED407F9FBB900EAE01D98E /* NotesAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F6487A72FB96906487C06E /* NotesAPI.swift */; };
 		09E64C386675C501F29FBE38 /* NutritionFormsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77D50A071799AC85F38203A5 /* NutritionFormsView.swift */; };
 		0F4492FECDECBC8A6FCF6741 /* HealthRecordsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF253E6583C20F46AD69F34C /* HealthRecordsAPI.swift */; };
 		13B2D859B9499FD0471EC17A /* InKindView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A643A74824235F40DCA7EFA2 /* InKindView.swift */; };
@@ -51,6 +52,7 @@
 		55D9315329DBB360B4CF917F /* ClassroomQualityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF00056D3C1220DF7611B6EA /* ClassroomQualityView.swift */; };
 		57AF1331C1DF2141FF0E9829 /* FamilyMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C45DBE05D2BC46E3BA4622 /* FamilyMessagesView.swift */; };
 		58D0872F5B464DFB74FCEC9D /* ComplianceChecklistAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20E632C924EBB7DD31C20312 /* ComplianceChecklistAPI.swift */; };
+		58FC83CC7DA334C3F4DF081B /* NotesAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F6487A72FB96906487C06E /* NotesAPI.swift */; };
 		5B39117CB65F74131ACEEC0D /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 261EC0C07163484F36AC17E2 /* DashboardView.swift */; };
 		5D36A378460BC9174D38964E /* ConversationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5618DBB10822780B4646D530 /* ConversationViewModel.swift */; };
 		5F3128A087F238162FCD314A /* NutritionFormsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5CB98E53DF425469AE8B6E /* NutritionFormsAPI.swift */; };
@@ -80,6 +82,7 @@
 		9C8E3307644BC70BF10C7A2D /* ApprovalsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7823EC5430486C45A9E91826 /* ApprovalsAPI.swift */; };
 		9D28E89FB66DC1570CB69AFE /* SproutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0A38F9249A71D36C7C8D51 /* SproutApp.swift */; };
 		A3058054E827DCF596441578 /* ApprovalsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7823EC5430486C45A9E91826 /* ApprovalsAPI.swift */; };
+		A5C3AACC60B5FEF69492880E /* NotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37A89C984EC26168CED80440 /* NotesView.swift */; };
 		AD4FD34FBD72A13C8BCB0AFD /* AttendancePlansView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 770FF0B138C77ACBF1C1520E /* AttendancePlansView.swift */; };
 		B2ACD528C988CB8E3883BDDE /* FamilyTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E7DB787F4DBCA0FEDBFCA5 /* FamilyTabView.swift */; };
 		B35C9847CA0EA544E59230E9 /* MockData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BEF0D0B340C6C48E3EE220D /* MockData.swift */; };
@@ -129,6 +132,7 @@
 		316D53C7A9A1945DE60BC130 /* ChildrenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildrenView.swift; sourceTree = "<group>"; };
 		35586F409AACB75FD9735D8A /* MessagingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagingView.swift; sourceTree = "<group>"; };
 		37850FC58C15A2C7BB2D7FD9 /* FamilyL10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyL10n.swift; sourceTree = "<group>"; };
+		37A89C984EC26168CED80440 /* NotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesView.swift; sourceTree = "<group>"; };
 		39E4266DC035767246225E8A /* PushNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotifications.swift; sourceTree = "<group>"; };
 		39E731A3456FBAB407D8D06C /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
 		42068229EC5407899BFD33FA /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
@@ -140,6 +144,7 @@
 		569092EC670A514B3B32DB63 /* BulkActionCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkActionCenterView.swift; sourceTree = "<group>"; };
 		582CBC887B97A0DA34065DB5 /* FamilyProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyProgressView.swift; sourceTree = "<group>"; };
 		61E96B9610A2736D05AF547A /* LessonPlanningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LessonPlanningView.swift; sourceTree = "<group>"; };
+		61F6487A72FB96906487C06E /* NotesAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesAPI.swift; sourceTree = "<group>"; };
 		6454ACFD004AD570875B4CDC /* AttendanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttendanceView.swift; sourceTree = "<group>"; };
 		6C838D8DF8D562A85805744A /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
 		6D5CB98E53DF425469AE8B6E /* NutritionFormsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionFormsAPI.swift; sourceTree = "<group>"; };
@@ -264,6 +269,14 @@
 				A7C45DBE05D2BC46E3BA4622 /* FamilyMessagesView.swift */,
 			);
 			path = Messages;
+			sourceTree = "<group>";
+		};
+		29395204481970A3DEE02140 /* Notes */ = {
+			isa = PBXGroup;
+			children = (
+				37A89C984EC26168CED80440 /* NotesView.swift */,
+			);
+			path = Notes;
 			sourceTree = "<group>";
 		};
 		2FDBEEC51A10E4FD3D40CDBC /* Progress */ = {
@@ -457,6 +470,7 @@
 				5618DBB10822780B4646D530 /* ConversationViewModel.swift */,
 				DF253E6583C20F46AD69F34C /* HealthRecordsAPI.swift */,
 				42068229EC5407899BFD33FA /* KeychainHelper.swift */,
+				61F6487A72FB96906487C06E /* NotesAPI.swift */,
 				6D5CB98E53DF425469AE8B6E /* NutritionFormsAPI.swift */,
 				97BA3FD9DF0C8D6AD1B5FBF8 /* ParticipationClearance.swift */,
 				39E4266DC035767246225E8A /* PushNotifications.swift */,
@@ -604,6 +618,7 @@
 				F1EDDE0479938E791AE74FBD /* Messaging */,
 				1C60DAAE898450999D82993D /* Models */,
 				9D183E6B241B578E4F656266 /* Networking */,
+				29395204481970A3DEE02140 /* Notes */,
 				C0AE322984B2AF4DE5EF9876 /* Nutrition */,
 				9A01BE2F82C17F5B7EF8A61C /* PolicyCouncil */,
 				677822FB633388655F4325E5 /* Portfolios */,
@@ -739,6 +754,7 @@
 				80331053BDC0F623B7E9CCE6 /* HealthRecordsAPI.swift in Sources */,
 				40F80B69D42E9545E0B51E80 /* KeychainHelper.swift in Sources */,
 				4042AB3A63FD13606892E93C /* Models.swift in Sources */,
+				02ED407F9FBB900EAE01D98E /* NotesAPI.swift in Sources */,
 				79C21C8CC3BA9356A7D37C95 /* NutritionFormsAPI.swift in Sources */,
 				8814DCCACA384503A109CF86 /* ParticipationClearance.swift in Sources */,
 				6508D3A37EE0B41F5754FCF6 /* PushNotifications.swift in Sources */,
@@ -814,6 +830,8 @@
 				2127DD7B5EBCC3940014C4BB /* MessagingView.swift in Sources */,
 				B35C9847CA0EA544E59230E9 /* MockData.swift in Sources */,
 				2C77396969058907CC52449A /* Models.swift in Sources */,
+				58FC83CC7DA334C3F4DF081B /* NotesAPI.swift in Sources */,
+				A5C3AACC60B5FEF69492880E /* NotesView.swift in Sources */,
 				5F3128A087F238162FCD314A /* NutritionFormsAPI.swift in Sources */,
 				09E64C386675C501F29FBE38 /* NutritionFormsView.swift in Sources */,
 				8F0FF2E799424C790436AD6D /* ParticipationClearance.swift in Sources */,

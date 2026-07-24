@@ -93,6 +93,14 @@ struct AppMenuSheet: View {
                             bgColor: .cfPrimaryLight,
                             destination: AnyView(DailyReportsView())
                         )
+                        ModuleCard(
+                            label: "Notes",
+                            subtitle: "All case notes, newest first",
+                            icon: "note.text",
+                            color: .cfChildren,
+                            bgColor: .cfChildrenBg,
+                            destination: AnyView(NotesView())
+                        )
                     }
 
                     // Curriculum & Funding
