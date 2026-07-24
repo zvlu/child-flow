@@ -55,6 +55,7 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
     items: [
       { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: PARENT_OK },
       { path: "/children", label: "Children", icon: Baby },
+      { path: "/notes", label: "Notes", icon: NotebookPen },
       { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
       { path: "/daily-reports", label: "Daily Reports", icon: Sparkles },
       { path: "/health", label: "Health Records", icon: Heart },

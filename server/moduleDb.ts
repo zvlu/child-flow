@@ -803,6 +803,75 @@ export async function createStudentNote(data: InsertStudentNote) {
   return { id: result.insertId };
 }
 
+export type RecentNote = {
+  id: string;
+  kind: "child" | "family";
+  subjectId: number;
+  subjectName: string;
+  title: string;
+  body: string;
+  tag: string | null;
+  priority: string | null;
+  confidentiality: "standard" | "sensitive";
+  author: string | null;
+  createdAt: Date;
+  href: string;
+};
+
+/**
+ * Unified, org-wide notes feed: every child note and family case note in one
+ * timeline, newest first, so a note is visible the moment it's submitted no
+ * matter which record it was filed against. Powers the central Notes page.
+ */
+export async function getRecentNotes(organizationId: number, limit = 100): Promise<RecentNote[]> {
+  const db = await requireDb();
+  const [sNotes, fNotes, kids, fams, staffRows] = await Promise.all([
+    db.select().from(studentNotes).where(eq(studentNotes.organizationId, organizationId)).orderBy(desc(studentNotes.createdAt)).limit(limit),
+    db.select().from(familyCaseNotes).where(eq(familyCaseNotes.organizationId, organizationId)).orderBy(desc(familyCaseNotes.createdAt)).limit(limit),
+    db.select({ id: children.id, first: children.firstName, last: children.lastName }).from(children).where(eq(children.organizationId, organizationId)),
+    db.select({ id: families.id, name: families.primaryContactName }).from(families).where(eq(families.organizationId, organizationId)),
+    db.select({ id: staff.id, first: staff.firstName, last: staff.lastName }).from(staff).where(eq(staff.organizationId, organizationId)),
+  ]);
+  const childName = new Map(kids.map((k) => [k.id, `${k.first} ${k.last}`]));
+  const famName = new Map(fams.map((f) => [f.id, f.name]));
+  const staffName = new Map(staffRows.map((s) => [s.id, `${s.first} ${s.last}`]));
+
+  const merged: RecentNote[] = [
+    ...sNotes.map((n): RecentNote => ({
+      id: `child-${n.id}`,
+      kind: "child",
+      subjectId: n.childId,
+      subjectName: childName.get(n.childId) ?? "Unknown child",
+      title: n.title,
+      body: n.content,
+      tag: n.category ?? null,
+      priority: n.priority ?? null,
+      confidentiality: "standard",
+      author: n.createdBy != null ? staffName.get(n.createdBy) ?? null : null,
+      createdAt: n.createdAt,
+      href: `/children/${n.childId}`,
+    })),
+    ...fNotes.map((n): RecentNote => ({
+      id: `family-${n.id}`,
+      kind: "family",
+      subjectId: n.familyId,
+      subjectName: famName.get(n.familyId) ?? "Unknown family",
+      title: n.type.replace(/_/g, " "),
+      body: n.body,
+      tag: n.type,
+      priority: null,
+      confidentiality: n.confidentiality,
+      author: n.authorId != null ? staffName.get(n.authorId) ?? null : null,
+      createdAt: n.createdAt,
+      href: `/family-services`,
+    })),
+  ]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, limit);
+
+  return merged;
+}
+
 // ==================== CALENDAR ====================
 
 export async function getCalendarEvents(organizationId: number) {

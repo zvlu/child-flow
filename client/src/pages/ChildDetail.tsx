@@ -133,6 +133,7 @@ export default function ChildDetail({ id }: ChildDetailProps) {
   const createNote = trpc.notes.create.useMutation({
     onSuccess: () => {
       utils.notes.list.invalidate({ organizationId: ORGANIZATION_ID, childId });
+      utils.notes.recent.invalidate();
       toast.success("Note added");
       setShowNoteDialog(false);
       setNoteTitle("");

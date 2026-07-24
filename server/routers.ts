@@ -1568,6 +1568,13 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return mod.getStudentNotes(input.organizationId, input.childId);
       }),
+    // Unified, org-wide feed of every child + family note, newest first — the
+    // central place a note is visible the moment it's submitted.
+    recent: orgStaffProcedure
+      .input(z.object({ organizationId: z.number(), limit: z.number().max(200).optional() }))
+      .query(async ({ input }) => {
+        return mod.getRecentNotes(input.organizationId, input.limit ?? 100);
+      }),
     create: orgStaffProcedure
       .input(
         z.object({

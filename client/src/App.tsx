@@ -30,6 +30,7 @@ import FamilyServices from "./pages/FamilyServices";
 import Staff from "./pages/Staff";
 import StaffDetail from "./pages/StaffDetail";
 import Approvals from "./pages/Approvals";
+import Notes from "./pages/Notes";
 import Reports from "./pages/Reports";
 import Enrollment from "./pages/Enrollment";
 import Compliance from "./pages/Compliance";
@@ -298,6 +299,13 @@ function Router() {
         {() => (
           <AppLayout>
             <Approvals />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/notes">
+        {() => (
+          <AppLayout>
+            <Notes />
           </AppLayout>
         )}
       </Route>
