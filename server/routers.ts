@@ -1,5 +1,6 @@
 import { COOKIE_NAME, NOT_ADMIN_ERR_MSG } from "@shared/const";
 import { MODULE_IDS } from "@shared/modules";
+import { STAFF_ROLE_VALUES } from "@shared/roles";
 import { TRPCError } from "@trpc/server";
 import { randomUUID } from "crypto";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -13,7 +14,7 @@ import { SUPPORTED_LANGUAGES } from "./translation";
 import { rateLimit } from "./_core/rateLimit";
 import { computeAuditReadiness } from "./auditReadiness";
 import { getBillingPlans, createBillingPlan, setBillingPlanActive, generateDueInvoices, getArAging } from "./billingPlans";
-import { auditAccess } from "./_core/audit";
+import { auditAccess, clientIpFromReq } from "./_core/audit";
 import { hashPassword, verifyPassword } from "./_core/password";
 import { persistMediaDataUrl } from "./storage";
 import { notifyMomentPosted } from "./_core/push";
@@ -47,6 +48,7 @@ import {
   createCommunicationLog,
   getEducationRecords,
   getPirData,
+  insertAuditLog,
 } from "./db";
 import * as mod from "./moduleDb";
 import { importRoster } from "./dataImport";
@@ -790,7 +792,11 @@ export const appRouter = router({
       return me ? { staffId: me.id, role: me.role, position: me.position } : null;
     }),
     // Creating/modifying staff and their roles is an administrative action.
-    create: orgAdminProcedure
+    // Admins manage everyone in the org; supervisory functional roles
+    // (director, coordinators, family services manager) manage only the
+    // employees who report to them. orgStaffProcedure lets both tiers in;
+    // resolveStaffManagement enforces the actual boundary below.
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -799,53 +805,240 @@ export const appRouter = router({
           email: z.string().optional(),
           phone: z.string().optional(),
           position: z.string().optional(),
-          role: z.enum([
-            "admin", "director", "fiscal_officer",
-            "education_coordinator", "coach",
-            "health_coordinator", "nurse", "nutritionist", "mental_health_consultant",
-            "disabilities_coordinator",
-            "family_services_manager", "family_advocate", "home_visitor",
-            "ersea_coordinator",
-            "teacher", "assistant",
-            "cook", "bus_driver",
-            "coordinator",
-          ]).optional(),
+          supervisorId: z.number().optional(),
+          customRoleId: z.number().nullable().optional(),
+          role: z.enum(STAFF_ROLE_VALUES).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
+        const mgmt = await mod.resolveStaffManagement({
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          accessTier: ctx.user.role,
+        });
+        if (!mgmt.allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have permission to add staff." });
+        }
         await assertStaffCapacity(input.organizationId, 1);
-        const result = await mod.createStaff(input);
+        // A manager (non-admin) can only create people who report to them —
+        // force the new hire's supervisor to the creating manager. Admins
+        // may set any supervisor (or none).
+        const supervisorId = mgmt.isAdmin ? input.supervisorId : (mgmt.actorStaffId ?? undefined);
+        const payload = { ...input, supervisorId };
+        // A manager's hire needs a higher-up's sign-off: park it as a pending
+        // approval instead of creating the staff row. Admins apply directly.
+        if (!mgmt.isAdmin) {
+          const req = await mod.createApprovalRequest({
+            organizationId: input.organizationId,
+            type: "staff_hire",
+            payload: JSON.stringify(payload),
+            requestedByUserId: ctx.user.id,
+            requestedByStaffId: mgmt.actorStaffId ?? null,
+          });
+          await auditAccess(ctx, { action: "create", resourceType: "approval_request", resourceId: Number(req.id), detail: `staff_hire org:${input.organizationId}` });
+          return { pendingApproval: true as const, approvalId: Number(req.id) };
+        }
+        const result = await mod.createStaff(payload);
         await auditAccess(ctx, { action: "create", resourceType: "staff", detail: `org:${input.organizationId}` });
-        return result;
+        return { pendingApproval: false as const, id: Number(result.id) };
       }),
-    update: orgAdminProcedure
+    update: orgStaffProcedure
       .input(
         z.object({
           id: z.number(),
+          organizationId: z.number(),
           firstName: z.string().min(1).optional(),
           lastName: z.string().min(1).optional(),
           email: z.string().optional(),
           phone: z.string().optional(),
           position: z.string().optional(),
-          role: z.enum([
-            "admin", "director", "fiscal_officer",
-            "education_coordinator", "coach",
-            "health_coordinator", "nurse", "nutritionist", "mental_health_consultant",
-            "disabilities_coordinator",
-            "family_services_manager", "family_advocate", "home_visitor",
-            "ersea_coordinator",
-            "teacher", "assistant",
-            "cook", "bus_driver",
-            "coordinator",
-          ]).optional(),
+          supervisorId: z.number().nullable().optional(),
+          customRoleId: z.number().nullable().optional(),
+          role: z.enum(STAFF_ROLE_VALUES).optional(),
           isActive: z.number().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const { id, ...data } = input;
+        const { id, organizationId, ...data } = input;
         await assertRecordInOrg(ctx.user, "staff", id);
+        const mgmt = await mod.resolveStaffManagement({
+          organizationId,
+          userId: ctx.user.id,
+          accessTier: ctx.user.role,
+          targetStaffId: id,
+        });
+        if (!mgmt.allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You can only manage staff who report to you." });
+        }
+        // Only admins may reassign who an employee reports to; a manager
+        // editing their report can't hand them to someone else.
+        if (!mgmt.isAdmin && "supervisorId" in data) delete (data as Record<string, unknown>).supervisorId;
+        // A manager changing someone's role or custom-role (their access/title)
+        // needs a higher-up's sign-off — park the whole patch as a pending
+        // approval instead of applying it. Non-role edits still apply directly.
+        if (!mgmt.isAdmin && ("role" in data || "customRoleId" in data)) {
+          const req = await mod.createApprovalRequest({
+            organizationId,
+            type: "staff_role_change",
+            payload: JSON.stringify(data),
+            targetStaffId: id,
+            requestedByUserId: ctx.user.id,
+            requestedByStaffId: mgmt.actorStaffId ?? null,
+          });
+          await auditAccess(ctx, { action: "update", resourceType: "approval_request", resourceId: Number(req.id), detail: `staff_role_change staff:${id}` });
+          return { pendingApproval: true as const, approvalId: Number(req.id) };
+        }
+        // Prevent reporting-line loops (A reports to B reports to A).
+        if (mgmt.isAdmin && data.supervisorId != null) {
+          if (await mod.wouldCreateSupervisorCycle(organizationId, id, data.supervisorId)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "That would create a reporting loop — a person can't report to someone who reports to them.",
+            });
+          }
+        }
         await auditAccess(ctx, { action: "update", resourceType: "staff", resourceId: id });
-        return mod.updateStaff(id, data);
+        const result = await mod.updateStaff(id, data);
+        // Deactivating a supervisor would strand their reports — move them up
+        // to the deactivated person's own supervisor so the chain holds.
+        if (data.isActive === 0) {
+          const moved = await mod.reparentReportsOnDeactivate(organizationId, id);
+          if (moved > 0) {
+            await auditAccess(ctx, {
+              action: "update",
+              resourceType: "staff",
+              resourceId: id,
+              detail: `reparented ${moved} report(s) on deactivate`,
+            });
+          }
+        }
+        return { pendingApproval: false as const, ...result };
+      }),
+
+    // A manager's team (their whole reporting subtree) — or, for admins,
+    // the full staff list. Drives the "My Team" view and manager scoping.
+    team: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const all = await getOrganizationStaff(input.organizationId);
+        if (ctx.user.role === "admin") return all;
+        const self = await mod.getStaffSelf(input.organizationId, ctx.user.id);
+        if (!self || !mod.STAFF_MANAGER_ROLES.has(self.role ?? "")) return [];
+        const ids = await mod.getStaffDescendants(input.organizationId, self.id);
+        return all.filter((m) => ids.has(m.id));
+      }),
+
+    // Full reporting hierarchy for the org chart (managers + admins).
+    orgChart: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => {
+        return mod.getStaffOrgChart(input.organizationId);
+      }),
+  }),
+
+  // ── Staff activity oversight ──────────────────────────────────────────
+  // Admins see anyone in the org; managers see only their reporting subtree
+  // (same boundary as staff management). Backed by the audit_logs table:
+  // logins/logouts, page views, and record actions.
+  activity: router({
+    // Client calls this on each screen change to record "what they see".
+    track: protectedProcedure
+      .input(z.object({ path: z.string().max(200), label: z.string().max(120).optional() }))
+      .mutation(async ({ input, ctx }) => {
+        await insertAuditLog({
+          userId: ctx.user.id,
+          actorOpenId: ctx.user.openId,
+          action: "view",
+          resourceType: "page",
+          resourceId: input.path.slice(0, 64),
+          ipAddress: clientIpFromReq(ctx.req),
+          detail: input.label ?? null,
+        });
+        return { ok: true };
+      }),
+
+    // Explicit sign-out event (login is already logged server-side).
+    logout: protectedProcedure.mutation(async ({ ctx }) => {
+      await insertAuditLog({
+        userId: ctx.user.id,
+        actorOpenId: ctx.user.openId,
+        action: "logout",
+        resourceType: "auth",
+        ipAddress: clientIpFromReq(ctx.req),
+      });
+      return { ok: true };
+    }),
+
+    // Full activity timeline for one employee. Visible only along the
+    // reporting line: an admin, or someone above the employee in the supervisor
+    // tree (their manager, that manager's manager, and so on up). Peers and the
+    // employee's own reports cannot see it.
+    forStaff: orgStaffProcedure
+      .input(z.object({ organizationId: z.number(), staffId: z.number(), limit: z.number().max(500).optional() }))
+      .query(async ({ input, ctx }) => {
+        const allowed = await mod.canViewStaffActivity({
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          accessTier: ctx.user.role,
+          targetStaffId: input.staffId,
+        });
+        if (!allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Activity is visible only to this employee's supervisors." });
+        }
+        const targetUserId = await mod.getStaffUserId(input.organizationId, input.staffId);
+        if (targetUserId == null) return [];
+        return mod.getActivityForUser(targetUserId, input.limit ?? 200);
+      }),
+
+    // Team overview: for everyone the caller manages, last login / last
+    // active / today's page-view count, plus a simple "active now" flag.
+    teamOverview: orgStaffProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const all = await getOrganizationStaff(input.organizationId);
+        let scoped = all;
+        if (ctx.user.role !== "admin") {
+          const self = await mod.getStaffSelf(input.organizationId, ctx.user.id);
+          if (!self || !mod.STAFF_MANAGER_ROLES.has(self.role ?? "")) return [];
+          const ids = await mod.getStaffDescendants(input.organizationId, self.id);
+          scoped = all.filter((m) => ids.has(m.id));
+        }
+        const withUser = scoped.filter((m) => m.userId != null);
+        const userIds = withUser.map((m) => m.userId as number);
+        const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // last 7 days
+        const rows = await mod.getActivityForUsers(userIds, since);
+
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const activeCutoff = Date.now() - 5 * 60 * 1000;
+
+        const byUser = new Map<number, typeof rows>();
+        for (const r of rows) {
+          if (r.userId == null) continue;
+          const list = byUser.get(r.userId) ?? [];
+          list.push(r);
+          byUser.set(r.userId, list);
+        }
+
+        return withUser.map((m) => {
+          const events = byUser.get(m.userId as number) ?? [];
+          const lastLogin = events.find((e) => e.action === "login")?.createdAt ?? null;
+          const lastActive = events[0]?.createdAt ?? null;
+          const viewsToday = events.filter(
+            (e) => e.action === "view" && e.createdAt >= startOfToday,
+          ).length;
+          const onlineNow = lastActive != null && lastActive.getTime() >= activeCutoff;
+          return {
+            staffId: m.id,
+            name: `${m.firstName} ${m.lastName}`,
+            role: m.role,
+            position: m.position,
+            lastLoginAt: lastLogin,
+            lastActiveAt: lastActive,
+            viewsToday,
+            onlineNow,
+          };
+        });
       }),
   }),
 
@@ -857,7 +1050,11 @@ export const appRouter = router({
       .query(async ({ input: organizationId }) => {
         return mod.getCustomRoles(organizationId);
       }),
-    create: orgAdminProcedure
+    // Admins and manager-tier staff (director, coordinators, …) may define
+    // roles. A manager creating a STAFF-access role applies directly; creating
+    // an ADMIN-access role needs a higher-up's sign-off (a director can't
+    // self-grant admin power), so it's parked as a pending approval.
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -868,16 +1065,79 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        const mgmt = await mod.resolveStaffManagement({ organizationId: input.organizationId, userId: ctx.user.id, accessTier: ctx.user.role });
+        if (!mgmt.allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have permission to create roles." });
+        }
+        if (!mgmt.isAdmin && input.accessLevel === "admin") {
+          const req = await mod.createApprovalRequest({
+            organizationId: input.organizationId,
+            type: "custom_role",
+            payload: JSON.stringify(input),
+            requestedByUserId: ctx.user.id,
+            requestedByStaffId: mgmt.actorStaffId ?? null,
+          });
+          await auditAccess(ctx, { action: "create", resourceType: "approval_request", resourceId: Number(req.id), detail: `custom_role:${input.name}:admin` });
+          return { pendingApproval: true as const, approvalId: Number(req.id) };
+        }
         const result = await mod.createCustomRole(input);
-        await auditAccess(ctx, { action: "create", resourceType: "custom_role", resourceId: result.id, detail: `${input.name}:${input.accessLevel}` });
-        return result;
+        await auditAccess(ctx, { action: "create", resourceType: "custom_role", resourceId: Number(result.id), detail: `${input.name}:${input.accessLevel}` });
+        return { pendingApproval: false as const, id: Number(result.id) };
       }),
-    delete: orgAdminProcedure
+    delete: orgStaffProcedure
       .input(z.object({ id: z.number(), organizationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
+        const mgmt = await mod.resolveStaffManagement({ organizationId: input.organizationId, userId: ctx.user.id, accessTier: ctx.user.role });
+        if (!mgmt.allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have permission to remove roles." });
+        }
         await mod.deleteCustomRole(input.id, input.organizationId);
         await auditAccess(ctx, { action: "delete", resourceType: "custom_role", resourceId: input.id });
         return { success: true };
+      }),
+  }),
+
+  // Higher-up approval queue: a manager's sensitive actions (admin-access role
+  // creation, new hires, role/access changes) land here as pending requests;
+  // org admins approve/deny, and approval applies the parked change.
+  approvals: router({
+    // Admins see the whole org's queue; managers see only their own requests.
+    list: orgStaffProcedure
+      .input(z.object({
+        organizationId: z.number(),
+        status: z.enum(["pending", "approved", "denied"]).optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.role === "admin") {
+          return mod.listApprovalRequests(input.organizationId, { status: input.status });
+        }
+        return mod.listApprovalRequests(input.organizationId, { status: input.status, requestedByUserId: ctx.user.id });
+      }),
+    // Admin-only count for the notification badge / dashboard card.
+    pendingCount: orgAdminProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => {
+        return { count: await mod.countPendingApprovals(input.organizationId) };
+      }),
+    approve: orgAdminProcedure
+      .input(z.object({ id: z.number(), organizationId: z.number(), note: z.string().max(500).optional() }))
+      .mutation(async ({ input, ctx }) => {
+        const res = await mod.decideApprovalRequest({ id: input.id, organizationId: input.organizationId, reviewerUserId: ctx.user.id, approve: true, note: input.note });
+        if (!res.ok) {
+          throw new TRPCError({ code: res.reason === "not_found" ? "NOT_FOUND" : "BAD_REQUEST", message: `Could not approve (${res.reason.replace(/_/g, " ")}).` });
+        }
+        await auditAccess(ctx, { action: "update", resourceType: "approval_request", resourceId: input.id, detail: `approved${res.applied ? ` -> ${res.applied.kind}:${res.applied.id}` : ""}` });
+        return res;
+      }),
+    deny: orgAdminProcedure
+      .input(z.object({ id: z.number(), organizationId: z.number(), note: z.string().max(500).optional() }))
+      .mutation(async ({ input, ctx }) => {
+        const res = await mod.decideApprovalRequest({ id: input.id, organizationId: input.organizationId, reviewerUserId: ctx.user.id, approve: false, note: input.note });
+        if (!res.ok) {
+          throw new TRPCError({ code: res.reason === "not_found" ? "NOT_FOUND" : "BAD_REQUEST", message: `Could not deny (${res.reason.replace(/_/g, " ")}).` });
+        }
+        await auditAccess(ctx, { action: "update", resourceType: "approval_request", resourceId: input.id, detail: "denied" });
+        return res;
       }),
   }),
 
@@ -1307,6 +1567,13 @@ export const appRouter = router({
       .input(z.object({ organizationId: z.number(), childId: z.number().optional() }))
       .query(async ({ input }) => {
         return mod.getStudentNotes(input.organizationId, input.childId);
+      }),
+    // Unified, org-wide feed of every child + family note, newest first — the
+    // central place a note is visible the moment it's submitted.
+    recent: orgStaffProcedure
+      .input(z.object({ organizationId: z.number(), limit: z.number().max(200).optional() }))
+      .query(async ({ input }) => {
+        return mod.getRecentNotes(input.organizationId, input.limit ?? 100);
       }),
     create: orgStaffProcedure
       .input(

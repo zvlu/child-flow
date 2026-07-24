@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { ORGANIZATION_ID } from "@/const";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { QuickNoteButton } from "@/components/QuickNoteButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -89,6 +90,24 @@ export default function AppLayout({ children }: AppLayoutProps) {
   // app defaults when there are no preferences.
   const navPrefs = (user as any)?.settings?.navigation ?? null;
   const navRole = ((user as any)?.role ?? "staff") as "admin" | "staff" | "parent";
+
+  // Activity oversight: record each screen the user opens (deduped by path)
+  // so supervisors can review it. Fire-and-forget; never blocks navigation.
+  const trackActivity = trpc.activity.track.useMutation();
+  const logActivityLogout = trpc.activity.logout.useMutation();
+  const signOut = () => {
+    // Best-effort logout event, then clear the session.
+    try { logActivityLogout.mutate(); } catch { /* non-blocking */ }
+    logout();
+  };
+  const lastTrackedPath = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user || location === lastTrackedPath.current) return;
+    lastTrackedPath.current = location;
+    const label = location.split("/").filter(Boolean)[0] ?? "dashboard";
+    trackActivity.mutate({ path: location, label });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location, user]);
   const isOwner = Boolean((user as any)?.isOwner);
   const orgModules = useOrgModules();
   const effectiveTopNav = applyTopNav(navPrefs, navRole, orgModules);
@@ -152,8 +171,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden flex-col">
-      {/* Top Navigation Bar - Matching ChildPlus Style */}
-      <header className="h-14 bg-[#2E4034] text-white flex items-center px-3 md:px-4 gap-2 flex-shrink-0 shadow-md z-20">
+      {/* Top Navigation Bar — uses the sidebar token (deep green in light,
+          near-black in dark) so it matches the side menu and darkens with
+          the theme instead of staying a fixed green. */}
+      <header className="h-14 bg-sidebar text-white flex items-center px-3 md:px-4 gap-2 flex-shrink-0 shadow-md z-20">
         <Button
           variant="ghost"
           size="icon"
@@ -268,7 +289,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => logout()}
+                onClick={() => signOut()}
                 className="text-red-600 focus:text-red-600"
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -418,7 +439,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   <p className="text-[10px] text-sidebar-foreground/50 truncate uppercase font-bold tracking-tighter">{displayTitle}</p>
                 </div>
                 <button
-                  onClick={() => logout()}
+                  onClick={() => signOut()}
                   className="p-1.5 rounded-md text-sidebar-foreground/60 hover:text-red-500 hover:bg-sidebar-accent transition-colors flex-shrink-0"
                   title="Sign out"
                   aria-label="Sign out"
@@ -446,6 +467,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <CalendarIcon className="h-3 w-3" />
                 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
+              <QuickNoteButton />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-7 w-7 relative" aria-label={`Notifications${bellAlerts.length ? `, ${bellAlerts.length} new` : ""}`}>
@@ -496,8 +518,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </div>
           </header>
 
-          {/* Page content */}
-          <main className="flex-1 overflow-y-auto bg-[#FBF6EE]">
+          {/* Page content — themed background so dark mode is actually dark
+              (was hardcoded cream #FBF6EE, which kept the main area light
+              while sidebar/cards went dark). */}
+          <main className="flex-1 overflow-y-auto bg-background">
             {children}
           </main>
         </div>

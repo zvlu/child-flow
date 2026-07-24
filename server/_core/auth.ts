@@ -73,13 +73,18 @@ export function registerAuthRoutes(app: Express) {
       // Real job title (e.g. "Family Advocate", "Center Director") — the
       // mobile app shows this instead of the generic admin/staff access tier.
       let position: string | null = null;
+      // The §1302.91 functional role enum (teacher, nurse, family_advocate…)
+      // — drives the role-shaped mobile experience.
+      let staffRole: string | null = null;
       if (user.organizationId != null) {
         const org = await db.getOrganizationById(user.organizationId);
         enabledModules = MODULE_IDS.filter((m) => hasModule(org, m));
         const staffId = await resolveStaffId(user.organizationId, user.id);
         if (staffId != null) {
           const members = await db.getOrganizationStaff(user.organizationId);
-          position = members.find((m) => m.id === staffId)?.position ?? null;
+          const me = members.find((m) => m.id === staffId);
+          position = me?.position ?? null;
+          staffRole = me?.role ?? null;
         }
       }
       res.json({
@@ -88,6 +93,7 @@ export function registerAuthRoutes(app: Express) {
         email: user.email ?? "",
         role: user.role,
         position,
+        staffRole,
         enabledModules,
       });
     } catch {

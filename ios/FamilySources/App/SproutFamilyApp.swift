@@ -20,6 +20,11 @@ struct SproutFamilyApp: App {
                         .onAppear { requestPushAuthorization() }
                 }
             }
+            // Brand: sage green everywhere .accentColor / tint is used.
+            // (The AccentColor asset exists but the generated project never
+            // set ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME, so SwiftUI
+            // was falling back to system blue.)
+            .tint(.cfPrimary)
             // #50 Multilingual: drive locale-aware formatting (dates, relative
             // times) and right-to-left layout (Arabic) from the in-app language.
             .environment(\.locale, l10n.locale)

@@ -112,11 +112,14 @@ export default function Dashboard() {
   // queries that just fail auth and never resolve, leaving the loading
   // skeletons on screen forever. Parents belong on /parent-portal instead.
   const isParent = authUser?.role === "parent";
+  const isAdmin = authUser?.role === "admin";
   useEffect(() => {
     if (!authLoading && isParent) setLocation("/parent-portal");
   }, [authLoading, isParent, setLocation]);
 
   const { data: stats, isLoading: statsLoading } = trpc.dashboard.stats.useQuery(ORGANIZATION_ID, { enabled: !isParent });
+  // Higher-up approval queue count — admins only (drives the dashboard tile).
+  const { data: approvalCount } = trpc.approvals.pendingCount.useQuery({ organizationId: ORGANIZATION_ID }, { enabled: isAdmin });
   // Role-aware quick actions: the signed-in staff member's most-used pages
   // come first (nurse sees Health, nutritionist sees Meal Planning, …).
   const { data: myRole } = trpc.staff.myRole.useQuery(undefined, { enabled: !isParent });
@@ -157,7 +160,7 @@ export default function Dashboard() {
   // ---- KPI cards (derived from dashboard.stats) ----
   const kpiCards = useMemo(() => {
     const attendanceRate = stats?.attendanceToday?.rate;
-    return [
+    const cards = [
       {
         title: "Total Enrolled",
         value: stats ? String(stats.activeChildren) : "—",
@@ -211,7 +214,23 @@ export default function Dashboard() {
         trendIcon: AlertTriangle as typeof TrendingUp | undefined,
       },
     ];
-  }, [stats]);
+    // Admin-only: pending higher-up approvals (hires, role changes, new roles).
+    if (isAdmin && (approvalCount?.count ?? 0) > 0) {
+      cards.push({
+        title: "Pending Approvals",
+        value: String(approvalCount!.count),
+        subtext: "Awaiting your sign-off",
+        href: "/approvals",
+        borderClass: "border-l-amber-500",
+        iconBgClass: "bg-amber-50",
+        iconClass: "text-amber-500",
+        subtextClass: "text-xs text-amber-600 flex items-center gap-1 mt-1",
+        icon: ClipboardCheck,
+        trendIcon: AlertTriangle as typeof TrendingUp | undefined,
+      });
+    }
+    return cards;
+  }, [stats, isAdmin, approvalCount]);
 
   // ---- Attendance chart: last 14 days grouped by day ----
   const attendanceData = useMemo(() => {

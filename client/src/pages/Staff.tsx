@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,31 +17,12 @@ import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/date";
 import { objectsToCsv, downloadCsv } from "@/lib/csv";
+import { type StaffRoleValue, ROLE_LABELS as roleLabels, STAFF_MANAGER_ROLES } from "@shared/roles";
 
-/** §1302.91 staffing taxonomy — grouped roughly by service area. */
-const roleLabels: Record<string, string> = {
-  director: "Head Start Director",
-  admin: "Administrator",
-  fiscal_officer: "Fiscal Officer",
-  education_coordinator: "Education Coordinator",
-  coach: "Coach",
-  teacher: "Teacher",
-  assistant: "Assistant Teacher",
-  health_coordinator: "Health Coordinator",
-  nurse: "Nurse",
-  nutritionist: "Nutritionist / RD",
-  mental_health_consultant: "Mental Health Consultant",
-  disabilities_coordinator: "Disabilities Coordinator",
-  family_services_manager: "Family Services Manager",
-  family_advocate: "Family Advocate",
-  home_visitor: "Home Visitor",
-  ersea_coordinator: "ERSEA Coordinator",
-  cook: "Cook / Food Service",
-  bus_driver: "Bus Driver",
-  coordinator: "Coordinator (legacy)",
-};
-
-const roleColors: Record<string, string> = {
+// roleLabels, the role value list, and the manager set all come from
+// @shared/roles (single source of truth). roleColors stays here — it's
+// web-only Tailwind styling, not shared taxonomy.
+export const roleColors: Record<string, string> = {
   admin: "bg-amber-100 text-amber-700 border-amber-200",
   teacher: "bg-blue-100 text-blue-700 border-blue-200",
   assistant: "bg-green-100 text-green-700 border-green-200",
@@ -67,18 +49,7 @@ const trainingEvents = [
   { title: "CPR/First Aid Renewal", date: "Jan 15, 2027", hours: 4, required: true },
 ];
 
-const STAFF_ROLES = [
-  "admin", "director", "fiscal_officer",
-  "education_coordinator", "coach",
-  "health_coordinator", "nurse", "nutritionist", "mental_health_consultant",
-  "disabilities_coordinator",
-  "family_services_manager", "family_advocate", "home_visitor",
-  "ersea_coordinator",
-  "teacher", "assistant",
-  "cook", "bus_driver",
-  "coordinator",
-] as const;
-type StaffRole = (typeof STAFF_ROLES)[number];
+type StaffRole = StaffRoleValue;
 
 type StaffFormState = {
   firstName: string;
@@ -87,6 +58,9 @@ type StaffFormState = {
   phone: string;
   position: string;
   role: StaffRole;
+  /** Optional org-defined role label overlaid on the fixed `role`. */
+  customRoleId: number | null;
+  supervisorId: number | null;
 };
 
 const emptyForm: StaffFormState = {
@@ -96,7 +70,13 @@ const emptyForm: StaffFormState = {
   phone: "",
   position: "",
   role: "teacher",
+  customRoleId: null,
+  supervisorId: null,
 };
+
+// Functional roles that may manage the employees who report to them. Admin
+// access tier can manage everyone. Sourced from @shared/roles.
+const MANAGER_ROLES = new Set<string>(STAFF_MANAGER_ROLES);
 
 function initials(first: string, last: string) {
   return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
@@ -110,15 +90,23 @@ export default function Staff() {
   const [form, setForm] = useState<StaffFormState>(emptyForm);
 
   const utils = trpc.useUtils();
+  const [, navigate] = useLocation();
   const { data: staff, isLoading: staffLoading } = trpc.staff.list.useQuery(ORGANIZATION_ID);
   const { data: classrooms } = trpc.classrooms.list.useQuery(ORGANIZATION_ID);
   const { data: certifications, isLoading: certsLoading } = trpc.staffOps.certifications.useQuery(ORGANIZATION_ID);
 
   const isAdmin = useIsAdmin();
+  // The signed-in user's own staff record — a manager-tier functional role
+  // may manage their direct reports even without the admin access tier.
+  const { data: myRole } = trpc.staff.myRole.useQuery();
+  const isManager = isAdmin || MANAGER_ROLES.has(myRole?.role ?? "");
+  const myStaffId = myRole?.staffId ?? null;
+  const { data: customRoles } = trpc.roles.list.useQuery(ORGANIZATION_ID);
   const createStaff = trpc.staff.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       utils.staff.list.invalidate();
-      toast.success("Staff member added");
+      utils.approvals.list.invalidate();
+      toast.success(data?.pendingApproval ? "Hire submitted for approval — an admin will review it." : "Staff member added");
       setAddOpen(false);
       setForm(emptyForm);
     },
@@ -126,9 +114,10 @@ export default function Staff() {
   });
 
   const updateStaff = trpc.staff.update.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       utils.staff.list.invalidate();
-      toast.success("Staff member updated");
+      utils.approvals.list.invalidate();
+      toast.success(data?.pendingApproval ? "Change submitted for approval — an admin will review it." : "Staff member updated");
       setEditId(null);
       setForm(emptyForm);
     },
@@ -183,6 +172,12 @@ export default function Staff() {
     toast.success(`Exported ${rows.length} staff member${rows.length === 1 ? "" : "s"} to CSV`);
   };
 
+  // Who the current user may manage: admins → everyone; a manager → only
+  // the employees whose supervisorId is their own staff id. (The server
+  // enforces this independently; this just shapes the UI.)
+  const canManage = (member: (typeof staffList)[number]) =>
+    isAdmin || (isManager && member.supervisorId === myStaffId);
+
   const openEdit = (member: (typeof staffList)[number]) => {
     setForm({
       firstName: member.firstName ?? "",
@@ -191,6 +186,8 @@ export default function Staff() {
       phone: member.phone ?? "",
       position: member.position ?? "",
       role: member.role ?? "teacher",
+      customRoleId: (member as { customRoleId?: number | null }).customRoleId ?? null,
+      supervisorId: (member as { supervisorId?: number | null }).supervisorId ?? null,
     });
     setEditId(member.id);
   };
@@ -207,13 +204,24 @@ export default function Staff() {
       phone: form.phone.trim() || undefined,
       position: form.position.trim() || undefined,
       role: form.role,
+      customRoleId: form.customRoleId,
+      // Only admins set the reporting line; managers' new hires are auto-
+      // assigned to them on the server.
+      ...(isAdmin ? { supervisorId: form.supervisorId ?? undefined } : {}),
     };
     if (editId !== null) {
-      updateStaff.mutate({ id: editId, ...payload });
+      updateStaff.mutate({ id: editId, organizationId: ORGANIZATION_ID, ...payload });
     } else {
       createStaff.mutate({ organizationId: ORGANIZATION_ID, ...payload });
     }
   };
+
+  // Name lookup for rendering "reports to" and the supervisor picker.
+  const staffById = useMemo(() => {
+    const m = new Map<number, (typeof staffList)[number]>();
+    for (const s of staffList) m.set(s.id, s);
+    return m;
+  }, [staffList]);
 
   const staffFormFields = (
     <div className="space-y-3">
@@ -254,6 +262,53 @@ export default function Staff() {
           </Select>
         </div>
       </div>
+      {/* Optional org-defined role label. Layered on top of the fixed role
+          above (which still drives access + manager semantics); shown as the
+          person's title where set. Programs create these in Settings. */}
+      {(customRoles?.length ?? 0) > 0 && (
+        <div className="space-y-1.5">
+          <Label>Custom role label (optional)</Label>
+          <Select
+            value={form.customRoleId != null ? String(form.customRoleId) : "none"}
+            onValueChange={(v) => setForm(f => ({ ...f, customRoleId: v === "none" ? null : Number(v) }))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Use standard role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Use standard role</SelectItem>
+              {customRoles!.map((r) => (
+                <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      {/* Reporting line — admins choose who this employee reports to. A
+          manager adding their own staff has them assigned automatically. */}
+      {isAdmin && (
+        <div className="space-y-1.5">
+          <Label>Reports to</Label>
+          <Select
+            value={form.supervisorId != null ? String(form.supervisorId) : "none"}
+            onValueChange={(v) => setForm(f => ({ ...f, supervisorId: v === "none" ? null : Number(v) }))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="No supervisor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No supervisor</SelectItem>
+              {staffList
+                .filter((s) => s.id !== editId && (s.role === "admin" || MANAGER_ROLES.has(s.role ?? "")))
+                .map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>
+                    {s.firstName} {s.lastName}{s.position ? ` · ${s.position}` : ""}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   );
 
@@ -268,7 +323,7 @@ export default function Staff() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-2" onClick={exportCsv}><Download className="h-4 w-4" />Export</Button>
-          {isAdmin && (
+          {isManager && (
             <Button size="sm" className="gap-2" onClick={() => { setForm(emptyForm); setAddOpen(true); }}>
               <Plus className="h-4 w-4" />Add Staff
             </Button>
@@ -296,9 +351,26 @@ export default function Staff() {
       <Tabs defaultValue="directory">
         <TabsList>
           <TabsTrigger value="directory">Staff Directory</TabsTrigger>
+          <TabsTrigger value="orgchart">Org Chart</TabsTrigger>
+          {isManager && <TabsTrigger value="activity">Activity</TabsTrigger>}
           <TabsTrigger value="training">Training & Development</TabsTrigger>
           <TabsTrigger value="certifications">Certifications</TabsTrigger>
         </TabsList>
+
+        {isManager && (
+          <TabsContent value="activity" className="mt-4">
+            <StaffActivity />
+          </TabsContent>
+        )}
+
+        <TabsContent value="orgchart" className="mt-4">
+          <OrgChart
+            staff={staffList}
+            myStaffId={myStaffId}
+            canManage={canManage}
+            onEdit={openEdit}
+          />
+        </TabsContent>
 
         <TabsContent value="directory" className="mt-4 space-y-4">
           <div className="flex items-center gap-3">
@@ -334,7 +406,14 @@ export default function Staff() {
                 const classroom = classroomByStaffName.get(fullName);
                 const memberCerts = certsByStaffId.get(member.id) ?? [];
                 return (
-                  <Card key={member.id} className="hover:shadow-md transition-shadow">
+                  <Card
+                    key={member.id}
+                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => navigate(`/staff/${member.id}`)}
+                    onKeyDown={(e) => { if (e.key === "Enter") navigate(`/staff/${member.id}`); }}
+                  >
                     <CardContent className="p-5">
                       <div className="flex items-start gap-4">
                         <Avatar className="h-12 w-12 flex-shrink-0">
@@ -345,9 +424,9 @@ export default function Staff() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <h3 className="font-semibold text-foreground">{fullName}</h3>
-                            {isAdmin && (
+                            {canManage(member) && (
                               <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
+                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                   <Button variant="ghost" size="icon" className="h-7 w-7">
                                     <MoreHorizontal className="h-4 w-4" />
                                   </Button>
@@ -355,7 +434,7 @@ export default function Staff() {
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={() => openEdit(member)}>Edit</DropdownMenuItem>
                                   <DropdownMenuItem
-                                    onClick={() => updateStaff.mutate({ id: member.id, isActive: member.isActive === 1 ? 0 : 1 })}
+                                    onClick={() => updateStaff.mutate({ id: member.id, organizationId: ORGANIZATION_ID, isActive: member.isActive === 1 ? 0 : 1 })}
                                   >
                                     {member.isActive === 1 ? "Deactivate" : "Activate"}
                                   </DropdownMenuItem>
@@ -371,6 +450,13 @@ export default function Staff() {
                               <Badge variant="outline" className="text-xs text-muted-foreground">Inactive</Badge>
                             )}
                           </div>
+                          {(member as { supervisorId?: number | null }).supervisorId != null &&
+                            staffById.get((member as { supervisorId?: number | null }).supervisorId!) && (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Reports to {staffById.get((member as { supervisorId?: number | null }).supervisorId!)!.firstName}{" "}
+                                {staffById.get((member as { supervisorId?: number | null }).supervisorId!)!.lastName}
+                              </p>
+                            )}
                           <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                             {classroom && <p>Classroom: {classroom}</p>}
                             {member.email && <div className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{member.email}</div>}
@@ -551,6 +637,241 @@ export default function Staff() {
               Save Changes
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Org Chart — renders the reporting hierarchy as an indented tree. Roots are
+// staff with no supervisor (or whose supervisor isn't in the list). Managers
+// can edit anyone in their own subtree inline.
+// ─────────────────────────────────────────────────────────────────────────
+
+type OrgStaff = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  position?: string | null;
+  role?: string | null;
+  isActive?: number | null;
+  supervisorId?: number | null;
+};
+
+function OrgChart<T extends OrgStaff>({
+  staff,
+  myStaffId,
+  canManage,
+  onEdit,
+}: {
+  staff: T[];
+  myStaffId: number | null;
+  canManage: (m: T) => boolean;
+  onEdit: (m: T) => void;
+}) {
+  const { roots, childrenOf } = useMemo(() => {
+    const ids = new Set(staff.map((s) => s.id));
+    const childrenOf = new Map<number, T[]>();
+    const roots: T[] = [];
+    for (const s of staff) {
+      const sup = s.supervisorId ?? null;
+      if (sup == null || !ids.has(sup)) {
+        roots.push(s);
+      } else {
+        const list = childrenOf.get(sup) ?? [];
+        list.push(s);
+        childrenOf.set(sup, list);
+      }
+    }
+    const byName = (a: OrgStaff, b: OrgStaff) =>
+      `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`);
+    roots.sort(byName);
+    Array.from(childrenOf.values()).forEach((list) => list.sort(byName));
+    return { roots, childrenOf };
+  }, [staff]);
+
+  if (staff.length === 0) {
+    return (
+      <div className="text-center py-12 text-muted-foreground text-sm">
+        No staff to chart yet.
+      </div>
+    );
+  }
+
+  const renderNode = (member: T, depth: number): React.ReactNode => {
+    const reports = childrenOf.get(member.id) ?? [];
+    const isMe = member.id === myStaffId;
+    return (
+      <div key={member.id}>
+        <div
+          className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-3 py-2.5 mb-2 hover:shadow-sm transition-shadow"
+          style={{ marginLeft: depth * 24 }}
+        >
+          <Avatar className="h-9 w-9 flex-shrink-0">
+            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+              {initials(member.firstName, member.lastName)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm text-foreground truncate">
+                {member.firstName} {member.lastName}
+              </span>
+              {isMe && <Badge variant="outline" className="text-[10px]">You</Badge>}
+              {member.isActive !== 1 && (
+                <Badge variant="outline" className="text-[10px] text-muted-foreground">Inactive</Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground truncate">
+              {member.position || roleLabels[member.role ?? "teacher"] || member.role}
+              {reports.length > 0 && ` · ${reports.length} report${reports.length === 1 ? "" : "s"}`}
+            </p>
+          </div>
+          {canManage(member) && (
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onEdit(member)}>
+              Edit
+            </Button>
+          )}
+        </div>
+        {reports.map((r) => renderNode(r, depth + 1))}
+      </div>
+    );
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Reporting structure</CardTitle>
+      </CardHeader>
+      <CardContent>{roots.map((r) => renderNode(r, 0))}</CardContent>
+    </Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Staff Activity — team overview (who's active, last seen, screens today)
+// plus a per-employee timeline. Scoped server-side: admins see everyone,
+// managers see only their reporting subtree.
+// ─────────────────────────────────────────────────────────────────────────
+
+function relativeTime(d: Date | string | null): string {
+  if (!d) return "—";
+  const t = typeof d === "string" ? new Date(d) : d;
+  const secs = Math.round((Date.now() - t.getTime()) / 1000);
+  if (secs < 60) return "just now";
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return `${Math.floor(secs / 86400)}d ago`;
+}
+
+function activityLabel(row: { action: string; resourceType: string; resourceId?: string | null; detail?: string | null }): string {
+  switch (row.action) {
+    case "login": return "Signed in";
+    case "logout": return "Signed out";
+    case "login_failed": return "Failed sign-in attempt";
+    case "view": return `Viewed ${row.detail || row.resourceId || "a page"}`;
+    case "create": return `Created ${row.resourceType}`;
+    case "update": return `Updated ${row.resourceType}${row.resourceId ? ` #${row.resourceId}` : ""}`;
+    case "delete": return `Deleted ${row.resourceType}`;
+    case "read": return `Opened ${row.resourceType}`;
+    case "check_in": return "Checked in a child";
+    case "access_denied": return `Blocked from ${row.resourceType}`;
+    default: return `${row.action} ${row.resourceType}`;
+  }
+}
+
+function StaffActivity() {
+  const [selected, setSelected] = useState<{ id: number; name: string } | null>(null);
+  const { data: team, isLoading } = trpc.activity.teamOverview.useQuery(
+    { organizationId: ORGANIZATION_ID },
+    { refetchInterval: 30_000 },
+  );
+  const { data: timeline, isLoading: timelineLoading } = trpc.activity.forStaff.useQuery(
+    { organizationId: ORGANIZATION_ID, staffId: selected?.id ?? 0 },
+    { enabled: selected !== null },
+  );
+
+  const rows = team ?? [];
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Team activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center gap-2 py-8 text-muted-foreground text-sm justify-center">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading activity…
+            </div>
+          ) : rows.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No one reports to you yet, or no activity has been recorded.
+            </p>
+          ) : (
+            <div className="divide-y divide-border">
+              {rows.map((m) => (
+                <button
+                  key={m.staffId}
+                  type="button"
+                  onClick={() => setSelected({ id: m.staffId, name: m.name })}
+                  className="flex w-full items-center gap-3 py-3 text-left hover:bg-muted/50 -mx-2 px-2 rounded-md transition-colors"
+                >
+                  <span className="relative flex h-2.5 w-2.5 shrink-0">
+                    {m.onlineNow && (
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-60" />
+                    )}
+                    <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${m.onlineNow ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {m.position || roleLabels[m.role ?? "teacher"] || m.role}
+                    </p>
+                  </div>
+                  <div className="hidden sm:block text-right">
+                    <p className="text-xs text-foreground">
+                      {m.onlineNow ? "Active now" : `Last seen ${relativeTime(m.lastActiveAt)}`}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {m.viewsToday} screen{m.viewsToday === 1 ? "" : "s"} today · signed in {relativeTime(m.lastLoginAt)}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={selected !== null} onOpenChange={(o) => { if (!o) setSelected(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{selected?.name} · activity</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {timelineLoading ? (
+              <div className="flex items-center gap-2 py-8 text-muted-foreground text-sm justify-center">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+              </div>
+            ) : (timeline ?? []).length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No recorded activity.</p>
+            ) : (
+              <ol className="relative space-y-3 border-l border-border pl-4">
+                {(timeline ?? []).map((row) => (
+                  <li key={row.id} className="relative">
+                    <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-primary/60" />
+                    <p className="text-sm text-foreground">{activityLabel(row)}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {formatDate(row.createdAt)} · {relativeTime(row.createdAt)}
+                      {row.ipAddress ? ` · ${row.ipAddress}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

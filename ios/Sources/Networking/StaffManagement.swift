@@ -16,7 +16,13 @@ import Foundation
 // date encoding) locally instead of editing APIClient.swift.
 
 struct CreateStaffResponse: Decodable {
-    let id: String
+    /// True when a manager-tier caller's hire was parked as a pending approval
+    /// rather than created outright. Absent/false on the admin (direct) path.
+    let pendingApproval: Bool?
+    /// Present when the staff row was created directly (admin path).
+    let id: String?
+    /// Present when the hire was parked for approval (manager path).
+    let approvalId: Int?
 }
 
 struct LogTrainingResponse: Decodable {
@@ -24,9 +30,18 @@ struct LogTrainingResponse: Decodable {
     let success: Bool
 }
 
+/// One entry in an employee's app-activity timeline (GET /api/staff/:id/activity).
+struct StaffActivityItem: Decodable, Identifiable {
+    let id: String
+    let label: String
+    /// ISO-8601 timestamp string, or nil.
+    let at: String?
+}
+
 extension APIClient {
-    /// Admin-only server-side — throws `APIError.httpError(403)` if the
-    /// signed-in user isn't an admin.
+    /// Admins create the staff row directly; manager-tier staff (director,
+    /// coordinators) may add people too, but the hire is parked as a pending
+    /// approval for a higher-up (response has `pendingApproval == true`).
     @discardableResult
     func createStaffMember(
         firstName: String,
@@ -87,6 +102,13 @@ extension APIClient {
         )
     }
 
+    /// One employee's app-activity timeline. Server restricts this to the
+    /// reporting line (admins, or supervisors above the employee); a 403 means
+    /// the caller isn't allowed to see it. See server/staffDirectory.ts.
+    func getStaffActivity(staffId: String) async throws -> [StaffActivityItem] {
+        try await staffMgmtGet("staff/\(staffId)/activity")
+    }
+
     // MARK: Self-contained networking (see note above)
 
     private static let staffMgmtBaseURL = URL(string: "http://localhost:3000/api")!
@@ -141,6 +163,16 @@ extension APIClient {
             }
             throw APIError.httpError(http.statusCode)
         }
+    }
+
+    private func staffMgmtGet<T: Decodable>(_ path: String) async throws -> T {
+        let url = staffMgmtMakeURL(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        staffMgmtAddAuthHeader(&request)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try staffMgmtValidate(response)
+        return try Self.staffMgmtDecoder.decode(T.self, from: data)
     }
 
     private func staffMgmtPost<Body: Encodable, T: Decodable>(_ path: String, body: Body) async throws -> T {

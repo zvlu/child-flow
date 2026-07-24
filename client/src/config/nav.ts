@@ -55,6 +55,7 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
     items: [
       { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: PARENT_OK },
       { path: "/children", label: "Children", icon: Baby },
+      { path: "/notes", label: "Notes", icon: NotebookPen },
       { path: "/attendance", label: "Attendance", icon: ClipboardCheck },
       { path: "/daily-reports", label: "Daily Reports", icon: Sparkles },
       { path: "/health", label: "Health Records", icon: Heart },
@@ -101,6 +102,7 @@ export const SIDE_NAV_SECTIONS: NavSection[] = [
     items: [
       { path: "/performance", label: "Performance Panel", icon: BarChart3 },
       { path: "/action-queue", label: "Action Queue", icon: AlertTriangle },
+      { path: "/approvals", label: "Approvals", icon: ClipboardCheck, roles: ADMIN_ONLY },
       { path: "/reports", label: "Reports", icon: FileText },
       { path: "/report-builder", label: "Report Builder", icon: Zap },
       { path: "/ai-insights", label: "AI Insights", icon: Zap },

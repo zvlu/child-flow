@@ -36,7 +36,7 @@ struct StaffView: View {
         .toolbar {
             // Managing staff accounts is admin-only (the server enforces this
             // on staff.create too).
-            if appState.isAdmin {
+            if appState.canManageStaff {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showAddStaff = true } label: {
                         Image(systemName: "person.badge.plus")
@@ -125,8 +125,24 @@ struct StaffDetailView: View {
     @EnvironmentObject var appState: AppState
     @State private var showLogTraining = false
     @State private var showEditClassroom = false
+    // App-activity oversight: hidden entirely unless the server (reporting-line
+    // guard) returns it. A 403 means this viewer isn't above the employee.
+    @State private var activity: [StaffActivityItem] = []
+    @State private var activityDenied = false
+    @State private var activityLoaded = false
 
     var roleColor: Color { StaffRole(rawValue: member.roleKey)?.color ?? .cfTextSecondary }
+
+    private static func formatActivityDate(_ iso: String) -> String {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        guard let date = fractional.date(from: iso) ?? plain.date(from: iso) else { return iso }
+        let out = DateFormatter()
+        out.dateStyle = .medium
+        out.timeStyle = .short
+        return out.string(from: date)
+    }
 
     // Pull the live version of this member from the viewModel
     var liveMember: StaffMember {
@@ -212,7 +228,7 @@ struct StaffDetailView: View {
             Section("Assignment") {
                 if let classroom = liveMember.classroom {
                     LabeledContent("Classroom", value: classroom)
-                    if appState.isAdmin {
+                    if appState.canManageStaff {
                         Button("Change Assignment") { showEditClassroom = true }
                             .foregroundColor(.cfPrimary)
                     }
@@ -221,10 +237,36 @@ struct StaffDetailView: View {
                         Text("No classroom assigned")
                             .foregroundColor(.secondary)
                         Spacer()
-                        if appState.isAdmin {
+                        if appState.canManageStaff {
                             Button("Assign") { showEditClassroom = true }
                                 .font(.cfCaption.bold())
                                 .foregroundColor(.cfPrimary)
+                        }
+                    }
+                }
+            }
+
+            if !activityDenied {
+                Section("App Activity") {
+                    if !activityLoaded {
+                        HStack { Spacer(); ProgressView(); Spacer() }
+                    } else if activity.isEmpty {
+                        Text("No recent activity recorded.")
+                            .font(.cfCaption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(activity.prefix(50)) { item in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.label)
+                                    .font(.cfSubheadline)
+                                    .foregroundColor(.cfTextPrimary)
+                                if let at = item.at {
+                                    Text(Self.formatActivityDate(at))
+                                        .font(.cfCaption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 2)
                         }
                     }
                 }
@@ -236,7 +278,7 @@ struct StaffDetailView: View {
                         .foregroundColor(.cfPrimary)
                 }
                 // Timesheet review is admin-only.
-                if appState.isAdmin {
+                if appState.canManageStaff {
                     NavigationLink(destination: TimesheetView()) {
                         Label("View Timesheet", systemImage: "clock.fill")
                             .foregroundColor(.cfChildren)
@@ -246,6 +288,15 @@ struct StaffDetailView: View {
         }
         .navigationTitle(liveMember.fullName)
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            do {
+                activity = try await APIClient.shared.getStaffActivity(staffId: member.id)
+            } catch {
+                // 403 = not in this employee's reporting line → hide the section.
+                if case APIError.httpError(403) = error { activityDenied = true }
+            }
+            activityLoaded = true
+        }
         .sheet(isPresented: $showLogTraining) {
             LogTrainingSheet(member: liveMember) { hours, trainingType, date, notes in
                 Task { await viewModel.logTraining(member: liveMember, trainingName: trainingType, hours: hours, date: date, notes: notes) }
@@ -456,6 +507,17 @@ enum StaffRole: String, CaseIterable {
     case busDriver = "bus_driver"
     case coordinator
     case admin
+    // Standard center positions added later (mirror server STAFF_ROLE_VALUES).
+    case assistantDirector = "assistant_director"
+    case centerDirector = "center_director"
+    case dataManager = "data_manager"
+    case leadTeacher = "lead_teacher"
+    case officeManager = "office_manager"
+    case enrollmentSpecialist = "enrollment_specialist"
+    case custodian
+    case busMonitor = "bus_monitor"
+    case kitchenAssistant = "kitchen_assistant"
+    case substitute
 
     var displayName: String {
         switch self {
@@ -472,12 +534,22 @@ enum StaffRole: String, CaseIterable {
         case .familyAdvocate:           return "Family Advocates"
         case .homeVisitor:              return "Home Visitors"
         case .erseaCoordinator:         return "ERSEA Coordinators"
-        case .teacher:                  return "Lead Teachers"
+        case .teacher:                  return "Teachers"
         case .assistant:                return "Teacher Assistants"
         case .cook:                     return "Cooks"
         case .busDriver:                return "Bus Drivers"
         case .coordinator:              return "Coordinators"
         case .admin:                    return "Administrators"
+        case .assistantDirector:        return "Assistant Directors"
+        case .centerDirector:           return "Center Directors"
+        case .dataManager:              return "Data Managers"
+        case .leadTeacher:              return "Lead Teachers"
+        case .officeManager:            return "Office Managers"
+        case .enrollmentSpecialist:     return "Enrollment Specialists"
+        case .custodian:                return "Custodians / Maintenance"
+        case .busMonitor:               return "Bus Monitors"
+        case .kitchenAssistant:         return "Kitchen Assistants"
+        case .substitute:               return "Substitutes / Floaters"
         }
     }
 
@@ -496,26 +568,36 @@ enum StaffRole: String, CaseIterable {
         case .familyAdvocate:           return "Family Advocate"
         case .homeVisitor:              return "Home Visitor"
         case .erseaCoordinator:         return "ERSEA Coordinator"
-        case .teacher:                  return "Lead Teacher"
+        case .teacher:                  return "Teacher"
         case .assistant:                return "Teacher Assistant"
         case .cook:                     return "Cook"
         case .busDriver:                return "Bus Driver"
         case .coordinator:              return "Coordinator"
         case .admin:                    return "Administrator"
+        case .assistantDirector:        return "Assistant Director"
+        case .centerDirector:           return "Center Director"
+        case .dataManager:              return "Data Manager"
+        case .leadTeacher:              return "Lead Teacher"
+        case .officeManager:            return "Office Manager"
+        case .enrollmentSpecialist:     return "Enrollment Specialist"
+        case .custodian:                return "Custodian / Maintenance"
+        case .busMonitor:               return "Bus Monitor"
+        case .kitchenAssistant:         return "Kitchen Assistant"
+        case .substitute:               return "Substitute / Floater"
         }
     }
 
     var color: Color {
         switch self {
-        case .director, .admin:                                     return .cfPrimary
-        case .fiscalOfficer, .coordinator:                           return .cfCompliance
+        case .director, .admin, .assistantDirector, .centerDirector:  return .cfPrimary
+        case .fiscalOfficer, .coordinator, .dataManager, .officeManager: return .cfCompliance
         case .educationCoordinator, .coach:                         return .cfGoals
         case .healthCoordinator, .nurse, .nutritionist,
              .mentalHealthConsultant, .disabilitiesCoordinator:      return .cfHealth
         case .familyServicesManager, .familyAdvocate, .homeVisitor:  return .cfFamily
-        case .erseaCoordinator:                                      return .cfAttendance
-        case .teacher, .assistant:                                   return .cfChildren
-        case .cook, .busDriver:                                      return .cfAccent
+        case .erseaCoordinator, .enrollmentSpecialist:               return .cfAttendance
+        case .teacher, .assistant, .leadTeacher, .substitute:        return .cfChildren
+        case .cook, .busDriver, .busMonitor, .kitchenAssistant, .custodian: return .cfAccent
         }
     }
 }
@@ -544,12 +626,14 @@ class StaffViewModel: ObservableObject {
         return rest.filter { $0.fullName.localizedCaseInsensitiveContains(searchText) }
     }
 
-    /// Creates the staff member server-side (admin-only) and reloads from
-    /// the server so the directory reflects the real, persisted record.
+    /// Creates the staff member server-side and reloads so the directory
+    /// reflects the persisted record. Admins create directly; a manager's hire
+    /// is parked as a pending approval (we surface that so they know it's not
+    /// live yet).
     @discardableResult
     func createStaff(firstName: String, lastName: String, email: String, phone: String, role: StaffRole) async -> Bool {
         do {
-            try await APIClient.shared.createStaffMember(
+            let result = try await APIClient.shared.createStaffMember(
                 firstName: firstName,
                 lastName: lastName,
                 email: email.isEmpty ? nil : email,
@@ -558,6 +642,9 @@ class StaffViewModel: ObservableObject {
                 role: role.rawValue
             )
             await load()
+            if result.pendingApproval == true {
+                alertMessage = "Submitted for approval — an administrator will review this hire before it takes effect."
+            }
             return true
         } catch {
             alertMessage = friendlyMessage(for: error, action: "add that staff member")

@@ -1,22 +1,72 @@
 import SwiftUI
 
 struct MainTabView: View {
+    @EnvironmentObject var appState: AppState
+
+    /// Each functional role leads with the screens it uses all day.
+    /// Every other module stays reachable through the app menu — this is
+    /// emphasis, not access control (the server enforces permissions).
     var body: some View {
         TabView {
-            DashboardView()
-                .tabItem { Label("Dashboard", systemImage: "chart.bar.fill") }
+            switch appState.roleGroup {
+            case .leadership:
+                DashboardView()
+                    .tabItem { Label("Dashboard", systemImage: "chart.bar.fill") }
+                ChildrenView()
+                    .tabItem { Label("Children", systemImage: "person.2.fill") }
+                AttendanceView()
+                    .tabItem { Label("Attendance", systemImage: "checkmark.circle.fill") }
+                HealthView()
+                    .tabItem { Label("Health", systemImage: "heart.fill") }
+                MessagingView()
+                    .tabItem { Label("Messages", systemImage: "message.fill") }
 
-            ChildrenView()
-                .tabItem { Label("Children", systemImage: "person.2.fill") }
+            case .teaching:
+                AttendanceView()
+                    .tabItem { Label("Attendance", systemImage: "checkmark.circle.fill") }
+                DailyReportsView()
+                    .tabItem { Label("Daily", systemImage: "sparkles") }
+                ChildrenView()
+                    .tabItem { Label("Children", systemImage: "person.2.fill") }
+                LessonPlanningView()
+                    .tabItem { Label("Lessons", systemImage: "book.fill") }
+                MessagingView()
+                    .tabItem { Label("Messages", systemImage: "message.fill") }
 
-            AttendanceView()
-                .tabItem { Label("Attendance", systemImage: "checkmark.circle.fill") }
+            case .health:
+                HealthView()
+                    .tabItem { Label("Health", systemImage: "heart.fill") }
+                ChildrenView()
+                    .tabItem { Label("Children", systemImage: "person.2.fill") }
+                NutritionFormsView()
+                    .tabItem { Label("Nutrition", systemImage: "fork.knife") }
+                AttendanceView()
+                    .tabItem { Label("Attendance", systemImage: "checkmark.circle.fill") }
+                MessagingView()
+                    .tabItem { Label("Messages", systemImage: "message.fill") }
 
-            HealthView()
-                .tabItem { Label("Health", systemImage: "heart.fill") }
+            case .familyServices:
+                FamilyServicesView()
+                    .tabItem { Label("Families", systemImage: "person.3.fill") }
+                ChildrenView()
+                    .tabItem { Label("Children", systemImage: "person.2.fill") }
+                FamilyEngagementEventView()
+                    .tabItem { Label("Events", systemImage: "calendar") }
+                AttendanceView()
+                    .tabItem { Label("Attendance", systemImage: "checkmark.circle.fill") }
+                MessagingView()
+                    .tabItem { Label("Messages", systemImage: "message.fill") }
 
-            MessagingView()
-                .tabItem { Label("Messages", systemImage: "message.fill") }
+            case .operations:
+                AttendanceView()
+                    .tabItem { Label("Attendance", systemImage: "checkmark.circle.fill") }
+                MealsView()
+                    .tabItem { Label("Meals", systemImage: "fork.knife") }
+                ChildrenView()
+                    .tabItem { Label("Children", systemImage: "person.2.fill") }
+                MessagingView()
+                    .tabItem { Label("Messages", systemImage: "message.fill") }
+            }
         }
         .tint(Color.cfPrimary)
     }
@@ -42,6 +92,14 @@ struct AppMenuSheet: View {
                             color: .cfPrimary,
                             bgColor: .cfPrimaryLight,
                             destination: AnyView(DailyReportsView())
+                        )
+                        ModuleCard(
+                            label: "Notes",
+                            subtitle: "All case notes, newest first",
+                            icon: "note.text",
+                            color: .cfChildren,
+                            bgColor: .cfChildrenBg,
+                            destination: AnyView(NotesView())
                         )
                     }
 
@@ -276,6 +334,17 @@ struct AppMenuSheet: View {
                             bgColor: .cfPrimaryLight,
                             destination: AnyView(StaffView())
                         )
+                        // Higher-up sign-off queue — reviewing is admin-only.
+                        if appState.isAdmin {
+                            ModuleCard(
+                                label: "Approvals",
+                                subtitle: "Review staff & role requests",
+                                icon: "checkmark.circle.badge.questionmark",
+                                color: .cfPrimary,
+                                bgColor: .cfPrimaryLight,
+                                destination: AnyView(ApprovalsView())
+                            )
+                        }
                         ModuleCard(
                             label: "Calendar",
                             subtitle: "Program events & holidays",

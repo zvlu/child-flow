@@ -10,6 +10,9 @@ struct User: Codable, Identifiable {
     /// "Center Director") — distinct from `role`, which is just the admin/staff
     /// access tier. nil for parents or staff with no position on file.
     var position: String?
+    /// The §1302.91 functional role enum (teacher, nurse, family_advocate…)
+    /// from the staff record — shapes which tabs the app leads with.
+    var staffRole: String?
     /// Optional feature modules enabled for this user's org, e.g. ["head_start"].
     /// Absent in older/mocked payloads, so default to empty rather than fail decoding.
     var enabledModules: [String] = []
@@ -30,15 +33,16 @@ struct User: Codable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, fullName, email, role, position, enabledModules
+        case id, fullName, email, role, position, staffRole, enabledModules
     }
 
-    init(id: String, fullName: String, email: String, role: String, position: String? = nil, enabledModules: [String] = []) {
+    init(id: String, fullName: String, email: String, role: String, position: String? = nil, staffRole: String? = nil, enabledModules: [String] = []) {
         self.id = id
         self.fullName = fullName
         self.email = email
         self.role = role
         self.position = position
+        self.staffRole = staffRole
         self.enabledModules = enabledModules
     }
 
@@ -49,6 +53,7 @@ struct User: Codable, Identifiable {
         email = try c.decode(String.self, forKey: .email)
         role = try c.decode(String.self, forKey: .role)
         position = try c.decodeIfPresent(String.self, forKey: .position)
+        staffRole = try c.decodeIfPresent(String.self, forKey: .staffRole)
         enabledModules = try c.decodeIfPresent([String].self, forKey: .enabledModules) ?? []
     }
 }

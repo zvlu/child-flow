@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray, lt, lte, or } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
 import {
   absenceReports,
+  approvalRequests,
   attendance,
   attendancePlans,
   calendarEvents,
@@ -273,6 +274,22 @@ export async function computeDashboard(user: User) {
         description: "Families reported their children out. Approve to mark the day excused.",
         type: "absence",
       });
+    }
+
+    // --- Manager requests awaiting a higher-up's sign-off (admins only) ---
+    if (user.role === "admin") {
+      const pendingApprovals = await db
+        .select({ id: approvalRequests.id })
+        .from(approvalRequests)
+        .where(and(eq(approvalRequests.organizationId, org.id), eq(approvalRequests.status, "pending")));
+      if (pendingApprovals.length > 0) {
+        alerts.push({
+          id: "alert-approvals",
+          title: `${pendingApprovals.length} Approval${pendingApprovals.length === 1 ? "" : "s"} Awaiting Review`,
+          description: "Staff hires, role changes, or new roles need your sign-off. Tap to review.",
+          type: "approval",
+        });
+      }
     }
 
     if (unreadFromParents > 0) {

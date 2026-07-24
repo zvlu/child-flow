@@ -7,26 +7,34 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		007134D1A66AA874D0978E98 /* FamilyTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2EF15EFD4166C8CAF9BB7AC /* FamilyTodayView.swift */; };
+		02ED407F9FBB900EAE01D98E /* NotesAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F6487A72FB96906487C06E /* NotesAPI.swift */; };
 		09E64C386675C501F29FBE38 /* NutritionFormsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77D50A071799AC85F38203A5 /* NutritionFormsView.swift */; };
+		0F4492FECDECBC8A6FCF6741 /* HealthRecordsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF253E6583C20F46AD69F34C /* HealthRecordsAPI.swift */; };
+		13B2D859B9499FD0471EC17A /* InKindView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A643A74824235F40DCA7EFA2 /* InKindView.swift */; };
 		14302802C7F917EE8737FE86 /* SubsidiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 770958F70768A6C05AF03A30 /* SubsidiesView.swift */; };
 		14B0C5ADFE7D1F9CB8C95AB2 /* ChronicAbsenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C82F748B01671842438D70C5 /* ChronicAbsenceView.swift */; };
 		155BE3C2BD7F04D8AF9B7287 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E731A3456FBAB407D8D06C /* CalendarView.swift */; };
 		15CF2ABDC4CF0B9EA9365B70 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C838D8DF8D562A85805744A /* ReportsView.swift */; };
 		16C337E820B9926C1DFAC337 /* DailyReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 812CB4ACECA6E348060D41AF /* DailyReportsView.swift */; };
+		1848F86AC6D2B8E6F8D80D79 /* StaffManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D4C441E49751379B7D52C1 /* StaffManagement.swift */; };
 		1A3BCC16B7C1FE5B50E4C95E /* ERSEAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F428D27772F53354290D74CD /* ERSEAView.swift */; };
 		1AA190AA887C9B0D0EE0CE17 /* FamilyL10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37850FC58C15A2C7BB2D7FD9 /* FamilyL10n.swift */; };
 		1C0736AF3E3A71619E3C1B32 /* TimesheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9770EF0A8FE7AC10D1C5ACF /* TimesheetView.swift */; };
+		1C6ED120E6EF8DEB26802D4E /* ApprovalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6A432AE10DF5E7B6F71433D /* ApprovalsView.swift */; };
 		1D0BA933D0EA17FA00938613 /* FamilyMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C45DBE05D2BC46E3BA4622 /* FamilyMessagesView.swift */; };
 		2127DD7B5EBCC3940014C4BB /* MessagingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35586F409AACB75FD9735D8A /* MessagingView.swift */; };
 		217C1A652C5D7597E809DAB8 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93506B6A71C7A4CC29B6C996 /* DesignSystem.swift */; };
 		227029FF632532387607D9AA /* PrivacyPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 490E3540E6220088F94BD222 /* PrivacyPolicyView.swift */; };
 		246FA609B48EA382C13609D8 /* FamilyAppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F493872C5D86E112F5C04B /* FamilyAppState.swift */; };
 		276966339FFF2F48D2547853 /* EnrollmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77A8B840E1C449839C00BDA0 /* EnrollmentView.swift */; };
+		2A51E668355B1469FCF9DFC6 /* ComplianceChecklistAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20E632C924EBB7DD31C20312 /* ComplianceChecklistAPI.swift */; };
 		2ADB1AF187833767EF167637 /* HealthComplianceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1B4DE2567000E6CD41FEFC /* HealthComplianceView.swift */; };
 		2B7BDB0AD067516CF77FD6EF /* AttendanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6454ACFD004AD570875B4CDC /* AttendanceView.swift */; };
 		2BBB9EE39FFF2B7EBB2A8EC0 /* InviteFamiliesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D6A97218AD855BC03422C35 /* InviteFamiliesView.swift */; };
 		2C77396969058907CC52449A /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF346697D678DB8DA4632D6 /* Models.swift */; };
 		300A1D3FD9A082F4B4426878 /* FamilyServicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCC6F8B66949AE604187CF7 /* FamilyServicesView.swift */; };
+		307949DB5049BB5BFA1E57B6 /* FamilyProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 989ED9CA5811AAB1A43926C0 /* FamilyProfileView.swift */; };
 		37DA47D944FC18831C74A723 /* FamilyProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 989ED9CA5811AAB1A43926C0 /* FamilyProfileView.swift */; };
 		3AACE272D7FE3BC4A8EB56D1 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93506B6A71C7A4CC29B6C996 /* DesignSystem.swift */; };
 		3D7F4362550221AE8DABB007 /* DisabilityServicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE5C97DC756C2FDC9C857928 /* DisabilityServicesView.swift */; };
@@ -38,31 +46,55 @@
 		430F1F851A4F94D6F118DF34 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4400A734F7A4506011ECF2D1 /* MainTabView.swift */; };
 		434D8D4586C3D0E4EDFC2DC1 /* AssessmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DCA00F0A8C87DBC8403B49 /* AssessmentsView.swift */; };
 		49D81A83A5775E0CC276E38C /* ApplicationVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 033C0C29DD81AFB7E40E1F33 /* ApplicationVerificationView.swift */; };
+		4B2A68E73CE63E067825B443 /* FamilyOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D282E0278E01839F5C630915 /* FamilyOnboardingView.swift */; };
 		4E23AACF1945126CE667D263 /* SproutFamilyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAD9B4ED73F9FD6C4D9BAC4C /* SproutFamilyApp.swift */; };
 		4FF35EA7764B9CC087D7C93C /* FamilyProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 582CBC887B97A0DA34065DB5 /* FamilyProgressView.swift */; };
+		55D9315329DBB360B4CF917F /* ClassroomQualityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF00056D3C1220DF7611B6EA /* ClassroomQualityView.swift */; };
+		57AF1331C1DF2141FF0E9829 /* FamilyMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C45DBE05D2BC46E3BA4622 /* FamilyMessagesView.swift */; };
+		58D0872F5B464DFB74FCEC9D /* ComplianceChecklistAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20E632C924EBB7DD31C20312 /* ComplianceChecklistAPI.swift */; };
+		58FC83CC7DA334C3F4DF081B /* NotesAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F6487A72FB96906487C06E /* NotesAPI.swift */; };
 		5B39117CB65F74131ACEEC0D /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 261EC0C07163484F36AC17E2 /* DashboardView.swift */; };
 		5D36A378460BC9174D38964E /* ConversationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5618DBB10822780B4646D530 /* ConversationViewModel.swift */; };
+		5F3128A087F238162FCD314A /* NutritionFormsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5CB98E53DF425469AE8B6E /* NutritionFormsAPI.swift */; };
 		6508D3A37EE0B41F5754FCF6 /* PushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E4266DC035767246225E8A /* PushNotifications.swift */; };
 		6CFD3F398824D18839D0936D /* DocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6793384ECBDC5F62FC7B486 /* DocumentsView.swift */; };
 		709C32022179EF80E1C26E11 /* HealthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 913837B6F20D4803A77B577A /* HealthView.swift */; };
+		71F0A363C49892B0C174BA62 /* FamilyL10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37850FC58C15A2C7BB2D7FD9 /* FamilyL10n.swift */; };
+		77A3116E39A369402F8C4287 /* StaffManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D4C441E49751379B7D52C1 /* StaffManagement.swift */; };
 		7918B6469C29D1F02C6C82B7 /* AbsenceReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4005813DCF2008E399B226 /* AbsenceReportsView.swift */; };
+		79C21C8CC3BA9356A7D37C95 /* NutritionFormsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D5CB98E53DF425469AE8B6E /* NutritionFormsAPI.swift */; };
 		7B61E61D89F12954474030D6 /* FamilyEngagementEventView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044ABE1F98BD696D5DFE64FB /* FamilyEngagementEventView.swift */; };
 		7BEB507E800D1135AA0C389C /* HomeVisitModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EB9B032AB29565DCD325596 /* HomeVisitModeView.swift */; };
+		7D55DAB29736FA1DDA1EA124 /* StoryAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE114A6EF56FEFA6DE1934D5 /* StoryAPI.swift */; };
+		80331053BDC0F623B7E9CCE6 /* HealthRecordsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF253E6583C20F46AD69F34C /* HealthRecordsAPI.swift */; };
 		86F6CEE6BF2032DBE98244EE /* StaffActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88F9D3873265DAC596977D6 /* StaffActivityView.swift */; };
+		8814DCCACA384503A109CF86 /* ParticipationClearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97BA3FD9DF0C8D6AD1B5FBF8 /* ParticipationClearance.swift */; };
 		899D035CE5CF4AA064B57006 /* ProgramStoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B10CBC506F7E9159947202C /* ProgramStoryView.swift */; };
 		8BB3755EE8D456FBDC69B694 /* FamilyTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2EF15EFD4166C8CAF9BB7AC /* FamilyTodayView.swift */; };
+		8C74EF5C1BEA37022DE6E40F /* FamilyProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 582CBC887B97A0DA34065DB5 /* FamilyProgressView.swift */; };
+		8D860A9287E63BBFF539CFF7 /* BulkActionCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 569092EC670A514B3B32DB63 /* BulkActionCenterView.swift */; };
+		8F0FF2E799424C790436AD6D /* ParticipationClearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97BA3FD9DF0C8D6AD1B5FBF8 /* ParticipationClearance.swift */; };
 		90C3B394FCA36C4FD93B2AA1 /* PortfoliosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9106EAE490369CD580BC194 /* PortfoliosView.swift */; };
+		9242802540AB01DF7A172178 /* PolicyCouncilView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D554DB5604518238D46AB97 /* PolicyCouncilView.swift */; };
 		949A639C238CB51CAC60B697 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20033ED1EE47F9DA5C21F53 /* APIClient.swift */; };
 		9B8C086A6FEA4B3377432D73 /* FamilyOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D282E0278E01839F5C630915 /* FamilyOnboardingView.swift */; };
 		9BB5FCEAD4FFFCAD23353730 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20033ED1EE47F9DA5C21F53 /* APIClient.swift */; };
+		9C8E3307644BC70BF10C7A2D /* ApprovalsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7823EC5430486C45A9E91826 /* ApprovalsAPI.swift */; };
 		9D28E89FB66DC1570CB69AFE /* SproutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0A38F9249A71D36C7C8D51 /* SproutApp.swift */; };
+		A3058054E827DCF596441578 /* ApprovalsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7823EC5430486C45A9E91826 /* ApprovalsAPI.swift */; };
+		A5C3AACC60B5FEF69492880E /* NotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37A89C984EC26168CED80440 /* NotesView.swift */; };
 		AD4FD34FBD72A13C8BCB0AFD /* AttendancePlansView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 770FF0B138C77ACBF1C1520E /* AttendancePlansView.swift */; };
 		B2ACD528C988CB8E3883BDDE /* FamilyTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E7DB787F4DBCA0FEDBFCA5 /* FamilyTabView.swift */; };
 		B35C9847CA0EA544E59230E9 /* MockData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BEF0D0B340C6C48E3EE220D /* MockData.swift */; };
+		B6A625F4C2133D7FE6733968 /* GrantBudgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECBB9A993DBA322E5AA82A3 /* GrantBudgetView.swift */; };
 		BAF1D6756A2AB627C683D7A3 /* MealsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D3379951A97462A414673D /* MealsView.swift */; };
 		BB8817A4E9D47B7BC277CB27 /* ClockInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87781B04447BEA7645F8D42B /* ClockInView.swift */; };
 		C7921EE915021F7368E8BEC7 /* FamilyPartnershipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2433634BF2C8DA4D1102B610 /* FamilyPartnershipView.swift */; };
+		D1C3BA3A0A302BA45D69E6BC /* FamilyHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08D2EE06FE588969F1E4B45C /* FamilyHomeView.swift */; };
+		D490C839ECAFE3D202977A81 /* HeadStartGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E78CDB8FCEE10E8198EA4E2 /* HeadStartGate.swift */; };
+		DCC69E3282C80BA47C09C635 /* FamilyTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E7DB787F4DBCA0FEDBFCA5 /* FamilyTabView.swift */; };
 		DF29C9E5549CA9FDC39DA628 /* ComplianceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E8DAD38174B9B2B74734E61 /* ComplianceView.swift */; };
+		E87B75AC40C3777422381DC1 /* FamilyAppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F493872C5D86E112F5C04B /* FamilyAppState.swift */; };
 		ECC8F210FC51B1676DF484E4 /* GlobalSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD29B811DD7186D6C8978C57 /* GlobalSearchView.swift */; };
 		F119CF04C56E1D4B56670A5E /* FamilyHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08D2EE06FE588969F1E4B45C /* FamilyHomeView.swift */; };
 		F25FB414E720F50961E5B3DF /* LessonPlanningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61E96B9610A2736D05AF547A /* LessonPlanningView.swift */; };
@@ -91,6 +123,7 @@
 		08D2EE06FE588969F1E4B45C /* FamilyHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyHomeView.swift; sourceTree = "<group>"; };
 		0BEF0D0B340C6C48E3EE220D /* MockData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockData.swift; sourceTree = "<group>"; };
 		0E8DAD38174B9B2B74734E61 /* ComplianceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplianceView.swift; sourceTree = "<group>"; };
+		20E632C924EBB7DD31C20312 /* ComplianceChecklistAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplianceChecklistAPI.swift; sourceTree = "<group>"; };
 		2433634BF2C8DA4D1102B610 /* FamilyPartnershipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyPartnershipView.swift; sourceTree = "<group>"; };
 		24C466DC685D97AE46E695D8 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		261EC0C07163484F36AC17E2 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
@@ -99,33 +132,43 @@
 		316D53C7A9A1945DE60BC130 /* ChildrenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChildrenView.swift; sourceTree = "<group>"; };
 		35586F409AACB75FD9735D8A /* MessagingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagingView.swift; sourceTree = "<group>"; };
 		37850FC58C15A2C7BB2D7FD9 /* FamilyL10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyL10n.swift; sourceTree = "<group>"; };
+		37A89C984EC26168CED80440 /* NotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesView.swift; sourceTree = "<group>"; };
 		39E4266DC035767246225E8A /* PushNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotifications.swift; sourceTree = "<group>"; };
 		39E731A3456FBAB407D8D06C /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
 		42068229EC5407899BFD33FA /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		4400A734F7A4506011ECF2D1 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		490E3540E6220088F94BD222 /* PrivacyPolicyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPolicyView.swift; sourceTree = "<group>"; };
+		4D554DB5604518238D46AB97 /* PolicyCouncilView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolicyCouncilView.swift; sourceTree = "<group>"; };
 		550BE1544327EEAEE259B95F /* DigitalDocumentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitalDocumentsView.swift; sourceTree = "<group>"; };
 		5618DBB10822780B4646D530 /* ConversationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationViewModel.swift; sourceTree = "<group>"; };
+		569092EC670A514B3B32DB63 /* BulkActionCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkActionCenterView.swift; sourceTree = "<group>"; };
 		582CBC887B97A0DA34065DB5 /* FamilyProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyProgressView.swift; sourceTree = "<group>"; };
 		61E96B9610A2736D05AF547A /* LessonPlanningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LessonPlanningView.swift; sourceTree = "<group>"; };
+		61F6487A72FB96906487C06E /* NotesAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesAPI.swift; sourceTree = "<group>"; };
 		6454ACFD004AD570875B4CDC /* AttendanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttendanceView.swift; sourceTree = "<group>"; };
 		6C838D8DF8D562A85805744A /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
+		6D5CB98E53DF425469AE8B6E /* NutritionFormsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionFormsAPI.swift; sourceTree = "<group>"; };
+		6E78CDB8FCEE10E8198EA4E2 /* HeadStartGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeadStartGate.swift; sourceTree = "<group>"; };
 		770958F70768A6C05AF03A30 /* SubsidiesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubsidiesView.swift; sourceTree = "<group>"; };
 		770FF0B138C77ACBF1C1520E /* AttendancePlansView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttendancePlansView.swift; sourceTree = "<group>"; };
 		77A8B840E1C449839C00BDA0 /* EnrollmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrollmentView.swift; sourceTree = "<group>"; };
 		77D50A071799AC85F38203A5 /* NutritionFormsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionFormsView.swift; sourceTree = "<group>"; };
 		77E7DB787F4DBCA0FEDBFCA5 /* FamilyTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyTabView.swift; sourceTree = "<group>"; };
+		7823EC5430486C45A9E91826 /* ApprovalsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalsAPI.swift; sourceTree = "<group>"; };
 		7CA434A9F7637F6318F76281 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		812CB4ACECA6E348060D41AF /* DailyReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyReportsView.swift; sourceTree = "<group>"; };
+		82D4C441E49751379B7D52C1 /* StaffManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffManagement.swift; sourceTree = "<group>"; };
 		87781B04447BEA7645F8D42B /* ClockInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockInView.swift; sourceTree = "<group>"; };
 		8E4005813DCF2008E399B226 /* AbsenceReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AbsenceReportsView.swift; sourceTree = "<group>"; };
 		8EB9B032AB29565DCD325596 /* HomeVisitModeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeVisitModeView.swift; sourceTree = "<group>"; };
 		913837B6F20D4803A77B577A /* HealthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthView.swift; sourceTree = "<group>"; };
 		93506B6A71C7A4CC29B6C996 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		97BA3FD9DF0C8D6AD1B5FBF8 /* ParticipationClearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticipationClearance.swift; sourceTree = "<group>"; };
 		989ED9CA5811AAB1A43926C0 /* FamilyProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyProfileView.swift; sourceTree = "<group>"; };
 		A1D3379951A97462A414673D /* MealsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsView.swift; sourceTree = "<group>"; };
 		A1FE3642753661630AB2BB3C /* Sprout.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Sprout.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A391C57ACEA9241F266C5818 /* StaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffView.swift; sourceTree = "<group>"; };
+		A643A74824235F40DCA7EFA2 /* InKindView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InKindView.swift; sourceTree = "<group>"; };
 		A7C45DBE05D2BC46E3BA4622 /* FamilyMessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMessagesView.swift; sourceTree = "<group>"; };
 		A88F9D3873265DAC596977D6 /* StaffActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffActivityView.swift; sourceTree = "<group>"; };
 		AF1B4DE2567000E6CD41FEFC /* HealthComplianceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthComplianceView.swift; sourceTree = "<group>"; };
@@ -142,6 +185,11 @@
 		D6793384ECBDC5F62FC7B486 /* DocumentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentsView.swift; sourceTree = "<group>"; };
 		DB9B2DC3BC477C878D1DD08C /* SproutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SproutTests.swift; sourceTree = "<group>"; };
 		DD8023DFC1F4C7D966B0A84B /* SproutFamily.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SproutFamily.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DE114A6EF56FEFA6DE1934D5 /* StoryAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryAPI.swift; sourceTree = "<group>"; };
+		DECBB9A993DBA322E5AA82A3 /* GrantBudgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrantBudgetView.swift; sourceTree = "<group>"; };
+		DF00056D3C1220DF7611B6EA /* ClassroomQualityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassroomQualityView.swift; sourceTree = "<group>"; };
+		DF253E6583C20F46AD69F34C /* HealthRecordsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthRecordsAPI.swift; sourceTree = "<group>"; };
+		E6A432AE10DF5E7B6F71433D /* ApprovalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalsView.swift; sourceTree = "<group>"; };
 		EA1132B5A3BF1C3FD2E869B8 /* SproutTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SproutTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EAD9B4ED73F9FD6C4D9BAC4C /* SproutFamilyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SproutFamilyApp.swift; sourceTree = "<group>"; };
 		F428D27772F53354290D74CD /* ERSEAView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ERSEAView.swift; sourceTree = "<group>"; };
@@ -221,6 +269,14 @@
 				A7C45DBE05D2BC46E3BA4622 /* FamilyMessagesView.swift */,
 			);
 			path = Messages;
+			sourceTree = "<group>";
+		};
+		29395204481970A3DEE02140 /* Notes */ = {
+			isa = PBXGroup;
+			children = (
+				37A89C984EC26168CED80440 /* NotesView.swift */,
+			);
+			path = Notes;
 			sourceTree = "<group>";
 		};
 		2FDBEEC51A10E4FD3D40CDBC /* Progress */ = {
@@ -312,6 +368,7 @@
 				FF70278ECDA1C3120A3478AC /* AppState.swift */,
 				93506B6A71C7A4CC29B6C996 /* DesignSystem.swift */,
 				FD29B811DD7186D6C8978C57 /* GlobalSearchView.swift */,
+				6E78CDB8FCEE10E8198EA4E2 /* HeadStartGate.swift */,
 				24C466DC685D97AE46E695D8 /* LoginView.swift */,
 				4400A734F7A4506011ECF2D1 /* MainTabView.swift */,
 				0BEF0D0B340C6C48E3EE220D /* MockData.swift */,
@@ -348,6 +405,30 @@
 			path = Staff;
 			sourceTree = "<group>";
 		};
+		81B0467DE18B2B0515F0108B /* InKind */ = {
+			isa = PBXGroup;
+			children = (
+				A643A74824235F40DCA7EFA2 /* InKindView.swift */,
+			);
+			path = InKind;
+			sourceTree = "<group>";
+		};
+		825B96C8B73F5BFF689FBFD3 /* Approvals */ = {
+			isa = PBXGroup;
+			children = (
+				E6A432AE10DF5E7B6F71433D /* ApprovalsView.swift */,
+			);
+			path = Approvals;
+			sourceTree = "<group>";
+		};
+		8BDCFE035F2D255DCC35FFF1 /* GrantBudget */ = {
+			isa = PBXGroup;
+			children = (
+				DECBB9A993DBA322E5AA82A3 /* GrantBudgetView.swift */,
+			);
+			path = GrantBudget;
+			sourceTree = "<group>";
+		};
 		8EBF533357FDD0EC5D2D98F0 /* Today */ = {
 			isa = PBXGroup;
 			children = (
@@ -364,6 +445,14 @@
 			path = DailyReports;
 			sourceTree = "<group>";
 		};
+		9A01BE2F82C17F5B7EF8A61C /* PolicyCouncil */ = {
+			isa = PBXGroup;
+			children = (
+				4D554DB5604518238D46AB97 /* PolicyCouncilView.swift */,
+			);
+			path = PolicyCouncil;
+			sourceTree = "<group>";
+		};
 		9B5FADFB8F86899B0ED6B222 /* Calendar */ = {
 			isa = PBXGroup;
 			children = (
@@ -376,9 +465,17 @@
 			isa = PBXGroup;
 			children = (
 				D20033ED1EE47F9DA5C21F53 /* APIClient.swift */,
+				7823EC5430486C45A9E91826 /* ApprovalsAPI.swift */,
+				20E632C924EBB7DD31C20312 /* ComplianceChecklistAPI.swift */,
 				5618DBB10822780B4646D530 /* ConversationViewModel.swift */,
+				DF253E6583C20F46AD69F34C /* HealthRecordsAPI.swift */,
 				42068229EC5407899BFD33FA /* KeychainHelper.swift */,
+				61F6487A72FB96906487C06E /* NotesAPI.swift */,
+				6D5CB98E53DF425469AE8B6E /* NutritionFormsAPI.swift */,
+				97BA3FD9DF0C8D6AD1B5FBF8 /* ParticipationClearance.swift */,
 				39E4266DC035767246225E8A /* PushNotifications.swift */,
+				82D4C441E49751379B7D52C1 /* StaffManagement.swift */,
+				DE114A6EF56FEFA6DE1934D5 /* StoryAPI.swift */,
 			);
 			name = Networking;
 			path = Networking;
@@ -426,6 +523,14 @@
 				77D50A071799AC85F38203A5 /* NutritionFormsView.swift */,
 			);
 			path = Nutrition;
+			sourceTree = "<group>";
+		};
+		DC5C849B8D09C4E914EAEEE1 /* ClassroomQuality */ = {
+			isa = PBXGroup;
+			children = (
+				DF00056D3C1220DF7611B6EA /* ClassroomQualityView.swift */,
+			);
+			path = ClassroomQuality;
 			sourceTree = "<group>";
 		};
 		DC5CC89A7CF0415CDCD54F68 /* Events */ = {
@@ -489,10 +594,13 @@
 			isa = PBXGroup;
 			children = (
 				61ABE583DDDFDBF8EB8DC1F5 /* App */,
+				825B96C8B73F5BFF689FBFD3 /* Approvals */,
 				E4E56FA70BAB08FD6729A01B /* Assessments */,
 				4A2AFD582D496A8B618B7922 /* Attendance */,
+				F95487D330C411D02F75CA34 /* BulkActions */,
 				9B5FADFB8F86899B0ED6B222 /* Calendar */,
 				AF641C89278E6DC66B0EF145 /* Children */,
+				DC5C849B8D09C4E914EAEEE1 /* ClassroomQuality */,
 				DE423365F733E613122D6F89 /* Compliance */,
 				91F2097ECBB75F34F4D540BA /* DailyReports */,
 				223FFDECE91ED44399137D39 /* Dashboard */,
@@ -501,14 +609,18 @@
 				353072DE6469763C6D03CDC9 /* Enrollment */,
 				DC5CC89A7CF0415CDCD54F68 /* Events */,
 				3FCBB489947E9C622E8DB19E /* FamilyServices */,
+				8BDCFE035F2D255DCC35FFF1 /* GrantBudget */,
 				ACBF3CFFD616CE6F3BF68CC6 /* Health */,
 				60117F3218AB72A34226265F /* HomeVisit */,
+				81B0467DE18B2B0515F0108B /* InKind */,
 				1C08CC3CF07257C14BCD0047 /* LessonPlanning */,
 				3ECCFAB74DA58C4113A86B7F /* Meals */,
 				F1EDDE0479938E791AE74FBD /* Messaging */,
 				1C60DAAE898450999D82993D /* Models */,
 				9D183E6B241B578E4F656266 /* Networking */,
+				29395204481970A3DEE02140 /* Notes */,
 				C0AE322984B2AF4DE5EF9876 /* Nutrition */,
+				9A01BE2F82C17F5B7EF8A61C /* PolicyCouncil */,
 				677822FB633388655F4325E5 /* Portfolios */,
 				314988299D5DFDB9683798AD /* Reports */,
 				33572897CCF722A9C039A41D /* Settings */,
@@ -517,6 +629,14 @@
 				ECC8008148E4D9BB790855FA /* Subsidies */,
 			);
 			path = Sources;
+			sourceTree = "<group>";
+		};
+		F95487D330C411D02F75CA34 /* BulkActions */ = {
+			isa = PBXGroup;
+			children = (
+				569092EC670A514B3B32DB63 /* BulkActionCenterView.swift */,
+			);
+			path = BulkActions;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -618,6 +738,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				9BB5FCEAD4FFFCAD23353730 /* APIClient.swift in Sources */,
+				A3058054E827DCF596441578 /* ApprovalsAPI.swift in Sources */,
+				58D0872F5B464DFB74FCEC9D /* ComplianceChecklistAPI.swift in Sources */,
 				F66DA6B702C6CAD8D48111DF /* ConversationViewModel.swift in Sources */,
 				217C1A652C5D7597E809DAB8 /* DesignSystem.swift in Sources */,
 				246FA609B48EA382C13609D8 /* FamilyAppState.swift in Sources */,
@@ -629,10 +751,15 @@
 				4FF35EA7764B9CC087D7C93C /* FamilyProgressView.swift in Sources */,
 				B2ACD528C988CB8E3883BDDE /* FamilyTabView.swift in Sources */,
 				8BB3755EE8D456FBDC69B694 /* FamilyTodayView.swift in Sources */,
+				80331053BDC0F623B7E9CCE6 /* HealthRecordsAPI.swift in Sources */,
 				40F80B69D42E9545E0B51E80 /* KeychainHelper.swift in Sources */,
 				4042AB3A63FD13606892E93C /* Models.swift in Sources */,
+				02ED407F9FBB900EAE01D98E /* NotesAPI.swift in Sources */,
+				79C21C8CC3BA9356A7D37C95 /* NutritionFormsAPI.swift in Sources */,
+				8814DCCACA384503A109CF86 /* ParticipationClearance.swift in Sources */,
 				6508D3A37EE0B41F5754FCF6 /* PushNotifications.swift in Sources */,
 				4E23AACF1945126CE667D263 /* SproutFamilyApp.swift in Sources */,
+				77A3116E39A369402F8C4287 /* StaffManagement.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -652,13 +779,18 @@
 				7918B6469C29D1F02C6C82B7 /* AbsenceReportsView.swift in Sources */,
 				FE0CECEF6F3323A3C87A451C /* AppState.swift in Sources */,
 				49D81A83A5775E0CC276E38C /* ApplicationVerificationView.swift in Sources */,
+				9C8E3307644BC70BF10C7A2D /* ApprovalsAPI.swift in Sources */,
+				1C6ED120E6EF8DEB26802D4E /* ApprovalsView.swift in Sources */,
 				434D8D4586C3D0E4EDFC2DC1 /* AssessmentsView.swift in Sources */,
 				AD4FD34FBD72A13C8BCB0AFD /* AttendancePlansView.swift in Sources */,
 				2B7BDB0AD067516CF77FD6EF /* AttendanceView.swift in Sources */,
+				8D860A9287E63BBFF539CFF7 /* BulkActionCenterView.swift in Sources */,
 				155BE3C2BD7F04D8AF9B7287 /* CalendarView.swift in Sources */,
 				F5423A175E94C36C08A5410F /* ChildrenView.swift in Sources */,
 				14B0C5ADFE7D1F9CB8C95AB2 /* ChronicAbsenceView.swift in Sources */,
+				55D9315329DBB360B4CF917F /* ClassroomQualityView.swift in Sources */,
 				BB8817A4E9D47B7BC277CB27 /* ClockInView.swift in Sources */,
+				2A51E668355B1469FCF9DFC6 /* ComplianceChecklistAPI.swift in Sources */,
 				DF29C9E5549CA9FDC39DA628 /* ComplianceView.swift in Sources */,
 				5D36A378460BC9174D38964E /* ConversationViewModel.swift in Sources */,
 				16C337E820B9926C1DFAC337 /* DailyReportsView.swift in Sources */,
@@ -669,13 +801,26 @@
 				6CFD3F398824D18839D0936D /* DocumentsView.swift in Sources */,
 				1A3BCC16B7C1FE5B50E4C95E /* ERSEAView.swift in Sources */,
 				276966339FFF2F48D2547853 /* EnrollmentView.swift in Sources */,
+				E87B75AC40C3777422381DC1 /* FamilyAppState.swift in Sources */,
 				7B61E61D89F12954474030D6 /* FamilyEngagementEventView.swift in Sources */,
+				D1C3BA3A0A302BA45D69E6BC /* FamilyHomeView.swift in Sources */,
+				71F0A363C49892B0C174BA62 /* FamilyL10n.swift in Sources */,
+				57AF1331C1DF2141FF0E9829 /* FamilyMessagesView.swift in Sources */,
+				4B2A68E73CE63E067825B443 /* FamilyOnboardingView.swift in Sources */,
 				C7921EE915021F7368E8BEC7 /* FamilyPartnershipView.swift in Sources */,
+				307949DB5049BB5BFA1E57B6 /* FamilyProfileView.swift in Sources */,
+				8C74EF5C1BEA37022DE6E40F /* FamilyProgressView.swift in Sources */,
 				300A1D3FD9A082F4B4426878 /* FamilyServicesView.swift in Sources */,
+				DCC69E3282C80BA47C09C635 /* FamilyTabView.swift in Sources */,
+				007134D1A66AA874D0978E98 /* FamilyTodayView.swift in Sources */,
 				ECC8F210FC51B1676DF484E4 /* GlobalSearchView.swift in Sources */,
+				B6A625F4C2133D7FE6733968 /* GrantBudgetView.swift in Sources */,
+				D490C839ECAFE3D202977A81 /* HeadStartGate.swift in Sources */,
 				2ADB1AF187833767EF167637 /* HealthComplianceView.swift in Sources */,
+				0F4492FECDECBC8A6FCF6741 /* HealthRecordsAPI.swift in Sources */,
 				709C32022179EF80E1C26E11 /* HealthView.swift in Sources */,
 				7BEB507E800D1135AA0C389C /* HomeVisitModeView.swift in Sources */,
+				13B2D859B9499FD0471EC17A /* InKindView.swift in Sources */,
 				2BBB9EE39FFF2B7EBB2A8EC0 /* InviteFamiliesView.swift in Sources */,
 				F8EB2A219D6309183F932BA7 /* KeychainHelper.swift in Sources */,
 				F25FB414E720F50961E5B3DF /* LessonPlanningView.swift in Sources */,
@@ -685,7 +830,12 @@
 				2127DD7B5EBCC3940014C4BB /* MessagingView.swift in Sources */,
 				B35C9847CA0EA544E59230E9 /* MockData.swift in Sources */,
 				2C77396969058907CC52449A /* Models.swift in Sources */,
+				58FC83CC7DA334C3F4DF081B /* NotesAPI.swift in Sources */,
+				A5C3AACC60B5FEF69492880E /* NotesView.swift in Sources */,
+				5F3128A087F238162FCD314A /* NutritionFormsAPI.swift in Sources */,
 				09E64C386675C501F29FBE38 /* NutritionFormsView.swift in Sources */,
+				8F0FF2E799424C790436AD6D /* ParticipationClearance.swift in Sources */,
+				9242802540AB01DF7A172178 /* PolicyCouncilView.swift in Sources */,
 				90C3B394FCA36C4FD93B2AA1 /* PortfoliosView.swift in Sources */,
 				227029FF632532387607D9AA /* PrivacyPolicyView.swift in Sources */,
 				899D035CE5CF4AA064B57006 /* ProgramStoryView.swift in Sources */,
@@ -694,7 +844,9 @@
 				F7C1D1FDEB8A1B19817513E8 /* SettingsView.swift in Sources */,
 				9D28E89FB66DC1570CB69AFE /* SproutApp.swift in Sources */,
 				86F6CEE6BF2032DBE98244EE /* StaffActivityView.swift in Sources */,
+				1848F86AC6D2B8E6F8D80D79 /* StaffManagement.swift in Sources */,
 				3DBB17D42E407417115E1F5C /* StaffView.swift in Sources */,
+				7D55DAB29736FA1DDA1EA124 /* StoryAPI.swift in Sources */,
 				14302802C7F917EE8737FE86 /* SubsidiesView.swift in Sources */,
 				1C0736AF3E3A71619E3C1B32 /* TimesheetView.swift in Sources */,
 			);
@@ -750,6 +902,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -888,6 +1041,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";

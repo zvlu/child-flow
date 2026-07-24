@@ -22,14 +22,17 @@ import {
   InsertEducationRecord, InsertAiInsight, InsertBulkActionLog,
   InsertActivityLog, InsertAttendance,
   customRoles, InsertCustomRole,
+  approvalRequests, InsertApprovalRequest,
   enrollmentApplications, InsertEnrollmentApplication,
   inKindContributions, InsertInKindContribution,
   programRequests, InsertProgramRequest, organizations, InsertOrganization,
   disabilityServices,
   familyGoals, familyReferrals, familyHomeVisits, cfcrRecords, familyCaseNotes, attendancePlans,
+  auditLogs,
 } from "../drizzle/schema";
 import { getDb } from "./db";
 import { isEmptyPatch } from "./_core/patch";
+import { STAFF_MANAGER_ROLES as SHARED_MANAGER_ROLES } from "@shared/roles";
 
 async function requireDb() {
   const db = await getDb();
@@ -261,6 +264,229 @@ export async function getAttendanceRange(organizationId: number, start: Date, en
 
 // ==================== STAFF ====================
 
+/**
+ * Functional roles that may manage the employees who report to them. The
+ * users.role ACCESS tier ("admin") always can, org-wide; these functional
+ * (staff.role) titles can manage only their direct reports.
+ */
+export const STAFF_MANAGER_ROLES = new Set<string>(SHARED_MANAGER_ROLES);
+
+/** A staff member's own functional role + id, for permission checks. */
+export async function getStaffSelf(organizationId: number, userId: number) {
+  const staffId = await resolveStaffId(organizationId, userId);
+  if (staffId == null) return null;
+  const db = await requireDb();
+  const rows = await db
+    .select({ id: staff.id, role: staff.role })
+    .from(staff)
+    .where(eq(staff.id, staffId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Look up a single staff row scoped to an org (null if not in that org). */
+export async function getStaffInOrg(organizationId: number, staffId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(staff)
+    .where(and(eq(staff.id, staffId), eq(staff.organizationId, organizationId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Minimal supervisor graph for an org: every staff id → its supervisorId. */
+async function getSupervisorGraph(organizationId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ id: staff.id, supervisorId: staff.supervisorId })
+    .from(staff)
+    .where(eq(staff.organizationId, organizationId));
+  // childrenOf: supervisorId → [staffId, …]
+  const childrenOf = new Map<number, number[]>();
+  const supervisorOf = new Map<number, number | null>();
+  for (const r of rows) {
+    supervisorOf.set(r.id, r.supervisorId ?? null);
+    if (r.supervisorId != null) {
+      const list = childrenOf.get(r.supervisorId) ?? [];
+      list.push(r.id);
+      childrenOf.set(r.supervisorId, list);
+    }
+  }
+  return { childrenOf, supervisorOf };
+}
+
+/**
+ * Every staff id beneath `rootStaffId` in the reporting tree (direct AND
+ * indirect reports), so a director who supervises coordinators can also
+ * manage the advocates beneath them. Excludes the root. Cycle-safe.
+ */
+export async function getStaffDescendants(
+  organizationId: number,
+  rootStaffId: number,
+): Promise<Set<number>> {
+  const { childrenOf } = await getSupervisorGraph(organizationId);
+  const out = new Set<number>();
+  const queue = [...(childrenOf.get(rootStaffId) ?? [])];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (out.has(id)) continue; // guard against pre-existing bad cycles
+    out.add(id);
+    for (const child of childrenOf.get(id) ?? []) queue.push(child);
+  }
+  return out;
+}
+
+/**
+ * Would setting `staffId`'s supervisor to `newSupervisorId` create a loop?
+ * True if the proposed supervisor is the staff member itself or already sits
+ * somewhere beneath it in the tree.
+ */
+export async function wouldCreateSupervisorCycle(
+  organizationId: number,
+  staffId: number,
+  newSupervisorId: number,
+): Promise<boolean> {
+  if (staffId === newSupervisorId) return true;
+  const descendants = await getStaffDescendants(organizationId, staffId);
+  return descendants.has(newSupervisorId);
+}
+
+/**
+ * Can `userId` manage staff in `organizationId`, and if `targetStaffId` is
+ * given, that specific employee? Admin tier → yes, org-wide. Manager-tier
+ * functional role → any employee in their reporting subtree (direct or
+ * indirect report). Returns the actor's staffId so callers can default new
+ * hires' supervisor to the creating manager.
+ */
+export async function resolveStaffManagement(opts: {
+  organizationId: number;
+  userId: number;
+  accessTier: string; // users.role
+  targetStaffId?: number;
+}): Promise<{ allowed: boolean; actorStaffId: number | null; isAdmin: boolean }> {
+  const isAdmin = opts.accessTier === "admin";
+  const self = await getStaffSelf(opts.organizationId, opts.userId);
+  const actorStaffId = self?.id ?? null;
+
+  if (isAdmin) return { allowed: true, actorStaffId, isAdmin };
+
+  // Non-admins must hold a manager-tier functional role.
+  if (!self || !STAFF_MANAGER_ROLES.has(self.role ?? "")) {
+    return { allowed: false, actorStaffId, isAdmin };
+  }
+  // Managing the org in general (e.g. creating a new hire) is allowed for
+  // managers; a specific target must be somewhere in their subtree.
+  if (opts.targetStaffId == null) return { allowed: true, actorStaffId, isAdmin };
+  if (actorStaffId == null) return { allowed: false, actorStaffId, isAdmin };
+
+  const descendants = await getStaffDescendants(opts.organizationId, actorStaffId);
+  return { allowed: descendants.has(opts.targetStaffId), actorStaffId, isAdmin };
+}
+
+/**
+ * Who may view a staff member's app-activity timeline. Deliberately based on
+ * the REPORTING LINE, not job title: an admin sees anyone; otherwise only
+ * people ABOVE the employee in the supervisor tree (their manager, their
+ * manager's manager, … all the way up) may look. Peers and reports cannot.
+ * (The viewer's own record is excluded — this is an oversight view.)
+ */
+export async function canViewStaffActivity(opts: {
+  organizationId: number;
+  userId: number;
+  accessTier: string; // users.role
+  targetStaffId: number;
+}): Promise<boolean> {
+  if (opts.accessTier === "admin") return true;
+  const self = await getStaffSelf(opts.organizationId, opts.userId);
+  if (!self) return false;
+  const descendants = await getStaffDescendants(opts.organizationId, self.id);
+  return descendants.has(opts.targetStaffId);
+}
+
+/**
+ * When a supervisor is deactivated, their direct reports would be orphaned.
+ * Re-parent them to the deactivated supervisor's own supervisor (their
+ * grand-supervisor), keeping the chain intact. Returns the number moved.
+ */
+export async function reparentReportsOnDeactivate(
+  organizationId: number,
+  deactivatedStaffId: number,
+): Promise<number> {
+  const db = await requireDb();
+  const target = await getStaffInOrg(organizationId, deactivatedStaffId);
+  if (!target) return 0;
+  const newSupervisor = target.supervisorId ?? null; // may be null (top of org)
+  const reports = await db
+    .select({ id: staff.id })
+    .from(staff)
+    .where(and(eq(staff.organizationId, organizationId), eq(staff.supervisorId, deactivatedStaffId)));
+  if (!reports.length) return 0;
+  await db
+    .update(staff)
+    .set({ supervisorId: newSupervisor })
+    .where(and(eq(staff.organizationId, organizationId), eq(staff.supervisorId, deactivatedStaffId)));
+  return reports.length;
+}
+
+/** Org chart rows: id, name, position, role, supervisorId, active. */
+export async function getStaffOrgChart(organizationId: number) {
+  const db = await requireDb();
+  return db
+    .select({
+      id: staff.id,
+      firstName: staff.firstName,
+      lastName: staff.lastName,
+      position: staff.position,
+      role: staff.role,
+      customRoleId: staff.customRoleId,
+      supervisorId: staff.supervisorId,
+      isActive: staff.isActive,
+    })
+    .from(staff)
+    .where(eq(staff.organizationId, organizationId));
+}
+
+// ==================== STAFF ACTIVITY (audit-log-backed) ====================
+
+/** A staff row's linked login userId (null if the staff has no account). */
+export async function getStaffUserId(organizationId: number, staffId: number): Promise<number | null> {
+  const row = await getStaffInOrg(organizationId, staffId);
+  return row?.userId ?? null;
+}
+
+/** Recent activity events for one user, newest first. */
+export async function getActivityForUser(userId: number, limit = 200) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(auditLogs)
+    .where(eq(auditLogs.userId, userId))
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(limit);
+}
+
+/**
+ * Activity for a set of users since a cutoff — used to build the team
+ * overview (last login, last active, today's page views) in one query.
+ */
+export async function getActivityForUsers(userIds: number[], since: Date) {
+  if (userIds.length === 0) return [];
+  const db = await requireDb();
+  return db
+    .select({
+      userId: auditLogs.userId,
+      action: auditLogs.action,
+      resourceType: auditLogs.resourceType,
+      resourceId: auditLogs.resourceId,
+      detail: auditLogs.detail,
+      createdAt: auditLogs.createdAt,
+    })
+    .from(auditLogs)
+    .where(and(inArray(auditLogs.userId, userIds), gte(auditLogs.createdAt, since)))
+    .orderBy(desc(auditLogs.createdAt));
+}
+
 export async function createStaff(data: InsertStaff) {
   const db = await requireDb();
   const [result] = await db.insert(staff).values(data);
@@ -298,6 +524,122 @@ export async function deleteCustomRole(id: number, organizationId: number) {
     .delete(customRoles)
     .where(and(eq(customRoles.id, id), eq(customRoles.organizationId, organizationId)));
   return { success: true };
+}
+
+// ==================== APPROVAL REQUESTS ====================
+//
+// Higher-up sign-off queue. A manager-tier staffer's sensitive action is parked
+// here (deferred-payload model) and only applied when an org admin approves. See
+// the approval_requests table in drizzle/schema.ts. The router builds the
+// payload; here we persist, list, and apply-on-approve.
+
+export type ApprovalRequestType = "custom_role" | "staff_hire" | "staff_role_change";
+
+export async function createApprovalRequest(data: InsertApprovalRequest) {
+  const db = await requireDb();
+  const [result] = await db.insert(approvalRequests).values(data);
+  return { id: result.insertId };
+}
+
+export async function getApprovalRequest(id: number, organizationId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(approvalRequests)
+    .where(and(eq(approvalRequests.id, id), eq(approvalRequests.organizationId, organizationId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Approval rows for an org, newest first. `status` filters by decision state;
+ * `requestedByUserId` narrows to one submitter's own requests (used so a
+ * manager sees the status of what they submitted, without seeing the whole org).
+ */
+export async function listApprovalRequests(
+  organizationId: number,
+  opts?: { status?: "pending" | "approved" | "denied"; requestedByUserId?: number },
+) {
+  const db = await requireDb();
+  const conds = [eq(approvalRequests.organizationId, organizationId)];
+  if (opts?.status) conds.push(eq(approvalRequests.status, opts.status));
+  if (opts?.requestedByUserId != null) conds.push(eq(approvalRequests.requestedByUserId, opts.requestedByUserId));
+  return db
+    .select()
+    .from(approvalRequests)
+    .where(and(...conds))
+    .orderBy(desc(approvalRequests.createdAt));
+}
+
+/** Count of still-pending requests for an org (drives the admin badge/alert). */
+export async function countPendingApprovals(organizationId: number): Promise<number> {
+  const db = await requireDb();
+  const [row] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(approvalRequests)
+    .where(and(eq(approvalRequests.organizationId, organizationId), eq(approvalRequests.status, "pending")));
+  return Number(row?.n ?? 0);
+}
+
+/**
+ * Approve or deny a pending request. On approve, the stored payload is applied
+ * via the same create/update helpers a direct admin action would use, re-scoped
+ * to the request's own org (defense-in-depth against a tampered payload). On
+ * deny, only the decision fields are written. Idempotent-safe: a non-pending
+ * request is rejected so a double-approve can't apply twice.
+ */
+export async function decideApprovalRequest(opts: {
+  id: number;
+  organizationId: number;
+  reviewerUserId: number;
+  approve: boolean;
+  note?: string;
+}): Promise<
+  | { ok: true; applied: { kind: string; id: number } | null }
+  | { ok: false; reason: "not_found" | "already_reviewed" | "missing_target" | "target_gone" }
+> {
+  const db = await requireDb();
+  const req = await getApprovalRequest(opts.id, opts.organizationId);
+  if (!req) return { ok: false, reason: "not_found" };
+  if (req.status !== "pending") return { ok: false, reason: "already_reviewed" };
+
+  let applied: { kind: string; id: number } | null = null;
+  if (opts.approve) {
+    const payload = JSON.parse(req.payload) as Record<string, unknown>;
+    switch (req.type as ApprovalRequestType) {
+      case "custom_role": {
+        const r = await createCustomRole({ ...(payload as InsertCustomRole), organizationId: req.organizationId });
+        applied = { kind: "custom_role", id: Number(r.id) };
+        break;
+      }
+      case "staff_hire": {
+        const r = await createStaff({ ...(payload as InsertStaff), organizationId: req.organizationId });
+        applied = { kind: "staff", id: Number(r.id) };
+        break;
+      }
+      case "staff_role_change": {
+        if (req.targetStaffId == null) return { ok: false, reason: "missing_target" };
+        // The person may have been removed/moved since the request was filed.
+        const target = await getStaffInOrg(req.organizationId, req.targetStaffId);
+        if (!target) return { ok: false, reason: "target_gone" };
+        await updateStaff(req.targetStaffId, payload as Partial<InsertStaff>);
+        applied = { kind: "staff", id: req.targetStaffId };
+        break;
+      }
+    }
+  }
+
+  await db
+    .update(approvalRequests)
+    .set({
+      status: opts.approve ? "approved" : "denied",
+      reviewedBy: opts.reviewerUserId,
+      reviewedAt: new Date(),
+      decisionNote: opts.note ?? null,
+    })
+    .where(and(eq(approvalRequests.id, opts.id), eq(approvalRequests.organizationId, opts.organizationId)));
+
+  return { ok: true, applied };
 }
 
 // ==================== ENROLLMENT APPLICATIONS ====================
@@ -459,6 +801,75 @@ export async function createStudentNote(data: InsertStudentNote) {
   const db = await requireDb();
   const [result] = await db.insert(studentNotes).values(data);
   return { id: result.insertId };
+}
+
+export type RecentNote = {
+  id: string;
+  kind: "child" | "family";
+  subjectId: number;
+  subjectName: string;
+  title: string;
+  body: string;
+  tag: string | null;
+  priority: string | null;
+  confidentiality: "standard" | "sensitive";
+  author: string | null;
+  createdAt: Date;
+  href: string;
+};
+
+/**
+ * Unified, org-wide notes feed: every child note and family case note in one
+ * timeline, newest first, so a note is visible the moment it's submitted no
+ * matter which record it was filed against. Powers the central Notes page.
+ */
+export async function getRecentNotes(organizationId: number, limit = 100): Promise<RecentNote[]> {
+  const db = await requireDb();
+  const [sNotes, fNotes, kids, fams, staffRows] = await Promise.all([
+    db.select().from(studentNotes).where(eq(studentNotes.organizationId, organizationId)).orderBy(desc(studentNotes.createdAt)).limit(limit),
+    db.select().from(familyCaseNotes).where(eq(familyCaseNotes.organizationId, organizationId)).orderBy(desc(familyCaseNotes.createdAt)).limit(limit),
+    db.select({ id: children.id, first: children.firstName, last: children.lastName }).from(children).where(eq(children.organizationId, organizationId)),
+    db.select({ id: families.id, name: families.primaryContactName }).from(families).where(eq(families.organizationId, organizationId)),
+    db.select({ id: staff.id, first: staff.firstName, last: staff.lastName }).from(staff).where(eq(staff.organizationId, organizationId)),
+  ]);
+  const childName = new Map(kids.map((k) => [k.id, `${k.first} ${k.last}`]));
+  const famName = new Map(fams.map((f) => [f.id, f.name]));
+  const staffName = new Map(staffRows.map((s) => [s.id, `${s.first} ${s.last}`]));
+
+  const merged: RecentNote[] = [
+    ...sNotes.map((n): RecentNote => ({
+      id: `child-${n.id}`,
+      kind: "child",
+      subjectId: n.childId,
+      subjectName: childName.get(n.childId) ?? "Unknown child",
+      title: n.title,
+      body: n.content,
+      tag: n.category ?? null,
+      priority: n.priority ?? null,
+      confidentiality: "standard",
+      author: n.createdBy != null ? staffName.get(n.createdBy) ?? null : null,
+      createdAt: n.createdAt,
+      href: `/children/${n.childId}`,
+    })),
+    ...fNotes.map((n): RecentNote => ({
+      id: `family-${n.id}`,
+      kind: "family",
+      subjectId: n.familyId,
+      subjectName: famName.get(n.familyId) ?? "Unknown family",
+      title: n.type.replace(/_/g, " "),
+      body: n.body,
+      tag: n.type,
+      priority: null,
+      confidentiality: n.confidentiality,
+      author: n.authorId != null ? staffName.get(n.authorId) ?? null : null,
+      createdAt: n.createdAt,
+      href: `/family-services`,
+    })),
+  ]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, limit);
+
+  return merged;
 }
 
 // ==================== CALENDAR ====================

@@ -1,4 +1,4 @@
-import { date, decimal, int, json, mediumtext, mysqlEnum, mysqlTable, text, timestamp, unique, varchar } from "drizzle-orm/mysql-core";
+import { date, decimal, foreignKey, int, json, mediumtext, mysqlEnum, mysqlTable, text, timestamp, unique, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -187,6 +187,13 @@ export const staff = mysqlTable("staff", {
   phone: varchar("phone", { length: 20 }),
   position: varchar("position", { length: 100 }),
   /**
+   * Who this employee reports to (another staff member in the same org).
+   * Supervisory roles (director, coordinators, family services manager) may
+   * manage the staff who report to them; admins manage everyone. Nullable —
+   * top-of-org and unassigned staff have no supervisor.
+   */
+  supervisorId: int("supervisorId"),
+  /**
    * Program role, grounded in the §1302.91 staffing taxonomy. Original four
    * values kept for data compatibility; "coordinator" remains as the legacy
    * generic. users.role stays the ACCESS tier (admin/staff/parent) — this is
@@ -202,7 +209,19 @@ export const staff = mysqlTable("staff", {
     "teacher", "assistant",
     "cook", "bus_driver",
     "coordinator",
+    // Standard center positions added later. APPENDED (not interleaved) so the
+    // existing values keep their MySQL enum ordinals and no rows need rewriting.
+    "assistant_director", "center_director", "data_manager", "lead_teacher",
+    "office_manager", "enrollment_specialist", "custodian", "bus_monitor",
+    "kitchen_assistant", "substitute",
   ]).default("teacher"),
+  /**
+   * Optional link to an organization-defined role label (custom_roles). When
+   * set, the UI shows the custom role's name/color; `role` above still carries
+   * the fixed functional value that drives access-tier and manager semantics.
+   * Null = use `role`. Lets programs name positions beyond the fixed taxonomy.
+   */
+  customRoleId: int("customRoleId").references(() => customRoles.id),
   isActive: int("isActive").default(1),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -230,6 +249,41 @@ export const customRoles = mysqlTable("custom_roles", {
 
 export type CustomRole = typeof customRoles.$inferSelect;
 export type InsertCustomRole = typeof customRoles.$inferInsert;
+
+/**
+ * Higher-up approval queue. Sensitive actions taken by a manager-tier staff
+ * member (e.g. a director) are parked here as a pending request instead of
+ * being applied, until an org admin approves. Deferred-payload model: the
+ * intended change is stored as JSON in `payload` and only applied on approval,
+ * so no half-created staff/role rows exist while pending. Org-scoped, mirroring
+ * the absence_reports review pattern (status + reviewedBy/reviewedAt).
+ */
+export const approvalRequests = mysqlTable("approval_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  /** What kind of change is requested. Each maps to an apply handler on approve. */
+  type: mysqlEnum("type", ["custom_role", "staff_hire", "staff_role_change"]).notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "denied"]).default("pending").notNull(),
+  /** JSON-encoded, already-validated input for the intended action. */
+  payload: text("payload").notNull(),
+  /** The existing person a staff_role_change targets. Null for creates. */
+  targetStaffId: int("targetStaffId").references(() => staff.id),
+  /** users.id of the manager who submitted the request. */
+  requestedByUserId: int("requestedByUserId").notNull().references(() => users.id),
+  /** staff.id of the submitter when resolvable (for reporting-subtree checks). */
+  requestedByStaffId: int("requestedByStaffId").references(() => staff.id),
+  /** Optional free-text justification from the requester. */
+  requestReason: text("requestReason"),
+  /** users.id of the admin who decided. Null while pending. */
+  reviewedBy: int("reviewedBy").references(() => users.id),
+  reviewedAt: timestamp("reviewedAt"),
+  /** Optional reviewer note (especially on denial). */
+  decisionNote: text("decisionNote"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ApprovalRequest = typeof approvalRequests.$inferSelect;
+export type InsertApprovalRequest = typeof approvalRequests.$inferInsert;
 
 /**
  * Families table for storing family information.
@@ -1672,8 +1726,11 @@ export type InsertNutritionPreferenceForm = typeof nutritionPreferenceForms.$inf
 
 export const nutritionInfantFormulaForms = mysqlTable("nutrition_infant_formula_forms", {
   id: int("id").autoincrement().primaryKey(),
-  organizationId: int("organizationId").notNull().references(() => organizations.id),
-  childId: int("childId").notNull().references(() => children.id),
+  // FK constraints named explicitly: the auto-generated
+  // "nutrition_infant_formula_forms_organizationId_organizations_id_fk" is
+  // 65 chars, over MySQL's 64-char identifier limit.
+  organizationId: int("organizationId").notNull(),
+  childId: int("childId").notNull(),
   classroom: varchar("classroom", { length: 200 }),
   completedDate: timestamp("completedDate").notNull(),
   parentName: varchar("parentName", { length: 200 }),
@@ -1684,7 +1741,10 @@ export const nutritionInfantFormulaForms = mysqlTable("nutrition_infant_formula_
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (t) => ({
+  orgFk: foreignKey({ columns: [t.organizationId], foreignColumns: [organizations.id], name: "nif_forms_org_fk" }),
+  childFk: foreignKey({ columns: [t.childId], foreignColumns: [children.id], name: "nif_forms_child_fk" }),
+}));
 
 export type NutritionInfantFormulaForm = typeof nutritionInfantFormulaForms.$inferSelect;
 export type InsertNutritionInfantFormulaForm = typeof nutritionInfantFormulaForms.$inferInsert;

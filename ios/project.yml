@@ -12,6 +12,9 @@ settings:
     SWIFT_VERSION: "5.9"
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
+    # Use the AccentColor colorset from each target's asset catalog so
+    # .accentColor / default tint is brand sage instead of system blue.
+    ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
 
 # Shared sources used by both targets
 # (Sources/Models and Sources/Networking are included in both targets below)
@@ -26,6 +29,12 @@ targets:
     platform: iOS
     sources:
       - Sources
+      # One app, every role: the family (parent) experience is compiled in
+      # and reached from the same login screen. Exclude the family app's
+      # own @main entry point.
+      - path: FamilySources
+        excludes:
+          - "App/SproutFamilyApp.swift"
     resources:
       - Resources
     settings:
@@ -52,6 +61,13 @@ targets:
         name: Models
       - path: Sources/Networking
         name: Networking
+        # StoryAPI is the staff-only "moments" feed client. It references
+        # StoryPost, whose type lives in Sources/Story/ProgramStoryView.swift
+        # (a staff-only file not compiled into this target). The family app
+        # has no story UI and never calls it, so exclude it here rather than
+        # hoisting a view-coupled staff model into the shared layer.
+        excludes:
+          - "StoryAPI.swift"
       # Shared design tokens (programmatic colors/fonts; no asset-catalog deps)
       - path: Sources/App/DesignSystem.swift
         name: DesignSystem

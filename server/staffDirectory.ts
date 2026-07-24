@@ -1,10 +1,30 @@
 import type { Express, Request, Response } from "express";
 import { and, eq } from "drizzle-orm";
+import { ROLE_LABELS } from "@shared/roles";
 import { classrooms, staff, staffTrainingLogs, type User } from "../drizzle/schema";
 import { sdk } from "./_core/sdk";
 import { clientIpFromReq } from "./_core/audit";
 import { getDb, getOrganizationUsage, insertAuditLog } from "./db";
-import { createStaff, updateStaff } from "./moduleDb";
+import {
+  createStaff, updateStaff, getCustomRoles, resolveStaffManagement, createApprovalRequest,
+  canViewStaffActivity, getStaffUserId, getActivityForUser,
+} from "./moduleDb";
+
+/** One-line, human-readable label for an audit-log activity row (mirrors the
+ *  web StaffDetail's activityLabel so both surfaces read the same). */
+function activityText(a: { action: string; resourceType: string; resourceId?: string | null; detail?: string | null }): string {
+  const what = a.detail || a.resourceId || a.resourceType;
+  switch (a.action) {
+    case "view": return `Viewed ${what}`;
+    case "login": return "Signed in";
+    case "logout": return "Signed out";
+    case "create": return `Created ${a.resourceType}${a.resourceId ? ` #${a.resourceId}` : ""}`;
+    case "update": return `Updated ${a.resourceType}${a.resourceId ? ` #${a.resourceId}` : ""}`;
+    case "delete": return `Deleted ${a.resourceType}${a.resourceId ? ` #${a.resourceId}` : ""}`;
+    case "access_denied": return `Blocked from ${what}`;
+    default: return `${a.action} ${a.resourceType}`;
+  }
+}
 
 /**
  * REST backing for the iOS staff app's "Staff Directory" screen
@@ -31,29 +51,7 @@ async function requireAdmin(req: Request): Promise<User | null> {
   }
 }
 
-// §1302.91 role enum -> the display title the web Staff page already uses
-// (client/src/pages/Staff.tsx's `roleLabels`) so both surfaces agree.
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Administrator",
-  director: "Head Start Director",
-  fiscal_officer: "Fiscal Officer",
-  education_coordinator: "Education Coordinator",
-  coach: "Coach",
-  health_coordinator: "Health Coordinator",
-  nurse: "Nurse",
-  nutritionist: "Nutritionist / RD",
-  mental_health_consultant: "Mental Health Consultant",
-  disabilities_coordinator: "Disabilities Coordinator",
-  family_services_manager: "Family Services Manager",
-  family_advocate: "Family Advocate",
-  home_visitor: "Home Visitor",
-  ersea_coordinator: "ERSEA Coordinator",
-  teacher: "Teacher",
-  assistant: "Assistant Teacher",
-  cook: "Cook",
-  bus_driver: "Bus Driver",
-  coordinator: "Coordinator",
-};
+// ROLE_LABELS is imported from @shared/roles (single source of truth).
 
 export function registerStaffDirectoryRoutes(app: Express) {
   app.get("/api/staff", async (req: Request, res: Response) => {
@@ -93,14 +91,21 @@ export function registerStaffDirectoryRoutes(app: Express) {
       trainingHoursByStaff.set(t.staffId, (trainingHoursByStaff.get(t.staffId) ?? 0) + Number(t.hours));
     }
 
+    // Org-defined custom role labels: when a staffer has one, its name is the
+    // display title (the fixed `role` still drives the enum color/semantics).
+    const customRoleById = new Map<number, string>();
+    for (const cr of await getCustomRoles(org.id)) customRoleById.set(cr.id, cr.name);
+
     res.json(
       rows
         .filter((s) => s.isActive !== 0)
         .map((s) => ({
           id: String(s.id),
           fullName: `${s.firstName} ${s.lastName}`,
-          role: ROLE_LABELS[s.role ?? "teacher"] ?? "Staff",
+          role: (s.customRoleId != null ? customRoleById.get(s.customRoleId) : undefined)
+            ?? ROLE_LABELS[s.role ?? "teacher"] ?? "Staff",
           roleKey: s.role ?? "teacher",
+          customRoleId: s.customRoleId ?? null,
           email: s.email ?? "",
           phone: s.phone ?? "",
           trainingHours: trainingHoursByStaff.get(s.id) ?? 0,
@@ -116,9 +121,16 @@ export function registerStaffDirectoryRoutes(app: Express) {
    * only, admin-gated to match the web page's permission model).
    */
   app.post("/api/staff", async (req: Request, res: Response) => {
-    const user = await requireAdmin(req);
+    const user = await requireStaff(req);
     if (!user || user.organizationId == null) {
-      res.status(403).json({ error: "Admin access required" });
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    // Admins add directly; manager-tier staff (director, coordinators) may add
+    // people, but the hire is parked as a pending approval for a higher-up.
+    const mgmt = await resolveStaffManagement({ organizationId: user.organizationId, userId: user.id, accessTier: user.role });
+    if (!mgmt.allowed) {
+      res.status(403).json({ error: "You don't have permission to add staff." });
       return;
     }
     const usage = await getOrganizationUsage(user.organizationId);
@@ -134,7 +146,10 @@ export function registerStaffDirectoryRoutes(app: Express) {
       res.status(400).json({ error: "firstName and lastName are required" });
       return;
     }
-    const result = await createStaff({
+    const supervisorId = mgmt.isAdmin
+      ? (req.body?.supervisorId != null ? Number(req.body.supervisorId) : undefined)
+      : (mgmt.actorStaffId ?? undefined);
+    const payload = {
       organizationId: user.organizationId,
       firstName,
       lastName,
@@ -142,7 +157,30 @@ export function registerStaffDirectoryRoutes(app: Express) {
       phone: req.body?.phone ?? null,
       position: req.body?.position ?? null,
       role: req.body?.role ?? "teacher",
-    });
+      customRoleId: req.body?.customRoleId != null ? Number(req.body.customRoleId) : null,
+      supervisorId,
+    };
+    if (!mgmt.isAdmin) {
+      const reqRow = await createApprovalRequest({
+        organizationId: user.organizationId,
+        type: "staff_hire",
+        payload: JSON.stringify(payload),
+        requestedByUserId: user.id,
+        requestedByStaffId: mgmt.actorStaffId ?? null,
+      });
+      await insertAuditLog({
+        userId: user.id,
+        actorOpenId: user.openId,
+        action: "create",
+        resourceType: "approval_request",
+        resourceId: String(reqRow.id),
+        ipAddress: clientIpFromReq(req),
+        detail: "staff_hire",
+      });
+      res.json({ pendingApproval: true, approvalId: Number(reqRow.id) });
+      return;
+    }
+    const result = await createStaff(payload);
     await insertAuditLog({
       userId: user.id,
       actorOpenId: user.openId,
@@ -151,7 +189,7 @@ export function registerStaffDirectoryRoutes(app: Express) {
       resourceId: String(result.id),
       ipAddress: clientIpFromReq(req),
     });
-    res.json({ id: String(result.id) });
+    res.json({ pendingApproval: false, id: String(result.id) });
   });
 
   app.post("/api/staff/:id", async (req: Request, res: Response) => {
@@ -185,6 +223,46 @@ export function registerStaffDirectoryRoutes(app: Express) {
       ipAddress: clientIpFromReq(req),
     });
     res.json({ success: true });
+  });
+
+  /**
+   * One employee's app-activity timeline (iOS staff detail). Visible only along
+   * the reporting line — an admin, or someone above the employee in the
+   * supervisor tree. A staffer with no reports sees no one's activity. Mirrors
+   * the web tRPC activity.forStaff guard exactly (canViewStaffActivity).
+   */
+  app.get("/api/staff/:id/activity", async (req: Request, res: Response) => {
+    const user = await requireStaff(req);
+    if (!user || user.organizationId == null) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const staffId = Number(req.params.id);
+    if (!Number.isFinite(staffId)) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
+    const allowed = await canViewStaffActivity({
+      organizationId: user.organizationId,
+      userId: user.id,
+      accessTier: user.role,
+      targetStaffId: staffId,
+    });
+    if (!allowed) {
+      res.status(403).json({ error: "Activity is visible only to this employee's supervisors." });
+      return;
+    }
+    const targetUserId = await getStaffUserId(user.organizationId, staffId);
+    if (targetUserId == null) {
+      res.json([]);
+      return;
+    }
+    const rows = await getActivityForUser(targetUserId, 100);
+    res.json(rows.map((r) => ({
+      id: String(r.id),
+      label: activityText(r),
+      at: r.createdAt ? r.createdAt.toISOString() : null,
+    })));
   });
 
   /**

@@ -3,6 +3,8 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { sql } from "drizzle-orm";
+import { getDb } from "../db";
 import { registerAuthRoutes } from "./auth";
 import { registerOAuthRoutes } from "./oauth";
 import { registerDashboardRoutes } from "../dashboard";
@@ -18,6 +20,8 @@ import { registerFamilyCaseManagementRoutes } from "../familyCaseManagementRest"
 import { registerSettingsRoutes } from "../settingsRest";
 import { registerEnrollmentVerificationRoutes } from "../enrollmentVerificationsRest";
 import { registerStaffDirectoryRoutes } from "../staffDirectory";
+import { registerApprovalRoutes } from "../approvalsRest";
+import { registerNotesRoutes } from "../notesRest";
 import { registerErseaRoutes } from "../erseaRest";
 import { registerHealthComplianceRoutes } from "../healthComplianceRest";
 import { registerNutritionFormRoutes } from "../nutritionForms";
@@ -73,6 +77,28 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // Coarse per-IP rate limit across the API (auth routes keep stricter limits).
+  // Ops liveness/readiness probe (load balancers, uptime monitors). Not under
+  // /api, so it's unauthenticated and not rate-limited. 200 = app up + DB
+  // reachable; 503 = DB unreachable (so a monitor can page / drain traffic).
+  app.get("/healthz", async (_req, res) => {
+    let db = false;
+    try {
+      const d = await getDb();
+      if (d) {
+        await d.execute(sql`select 1`);
+        db = true;
+      }
+    } catch {
+      /* DB unreachable */
+    }
+    res.status(db ? 200 : 503).json({
+      ok: db,
+      db,
+      uptimeSeconds: Math.round(process.uptime()),
+      time: new Date().toISOString(),
+    });
+  });
+
   app.use("/api", apiRateLimiter);
   // Locally-stored document uploads (server/fileStorage.ts) — see that file
   // for why this is disk-based instead of S3/GCS.
@@ -106,6 +132,10 @@ async function startServer() {
   registerEnrollmentVerificationRoutes(app);
   // Staff Directory (iOS) under /api/staff
   registerStaffDirectoryRoutes(app);
+  // Higher-up approval inbox (iOS) under /api/approvals
+  registerApprovalRoutes(app);
+  // Unified notes feed (iOS) under /api/notes/recent
+  registerNotesRoutes(app);
   // ERSEA eligibility + suspension/expulsion logs (iOS) under /api/ersea/* — Head Start-gated
   registerErseaRoutes(app);
   // Health Compliance, Safety Drills, Mental Health Consults (iOS) under /api/health/*
