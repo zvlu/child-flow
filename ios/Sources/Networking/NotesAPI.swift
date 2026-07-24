@@ -23,9 +23,23 @@ struct NoteFeedItem: Decodable, Identifiable {
     let at: String?
 }
 
+struct CreateNoteResponse: Decodable { let id: String }
+
 extension APIClient {
     func getRecentNotes(limit: Int = 100) async throws -> [NoteFeedItem] {
         try await notesGet("notes/recent?limit=\(limit)")
+    }
+
+    /// File a child case note (iOS Quick Note). Mirrors POST /api/notes.
+    @discardableResult
+    func createStudentNote(childId: Int, title: String, content: String, priority: String) async throws -> CreateNoteResponse {
+        struct Body: Encodable {
+            let childId: Int
+            let title: String
+            let content: String
+            let priority: String
+        }
+        return try await notesPost("notes", body: Body(childId: childId, title: title, content: content, priority: priority))
     }
 
     // MARK: Self-contained networking (see StaffManagement.swift note)
@@ -50,13 +64,32 @@ extension APIClient {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         let (data, response) = try await URLSession.shared.data(for: request)
-        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+        try notesValidate(response)
+        return try Self.notesDecoder.decode(T.self, from: data)
+    }
+
+    private func notesPost<Body: Encodable, T: Decodable>(_ path: String, body: Body) async throws -> T {
+        let url = notesMakeURL(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = KeychainHelper.get(Self.notesTokenAccount) {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        request.httpBody = try JSONEncoder().encode(body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try notesValidate(response)
+        return try Self.notesDecoder.decode(T.self, from: data)
+    }
+
+    private func notesValidate(_ response: URLResponse) throws {
+        guard let http = response as? HTTPURLResponse else { return }
+        guard (200..<300).contains(http.statusCode) else {
             if http.statusCode == 401 {
                 NotificationCenter.default.post(name: .cfSessionExpired, object: nil)
                 throw APIError.unauthorized
             }
             throw APIError.httpError(http.statusCode)
         }
-        return try Self.notesDecoder.decode(T.self, from: data)
     }
 }

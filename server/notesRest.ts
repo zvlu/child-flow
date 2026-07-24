@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { sdk } from "./_core/sdk";
-import { getRecentNotes } from "./moduleDb";
+import { getRecentNotes, createStudentNote } from "./moduleDb";
+import { getChildById } from "./db";
 import type { User } from "../drizzle/schema";
 
 /**
@@ -42,5 +43,39 @@ export function registerNotesRoutes(app: Express) {
         at: n.createdAt.toISOString(),
       })),
     );
+  });
+
+  // Create a child case note (iOS Quick Note). Mirrors the web tRPC
+  // notes.create; verifies the child belongs to the caller's org first.
+  app.post("/api/notes", async (req: Request, res: Response) => {
+    const user = await requireStaff(req);
+    if (!user || user.organizationId == null) {
+      res.status(401).json({ error: "Please sign in again" });
+      return;
+    }
+    const childId = Number(req.body?.childId);
+    const title = String(req.body?.title ?? "").trim();
+    const content = String(req.body?.content ?? "").trim();
+    const priorityRaw = String(req.body?.priority ?? "medium");
+    const priority = (["low", "medium", "high", "critical"].includes(priorityRaw) ? priorityRaw : "medium") as
+      | "low" | "medium" | "high" | "critical";
+    if (!Number.isFinite(childId) || !title || !content) {
+      res.status(400).json({ error: "childId, title, and content are required" });
+      return;
+    }
+    const child = await getChildById(childId);
+    if (!child || child.organizationId !== user.organizationId) {
+      res.status(404).json({ error: "Child not found" });
+      return;
+    }
+    const result = await createStudentNote({
+      organizationId: user.organizationId,
+      childId,
+      title,
+      content,
+      priority,
+      createdBy: null,
+    });
+    res.json({ id: String(result.id) });
   });
 }
