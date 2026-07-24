@@ -33,15 +33,16 @@ struct User: Codable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, fullName, email, role, position, enabledModules
+        case id, fullName, email, role, position, staffRole, enabledModules
     }
 
-    init(id: String, fullName: String, email: String, role: String, position: String? = nil, enabledModules: [String] = []) {
+    init(id: String, fullName: String, email: String, role: String, position: String? = nil, staffRole: String? = nil, enabledModules: [String] = []) {
         self.id = id
         self.fullName = fullName
         self.email = email
         self.role = role
         self.position = position
+        self.staffRole = staffRole
         self.enabledModules = enabledModules
     }
 
@@ -52,6 +53,7 @@ struct User: Codable, Identifiable {
         email = try c.decode(String.self, forKey: .email)
         role = try c.decode(String.self, forKey: .role)
         position = try c.decodeIfPresent(String.self, forKey: .position)
+        staffRole = try c.decodeIfPresent(String.self, forKey: .staffRole)
         enabledModules = try c.decodeIfPresent([String].self, forKey: .enabledModules) ?? []
     }
 }

@@ -330,6 +330,13 @@
       "when": 1784578346038,
       "tag": "0046_left_vulcan",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "5",
+      "when": 1784836899656,
+      "tag": "0047_square_natasha_romanoff",
+      "breakpoints": true
     }
   ]
 }

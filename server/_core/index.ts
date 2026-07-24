@@ -18,6 +18,7 @@ import { registerFamilyCaseManagementRoutes } from "../familyCaseManagementRest"
 import { registerSettingsRoutes } from "../settingsRest";
 import { registerEnrollmentVerificationRoutes } from "../enrollmentVerificationsRest";
 import { registerStaffDirectoryRoutes } from "../staffDirectory";
+import { registerApprovalRoutes } from "../approvalsRest";
 import { registerErseaRoutes } from "../erseaRest";
 import { registerHealthComplianceRoutes } from "../healthComplianceRest";
 import { registerNutritionFormRoutes } from "../nutritionForms";
@@ -106,6 +107,8 @@ async function startServer() {
   registerEnrollmentVerificationRoutes(app);
   // Staff Directory (iOS) under /api/staff
   registerStaffDirectoryRoutes(app);
+  // Higher-up approval inbox (iOS) under /api/approvals
+  registerApprovalRoutes(app);
   // ERSEA eligibility + suspension/expulsion logs (iOS) under /api/ersea/* — Head Start-gated
   registerErseaRoutes(app);
   // Health Compliance, Safety Drills, Mental Health Consults (iOS) under /api/health/*

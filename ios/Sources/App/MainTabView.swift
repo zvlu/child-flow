@@ -326,6 +326,17 @@ struct AppMenuSheet: View {
                             bgColor: .cfPrimaryLight,
                             destination: AnyView(StaffView())
                         )
+                        // Higher-up sign-off queue — reviewing is admin-only.
+                        if appState.isAdmin {
+                            ModuleCard(
+                                label: "Approvals",
+                                subtitle: "Review staff & role requests",
+                                icon: "checkmark.circle.badge.questionmark",
+                                color: .cfPrimary,
+                                bgColor: .cfPrimaryLight,
+                                destination: AnyView(ApprovalsView())
+                            )
+                        }
                         ModuleCard(
                             label: "Calendar",
                             subtitle: "Program events & holidays",

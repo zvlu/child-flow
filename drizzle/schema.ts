@@ -209,7 +209,19 @@ export const staff = mysqlTable("staff", {
     "teacher", "assistant",
     "cook", "bus_driver",
     "coordinator",
+    // Standard center positions added later. APPENDED (not interleaved) so the
+    // existing values keep their MySQL enum ordinals and no rows need rewriting.
+    "assistant_director", "center_director", "data_manager", "lead_teacher",
+    "office_manager", "enrollment_specialist", "custodian", "bus_monitor",
+    "kitchen_assistant", "substitute",
   ]).default("teacher"),
+  /**
+   * Optional link to an organization-defined role label (custom_roles). When
+   * set, the UI shows the custom role's name/color; `role` above still carries
+   * the fixed functional value that drives access-tier and manager semantics.
+   * Null = use `role`. Lets programs name positions beyond the fixed taxonomy.
+   */
+  customRoleId: int("customRoleId").references(() => customRoles.id),
   isActive: int("isActive").default(1),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -237,6 +249,41 @@ export const customRoles = mysqlTable("custom_roles", {
 
 export type CustomRole = typeof customRoles.$inferSelect;
 export type InsertCustomRole = typeof customRoles.$inferInsert;
+
+/**
+ * Higher-up approval queue. Sensitive actions taken by a manager-tier staff
+ * member (e.g. a director) are parked here as a pending request instead of
+ * being applied, until an org admin approves. Deferred-payload model: the
+ * intended change is stored as JSON in `payload` and only applied on approval,
+ * so no half-created staff/role rows exist while pending. Org-scoped, mirroring
+ * the absence_reports review pattern (status + reviewedBy/reviewedAt).
+ */
+export const approvalRequests = mysqlTable("approval_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull().references(() => organizations.id),
+  /** What kind of change is requested. Each maps to an apply handler on approve. */
+  type: mysqlEnum("type", ["custom_role", "staff_hire", "staff_role_change"]).notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "denied"]).default("pending").notNull(),
+  /** JSON-encoded, already-validated input for the intended action. */
+  payload: text("payload").notNull(),
+  /** The existing person a staff_role_change targets. Null for creates. */
+  targetStaffId: int("targetStaffId").references(() => staff.id),
+  /** users.id of the manager who submitted the request. */
+  requestedByUserId: int("requestedByUserId").notNull().references(() => users.id),
+  /** staff.id of the submitter when resolvable (for reporting-subtree checks). */
+  requestedByStaffId: int("requestedByStaffId").references(() => staff.id),
+  /** Optional free-text justification from the requester. */
+  requestReason: text("requestReason"),
+  /** users.id of the admin who decided. Null while pending. */
+  reviewedBy: int("reviewedBy").references(() => users.id),
+  reviewedAt: timestamp("reviewedAt"),
+  /** Optional reviewer note (especially on denial). */
+  decisionNote: text("decisionNote"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ApprovalRequest = typeof approvalRequests.$inferSelect;
+export type InsertApprovalRequest = typeof approvalRequests.$inferInsert;
 
 /**
  * Families table for storing family information.

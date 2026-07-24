@@ -28,6 +28,7 @@ import Health from "./pages/Health";
 import HealthDeadlines from "./pages/HealthDeadlines";
 import FamilyServices from "./pages/FamilyServices";
 import Staff from "./pages/Staff";
+import Approvals from "./pages/Approvals";
 import Reports from "./pages/Reports";
 import Enrollment from "./pages/Enrollment";
 import Compliance from "./pages/Compliance";
@@ -282,6 +283,13 @@ function Router() {
         {() => (
           <AppLayout>
             <Staff />
+          </AppLayout>
+        )}
+      </Route>
+      <Route path="/approvals">
+        {() => (
+          <AppLayout>
+            <Approvals />
           </AppLayout>
         )}
       </Route>

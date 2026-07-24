@@ -111,6 +111,26 @@ async function assertStaffCapacity(organizationId: number, adding: number) {
   }
 }
 
+/**
+ * The §1302.91 functional-role taxonomy, as a Zod-enum tuple. Mirrors the
+ * `staff.role` mysqlEnum in drizzle/schema.ts and the ROLE_LABELS map in
+ * server/staffDirectory.ts (and the client/iOS label maps). Keep in sync.
+ */
+const STAFF_ROLE_VALUES = [
+  "admin", "director", "fiscal_officer",
+  "education_coordinator", "coach",
+  "health_coordinator", "nurse", "nutritionist", "mental_health_consultant",
+  "disabilities_coordinator",
+  "family_services_manager", "family_advocate", "home_visitor",
+  "ersea_coordinator",
+  "teacher", "assistant",
+  "cook", "bus_driver",
+  "coordinator",
+  "assistant_director", "center_director", "data_manager", "lead_teacher",
+  "office_manager", "enrollment_specialist", "custodian", "bus_monitor",
+  "kitchen_assistant", "substitute",
+] as const;
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -805,17 +825,8 @@ export const appRouter = router({
           phone: z.string().optional(),
           position: z.string().optional(),
           supervisorId: z.number().optional(),
-          role: z.enum([
-            "admin", "director", "fiscal_officer",
-            "education_coordinator", "coach",
-            "health_coordinator", "nurse", "nutritionist", "mental_health_consultant",
-            "disabilities_coordinator",
-            "family_services_manager", "family_advocate", "home_visitor",
-            "ersea_coordinator",
-            "teacher", "assistant",
-            "cook", "bus_driver",
-            "coordinator",
-          ]).optional(),
+          customRoleId: z.number().nullable().optional(),
+          role: z.enum(STAFF_ROLE_VALUES).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -832,9 +843,23 @@ export const appRouter = router({
         // force the new hire's supervisor to the creating manager. Admins
         // may set any supervisor (or none).
         const supervisorId = mgmt.isAdmin ? input.supervisorId : (mgmt.actorStaffId ?? undefined);
-        const result = await mod.createStaff({ ...input, supervisorId });
+        const payload = { ...input, supervisorId };
+        // A manager's hire needs a higher-up's sign-off: park it as a pending
+        // approval instead of creating the staff row. Admins apply directly.
+        if (!mgmt.isAdmin) {
+          const req = await mod.createApprovalRequest({
+            organizationId: input.organizationId,
+            type: "staff_hire",
+            payload: JSON.stringify(payload),
+            requestedByUserId: ctx.user.id,
+            requestedByStaffId: mgmt.actorStaffId ?? null,
+          });
+          await auditAccess(ctx, { action: "create", resourceType: "approval_request", resourceId: Number(req.id), detail: `staff_hire org:${input.organizationId}` });
+          return { pendingApproval: true as const, approvalId: Number(req.id) };
+        }
+        const result = await mod.createStaff(payload);
         await auditAccess(ctx, { action: "create", resourceType: "staff", detail: `org:${input.organizationId}` });
-        return result;
+        return { pendingApproval: false as const, id: Number(result.id) };
       }),
     update: orgStaffProcedure
       .input(
@@ -847,17 +872,8 @@ export const appRouter = router({
           phone: z.string().optional(),
           position: z.string().optional(),
           supervisorId: z.number().nullable().optional(),
-          role: z.enum([
-            "admin", "director", "fiscal_officer",
-            "education_coordinator", "coach",
-            "health_coordinator", "nurse", "nutritionist", "mental_health_consultant",
-            "disabilities_coordinator",
-            "family_services_manager", "family_advocate", "home_visitor",
-            "ersea_coordinator",
-            "teacher", "assistant",
-            "cook", "bus_driver",
-            "coordinator",
-          ]).optional(),
+          customRoleId: z.number().nullable().optional(),
+          role: z.enum(STAFF_ROLE_VALUES).optional(),
           isActive: z.number().optional(),
         })
       )
@@ -876,6 +892,21 @@ export const appRouter = router({
         // Only admins may reassign who an employee reports to; a manager
         // editing their report can't hand them to someone else.
         if (!mgmt.isAdmin && "supervisorId" in data) delete (data as Record<string, unknown>).supervisorId;
+        // A manager changing someone's role or custom-role (their access/title)
+        // needs a higher-up's sign-off — park the whole patch as a pending
+        // approval instead of applying it. Non-role edits still apply directly.
+        if (!mgmt.isAdmin && ("role" in data || "customRoleId" in data)) {
+          const req = await mod.createApprovalRequest({
+            organizationId,
+            type: "staff_role_change",
+            payload: JSON.stringify(data),
+            targetStaffId: id,
+            requestedByUserId: ctx.user.id,
+            requestedByStaffId: mgmt.actorStaffId ?? null,
+          });
+          await auditAccess(ctx, { action: "update", resourceType: "approval_request", resourceId: Number(req.id), detail: `staff_role_change staff:${id}` });
+          return { pendingApproval: true as const, approvalId: Number(req.id) };
+        }
         // Prevent reporting-line loops (A reports to B reports to A).
         if (mgmt.isAdmin && data.supervisorId != null) {
           if (await mod.wouldCreateSupervisorCycle(organizationId, id, data.supervisorId)) {
@@ -900,7 +931,7 @@ export const appRouter = router({
             });
           }
         }
-        return result;
+        return { pendingApproval: false as const, ...result };
       }),
 
     // A manager's team (their whole reporting subtree) — or, for admins,
@@ -1035,7 +1066,11 @@ export const appRouter = router({
       .query(async ({ input: organizationId }) => {
         return mod.getCustomRoles(organizationId);
       }),
-    create: orgAdminProcedure
+    // Admins and manager-tier staff (director, coordinators, …) may define
+    // roles. A manager creating a STAFF-access role applies directly; creating
+    // an ADMIN-access role needs a higher-up's sign-off (a director can't
+    // self-grant admin power), so it's parked as a pending approval.
+    create: orgStaffProcedure
       .input(
         z.object({
           organizationId: z.number(),
@@ -1046,16 +1081,79 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        const mgmt = await mod.resolveStaffManagement({ organizationId: input.organizationId, userId: ctx.user.id, accessTier: ctx.user.role });
+        if (!mgmt.allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have permission to create roles." });
+        }
+        if (!mgmt.isAdmin && input.accessLevel === "admin") {
+          const req = await mod.createApprovalRequest({
+            organizationId: input.organizationId,
+            type: "custom_role",
+            payload: JSON.stringify(input),
+            requestedByUserId: ctx.user.id,
+            requestedByStaffId: mgmt.actorStaffId ?? null,
+          });
+          await auditAccess(ctx, { action: "create", resourceType: "approval_request", resourceId: Number(req.id), detail: `custom_role:${input.name}:admin` });
+          return { pendingApproval: true as const, approvalId: Number(req.id) };
+        }
         const result = await mod.createCustomRole(input);
-        await auditAccess(ctx, { action: "create", resourceType: "custom_role", resourceId: result.id, detail: `${input.name}:${input.accessLevel}` });
-        return result;
+        await auditAccess(ctx, { action: "create", resourceType: "custom_role", resourceId: Number(result.id), detail: `${input.name}:${input.accessLevel}` });
+        return { pendingApproval: false as const, id: Number(result.id) };
       }),
-    delete: orgAdminProcedure
+    delete: orgStaffProcedure
       .input(z.object({ id: z.number(), organizationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
+        const mgmt = await mod.resolveStaffManagement({ organizationId: input.organizationId, userId: ctx.user.id, accessTier: ctx.user.role });
+        if (!mgmt.allowed) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You don't have permission to remove roles." });
+        }
         await mod.deleteCustomRole(input.id, input.organizationId);
         await auditAccess(ctx, { action: "delete", resourceType: "custom_role", resourceId: input.id });
         return { success: true };
+      }),
+  }),
+
+  // Higher-up approval queue: a manager's sensitive actions (admin-access role
+  // creation, new hires, role/access changes) land here as pending requests;
+  // org admins approve/deny, and approval applies the parked change.
+  approvals: router({
+    // Admins see the whole org's queue; managers see only their own requests.
+    list: orgStaffProcedure
+      .input(z.object({
+        organizationId: z.number(),
+        status: z.enum(["pending", "approved", "denied"]).optional(),
+      }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user.role === "admin") {
+          return mod.listApprovalRequests(input.organizationId, { status: input.status });
+        }
+        return mod.listApprovalRequests(input.organizationId, { status: input.status, requestedByUserId: ctx.user.id });
+      }),
+    // Admin-only count for the notification badge / dashboard card.
+    pendingCount: orgAdminProcedure
+      .input(z.object({ organizationId: z.number() }))
+      .query(async ({ input }) => {
+        return { count: await mod.countPendingApprovals(input.organizationId) };
+      }),
+    approve: orgAdminProcedure
+      .input(z.object({ id: z.number(), organizationId: z.number(), note: z.string().max(500).optional() }))
+      .mutation(async ({ input, ctx }) => {
+        const res = await mod.decideApprovalRequest({ id: input.id, organizationId: input.organizationId, reviewerUserId: ctx.user.id, approve: true, note: input.note });
+        if (!res.ok) {
+          throw new TRPCError({ code: res.reason === "not_found" ? "NOT_FOUND" : "BAD_REQUEST", message: `Could not approve (${res.reason.replace(/_/g, " ")}).` });
+        }
+        await auditAccess(ctx, { action: "update", resourceType: "approval_request", resourceId: input.id, detail: `approved${res.applied ? ` -> ${res.applied.kind}:${res.applied.id}` : ""}` });
+        return res;
+      }),
+    deny: orgAdminProcedure
+      .input(z.object({ id: z.number(), organizationId: z.number(), note: z.string().max(500).optional() }))
+      .mutation(async ({ input, ctx }) => {
+        const res = await mod.decideApprovalRequest({ id: input.id, organizationId: input.organizationId, reviewerUserId: ctx.user.id, approve: false, note: input.note });
+        if (!res.ok) {
+          throw new TRPCError({ code: res.reason === "not_found" ? "NOT_FOUND" : "BAD_REQUEST", message: `Could not deny (${res.reason.replace(/_/g, " ")}).` });
+        }
+        await auditAccess(ctx, { action: "update", resourceType: "approval_request", resourceId: input.id, detail: "denied" });
+        return res;
       }),
   }),
 

@@ -20,6 +20,7 @@
 		1A3BCC16B7C1FE5B50E4C95E /* ERSEAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F428D27772F53354290D74CD /* ERSEAView.swift */; };
 		1AA190AA887C9B0D0EE0CE17 /* FamilyL10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37850FC58C15A2C7BB2D7FD9 /* FamilyL10n.swift */; };
 		1C0736AF3E3A71619E3C1B32 /* TimesheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9770EF0A8FE7AC10D1C5ACF /* TimesheetView.swift */; };
+		1C6ED120E6EF8DEB26802D4E /* ApprovalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6A432AE10DF5E7B6F71433D /* ApprovalsView.swift */; };
 		1D0BA933D0EA17FA00938613 /* FamilyMessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C45DBE05D2BC46E3BA4622 /* FamilyMessagesView.swift */; };
 		2127DD7B5EBCC3940014C4BB /* MessagingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35586F409AACB75FD9735D8A /* MessagingView.swift */; };
 		217C1A652C5D7597E809DAB8 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93506B6A71C7A4CC29B6C996 /* DesignSystem.swift */; };
@@ -76,7 +77,9 @@
 		949A639C238CB51CAC60B697 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20033ED1EE47F9DA5C21F53 /* APIClient.swift */; };
 		9B8C086A6FEA4B3377432D73 /* FamilyOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D282E0278E01839F5C630915 /* FamilyOnboardingView.swift */; };
 		9BB5FCEAD4FFFCAD23353730 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20033ED1EE47F9DA5C21F53 /* APIClient.swift */; };
+		9C8E3307644BC70BF10C7A2D /* ApprovalsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7823EC5430486C45A9E91826 /* ApprovalsAPI.swift */; };
 		9D28E89FB66DC1570CB69AFE /* SproutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0A38F9249A71D36C7C8D51 /* SproutApp.swift */; };
+		A3058054E827DCF596441578 /* ApprovalsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7823EC5430486C45A9E91826 /* ApprovalsAPI.swift */; };
 		AD4FD34FBD72A13C8BCB0AFD /* AttendancePlansView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 770FF0B138C77ACBF1C1520E /* AttendancePlansView.swift */; };
 		B2ACD528C988CB8E3883BDDE /* FamilyTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E7DB787F4DBCA0FEDBFCA5 /* FamilyTabView.swift */; };
 		B35C9847CA0EA544E59230E9 /* MockData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BEF0D0B340C6C48E3EE220D /* MockData.swift */; };
@@ -146,6 +149,7 @@
 		77A8B840E1C449839C00BDA0 /* EnrollmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrollmentView.swift; sourceTree = "<group>"; };
 		77D50A071799AC85F38203A5 /* NutritionFormsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionFormsView.swift; sourceTree = "<group>"; };
 		77E7DB787F4DBCA0FEDBFCA5 /* FamilyTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyTabView.swift; sourceTree = "<group>"; };
+		7823EC5430486C45A9E91826 /* ApprovalsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalsAPI.swift; sourceTree = "<group>"; };
 		7CA434A9F7637F6318F76281 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		812CB4ACECA6E348060D41AF /* DailyReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyReportsView.swift; sourceTree = "<group>"; };
 		82D4C441E49751379B7D52C1 /* StaffManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffManagement.swift; sourceTree = "<group>"; };
@@ -180,6 +184,7 @@
 		DECBB9A993DBA322E5AA82A3 /* GrantBudgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrantBudgetView.swift; sourceTree = "<group>"; };
 		DF00056D3C1220DF7611B6EA /* ClassroomQualityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassroomQualityView.swift; sourceTree = "<group>"; };
 		DF253E6583C20F46AD69F34C /* HealthRecordsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthRecordsAPI.swift; sourceTree = "<group>"; };
+		E6A432AE10DF5E7B6F71433D /* ApprovalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalsView.swift; sourceTree = "<group>"; };
 		EA1132B5A3BF1C3FD2E869B8 /* SproutTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SproutTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EAD9B4ED73F9FD6C4D9BAC4C /* SproutFamilyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SproutFamilyApp.swift; sourceTree = "<group>"; };
 		F428D27772F53354290D74CD /* ERSEAView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ERSEAView.swift; sourceTree = "<group>"; };
@@ -395,6 +400,14 @@
 			path = InKind;
 			sourceTree = "<group>";
 		};
+		825B96C8B73F5BFF689FBFD3 /* Approvals */ = {
+			isa = PBXGroup;
+			children = (
+				E6A432AE10DF5E7B6F71433D /* ApprovalsView.swift */,
+			);
+			path = Approvals;
+			sourceTree = "<group>";
+		};
 		8BDCFE035F2D255DCC35FFF1 /* GrantBudget */ = {
 			isa = PBXGroup;
 			children = (
@@ -439,6 +452,7 @@
 			isa = PBXGroup;
 			children = (
 				D20033ED1EE47F9DA5C21F53 /* APIClient.swift */,
+				7823EC5430486C45A9E91826 /* ApprovalsAPI.swift */,
 				20E632C924EBB7DD31C20312 /* ComplianceChecklistAPI.swift */,
 				5618DBB10822780B4646D530 /* ConversationViewModel.swift */,
 				DF253E6583C20F46AD69F34C /* HealthRecordsAPI.swift */,
@@ -566,6 +580,7 @@
 			isa = PBXGroup;
 			children = (
 				61ABE583DDDFDBF8EB8DC1F5 /* App */,
+				825B96C8B73F5BFF689FBFD3 /* Approvals */,
 				E4E56FA70BAB08FD6729A01B /* Assessments */,
 				4A2AFD582D496A8B618B7922 /* Attendance */,
 				F95487D330C411D02F75CA34 /* BulkActions */,
@@ -708,6 +723,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9BB5FCEAD4FFFCAD23353730 /* APIClient.swift in Sources */,
+				A3058054E827DCF596441578 /* ApprovalsAPI.swift in Sources */,
 				58D0872F5B464DFB74FCEC9D /* ComplianceChecklistAPI.swift in Sources */,
 				F66DA6B702C6CAD8D48111DF /* ConversationViewModel.swift in Sources */,
 				217C1A652C5D7597E809DAB8 /* DesignSystem.swift in Sources */,
@@ -747,6 +763,8 @@
 				7918B6469C29D1F02C6C82B7 /* AbsenceReportsView.swift in Sources */,
 				FE0CECEF6F3323A3C87A451C /* AppState.swift in Sources */,
 				49D81A83A5775E0CC276E38C /* ApplicationVerificationView.swift in Sources */,
+				9C8E3307644BC70BF10C7A2D /* ApprovalsAPI.swift in Sources */,
+				1C6ED120E6EF8DEB26802D4E /* ApprovalsView.swift in Sources */,
 				434D8D4586C3D0E4EDFC2DC1 /* AssessmentsView.swift in Sources */,
 				AD4FD34FBD72A13C8BCB0AFD /* AttendancePlansView.swift in Sources */,
 				2B7BDB0AD067516CF77FD6EF /* AttendanceView.swift in Sources */,

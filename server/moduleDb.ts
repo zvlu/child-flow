@@ -22,6 +22,7 @@ import {
   InsertEducationRecord, InsertAiInsight, InsertBulkActionLog,
   InsertActivityLog, InsertAttendance,
   customRoles, InsertCustomRole,
+  approvalRequests, InsertApprovalRequest,
   enrollmentApplications, InsertEnrollmentApplication,
   inKindContributions, InsertInKindContribution,
   programRequests, InsertProgramRequest, organizations, InsertOrganization,
@@ -269,6 +270,8 @@ export async function getAttendanceRange(organizationId: number, start: Date, en
  */
 export const STAFF_MANAGER_ROLES = new Set<string>([
   "director",
+  "assistant_director",
+  "center_director",
   "education_coordinator",
   "health_coordinator",
   "disabilities_coordinator",
@@ -424,6 +427,7 @@ export async function getStaffOrgChart(organizationId: number) {
       lastName: staff.lastName,
       position: staff.position,
       role: staff.role,
+      customRoleId: staff.customRoleId,
       supervisorId: staff.supervisorId,
       isActive: staff.isActive,
     })
@@ -508,6 +512,122 @@ export async function deleteCustomRole(id: number, organizationId: number) {
     .delete(customRoles)
     .where(and(eq(customRoles.id, id), eq(customRoles.organizationId, organizationId)));
   return { success: true };
+}
+
+// ==================== APPROVAL REQUESTS ====================
+//
+// Higher-up sign-off queue. A manager-tier staffer's sensitive action is parked
+// here (deferred-payload model) and only applied when an org admin approves. See
+// the approval_requests table in drizzle/schema.ts. The router builds the
+// payload; here we persist, list, and apply-on-approve.
+
+export type ApprovalRequestType = "custom_role" | "staff_hire" | "staff_role_change";
+
+export async function createApprovalRequest(data: InsertApprovalRequest) {
+  const db = await requireDb();
+  const [result] = await db.insert(approvalRequests).values(data);
+  return { id: result.insertId };
+}
+
+export async function getApprovalRequest(id: number, organizationId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(approvalRequests)
+    .where(and(eq(approvalRequests.id, id), eq(approvalRequests.organizationId, organizationId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Approval rows for an org, newest first. `status` filters by decision state;
+ * `requestedByUserId` narrows to one submitter's own requests (used so a
+ * manager sees the status of what they submitted, without seeing the whole org).
+ */
+export async function listApprovalRequests(
+  organizationId: number,
+  opts?: { status?: "pending" | "approved" | "denied"; requestedByUserId?: number },
+) {
+  const db = await requireDb();
+  const conds = [eq(approvalRequests.organizationId, organizationId)];
+  if (opts?.status) conds.push(eq(approvalRequests.status, opts.status));
+  if (opts?.requestedByUserId != null) conds.push(eq(approvalRequests.requestedByUserId, opts.requestedByUserId));
+  return db
+    .select()
+    .from(approvalRequests)
+    .where(and(...conds))
+    .orderBy(desc(approvalRequests.createdAt));
+}
+
+/** Count of still-pending requests for an org (drives the admin badge/alert). */
+export async function countPendingApprovals(organizationId: number): Promise<number> {
+  const db = await requireDb();
+  const [row] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(approvalRequests)
+    .where(and(eq(approvalRequests.organizationId, organizationId), eq(approvalRequests.status, "pending")));
+  return Number(row?.n ?? 0);
+}
+
+/**
+ * Approve or deny a pending request. On approve, the stored payload is applied
+ * via the same create/update helpers a direct admin action would use, re-scoped
+ * to the request's own org (defense-in-depth against a tampered payload). On
+ * deny, only the decision fields are written. Idempotent-safe: a non-pending
+ * request is rejected so a double-approve can't apply twice.
+ */
+export async function decideApprovalRequest(opts: {
+  id: number;
+  organizationId: number;
+  reviewerUserId: number;
+  approve: boolean;
+  note?: string;
+}): Promise<
+  | { ok: true; applied: { kind: string; id: number } | null }
+  | { ok: false; reason: "not_found" | "already_reviewed" | "missing_target" | "target_gone" }
+> {
+  const db = await requireDb();
+  const req = await getApprovalRequest(opts.id, opts.organizationId);
+  if (!req) return { ok: false, reason: "not_found" };
+  if (req.status !== "pending") return { ok: false, reason: "already_reviewed" };
+
+  let applied: { kind: string; id: number } | null = null;
+  if (opts.approve) {
+    const payload = JSON.parse(req.payload) as Record<string, unknown>;
+    switch (req.type as ApprovalRequestType) {
+      case "custom_role": {
+        const r = await createCustomRole({ ...(payload as InsertCustomRole), organizationId: req.organizationId });
+        applied = { kind: "custom_role", id: Number(r.id) };
+        break;
+      }
+      case "staff_hire": {
+        const r = await createStaff({ ...(payload as InsertStaff), organizationId: req.organizationId });
+        applied = { kind: "staff", id: Number(r.id) };
+        break;
+      }
+      case "staff_role_change": {
+        if (req.targetStaffId == null) return { ok: false, reason: "missing_target" };
+        // The person may have been removed/moved since the request was filed.
+        const target = await getStaffInOrg(req.organizationId, req.targetStaffId);
+        if (!target) return { ok: false, reason: "target_gone" };
+        await updateStaff(req.targetStaffId, payload as Partial<InsertStaff>);
+        applied = { kind: "staff", id: req.targetStaffId };
+        break;
+      }
+    }
+  }
+
+  await db
+    .update(approvalRequests)
+    .set({
+      status: opts.approve ? "approved" : "denied",
+      reviewedBy: opts.reviewerUserId,
+      reviewedAt: new Date(),
+      decisionNote: opts.note ?? null,
+    })
+    .where(and(eq(approvalRequests.id, opts.id), eq(approvalRequests.organizationId, opts.organizationId)));
+
+  return { ok: true, applied };
 }
 
 // ==================== ENROLLMENT APPLICATIONS ====================

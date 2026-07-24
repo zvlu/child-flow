@@ -54,10 +54,21 @@ const roleColorClasses: Record<RoleColor, string> = {
   blue: "bg-blue-100 text-blue-700 border-blue-200",
 };
 
+// Functional roles that may define custom roles (mirrors STAFF_MANAGER_ROLES on
+// the server). Admin access tier can too. Managers create staff-access roles
+// directly; admin-access roles they create go to approval.
+const SETTINGS_MANAGER_ROLES = new Set<string>([
+  "director", "assistant_director", "center_director",
+  "education_coordinator", "health_coordinator", "disabilities_coordinator",
+  "ersea_coordinator", "family_services_manager",
+]);
+
 export default function Settings() {
   const { user, loading, refresh } = useAuth();
   const isAdmin = useIsAdmin();
   const orgModules = useOrgModules();
+  const { data: myStaffRole } = trpc.staff.myRole.useQuery(undefined, { enabled: !!user && user.role !== "parent" });
+  const canManageRoles = isAdmin || SETTINGS_MANAGER_ROLES.has(myStaffRole?.role ?? "");
 
   const initials = user?.name
     ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -76,10 +87,10 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="account">
-        <TabsList className={`grid w-full ${isAdmin ? "grid-cols-6 max-w-3xl" : "grid-cols-4 max-w-xl"}`}>
+        <TabsList className={`grid w-full ${isAdmin ? "grid-cols-6 max-w-3xl" : canManageRoles ? "grid-cols-5 max-w-2xl" : "grid-cols-4 max-w-xl"}`}>
           <TabsTrigger value="account">Account</TabsTrigger>
           {isAdmin && <TabsTrigger value="program">Program</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
+          {canManageRoles && <TabsTrigger value="users">{isAdmin ? "Users" : "Roles"}</TabsTrigger>}
           <TabsTrigger value="layout">Layout</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
@@ -118,11 +129,12 @@ export default function Settings() {
         </TabsContent>
         )}
 
-        {/* User Management (admin only) — real staff + custom role labels */}
-        {isAdmin && (
+        {/* Roles + User Management. Managers can define custom roles; only
+            admins manage the underlying staff/login accounts. */}
+        {canManageRoles && (
         <TabsContent value="users" className="mt-4 space-y-6">
-          <CustomRolesManager />
-          <StaffUsers />
+          <CustomRolesManager isAdmin={isAdmin} />
+          {isAdmin && <StaffUsers />}
         </TabsContent>
         )}
 
@@ -538,7 +550,7 @@ function TwoFactorCard({ enabled, onSaved, disabled }: { enabled: boolean; onSav
 
 /* --------------------------- Custom Roles --------------------------- */
 
-function CustomRolesManager() {
+function CustomRolesManager({ isAdmin }: { isAdmin: boolean }) {
   const utils = trpc.useUtils();
   const rolesQuery = trpc.roles.list.useQuery(ORGANIZATION_ID);
   const [open, setOpen] = useState(false);
@@ -547,7 +559,13 @@ function CustomRolesManager() {
   );
 
   const create = trpc.roles.create.useMutation({
-    onSuccess: () => { utils.roles.list.invalidate(); setOpen(false); setForm({ name: "", description: "", accessLevel: "staff", color: "sage" }); toast.success("Role created"); },
+    onSuccess: (data) => {
+      utils.roles.list.invalidate();
+      utils.approvals.list.invalidate();
+      setOpen(false);
+      setForm({ name: "", description: "", accessLevel: "staff", color: "sage" });
+      toast.success(data?.pendingApproval ? "Admin-access role submitted for approval." : "Role created");
+    },
     onError: (e) => toast.error(e.message || "Could not create role"),
   });
   const remove = trpc.roles.delete.useMutation({
@@ -627,6 +645,9 @@ function CustomRolesManager() {
                     <SelectItem value="admin">Admin — full administration</SelectItem>
                   </SelectContent>
                 </Select>
+                {!isAdmin && form.accessLevel === "admin" && (
+                  <p className="text-xs text-amber-600">An admin-access role needs an administrator's approval before it's created.</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Badge color</Label>

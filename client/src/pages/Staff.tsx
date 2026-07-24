@@ -38,6 +38,16 @@ const roleLabels: Record<string, string> = {
   cook: "Cook / Food Service",
   bus_driver: "Bus Driver",
   coordinator: "Coordinator (legacy)",
+  assistant_director: "Assistant Director",
+  center_director: "Center Director",
+  data_manager: "Data Manager",
+  lead_teacher: "Lead Teacher",
+  office_manager: "Office Manager",
+  enrollment_specialist: "Enrollment Specialist",
+  custodian: "Custodian / Maintenance",
+  bus_monitor: "Bus Monitor",
+  kitchen_assistant: "Kitchen Assistant",
+  substitute: "Substitute / Floater",
 };
 
 const roleColors: Record<string, string> = {
@@ -77,6 +87,9 @@ const STAFF_ROLES = [
   "teacher", "assistant",
   "cook", "bus_driver",
   "coordinator",
+  "assistant_director", "center_director", "data_manager", "lead_teacher",
+  "office_manager", "enrollment_specialist", "custodian", "bus_monitor",
+  "kitchen_assistant", "substitute",
 ] as const;
 type StaffRole = (typeof STAFF_ROLES)[number];
 
@@ -87,6 +100,8 @@ type StaffFormState = {
   phone: string;
   position: string;
   role: StaffRole;
+  /** Optional org-defined role label overlaid on the fixed `role`. */
+  customRoleId: number | null;
   supervisorId: number | null;
 };
 
@@ -97,6 +112,7 @@ const emptyForm: StaffFormState = {
   phone: "",
   position: "",
   role: "teacher",
+  customRoleId: null,
   supervisorId: null,
 };
 
@@ -104,6 +120,8 @@ const emptyForm: StaffFormState = {
 // STAFF_MANAGER_ROLES on the server). Admin access tier can manage everyone.
 const MANAGER_ROLES = new Set<string>([
   "director",
+  "assistant_director",
+  "center_director",
   "education_coordinator",
   "health_coordinator",
   "disabilities_coordinator",
@@ -133,10 +151,12 @@ export default function Staff() {
   const { data: myRole } = trpc.staff.myRole.useQuery();
   const isManager = isAdmin || MANAGER_ROLES.has(myRole?.role ?? "");
   const myStaffId = myRole?.staffId ?? null;
+  const { data: customRoles } = trpc.roles.list.useQuery(ORGANIZATION_ID);
   const createStaff = trpc.staff.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       utils.staff.list.invalidate();
-      toast.success("Staff member added");
+      utils.approvals.list.invalidate();
+      toast.success(data?.pendingApproval ? "Hire submitted for approval — an admin will review it." : "Staff member added");
       setAddOpen(false);
       setForm(emptyForm);
     },
@@ -144,9 +164,10 @@ export default function Staff() {
   });
 
   const updateStaff = trpc.staff.update.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       utils.staff.list.invalidate();
-      toast.success("Staff member updated");
+      utils.approvals.list.invalidate();
+      toast.success(data?.pendingApproval ? "Change submitted for approval — an admin will review it." : "Staff member updated");
       setEditId(null);
       setForm(emptyForm);
     },
@@ -215,6 +236,7 @@ export default function Staff() {
       phone: member.phone ?? "",
       position: member.position ?? "",
       role: member.role ?? "teacher",
+      customRoleId: (member as { customRoleId?: number | null }).customRoleId ?? null,
       supervisorId: (member as { supervisorId?: number | null }).supervisorId ?? null,
     });
     setEditId(member.id);
@@ -232,6 +254,7 @@ export default function Staff() {
       phone: form.phone.trim() || undefined,
       position: form.position.trim() || undefined,
       role: form.role,
+      customRoleId: form.customRoleId,
       // Only admins set the reporting line; managers' new hires are auto-
       // assigned to them on the server.
       ...(isAdmin ? { supervisorId: form.supervisorId ?? undefined } : {}),
@@ -289,6 +312,28 @@ export default function Staff() {
           </Select>
         </div>
       </div>
+      {/* Optional org-defined role label. Layered on top of the fixed role
+          above (which still drives access + manager semantics); shown as the
+          person's title where set. Programs create these in Settings. */}
+      {(customRoles?.length ?? 0) > 0 && (
+        <div className="space-y-1.5">
+          <Label>Custom role label (optional)</Label>
+          <Select
+            value={form.customRoleId != null ? String(form.customRoleId) : "none"}
+            onValueChange={(v) => setForm(f => ({ ...f, customRoleId: v === "none" ? null : Number(v) }))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Use standard role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Use standard role</SelectItem>
+              {customRoles!.map((r) => (
+                <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       {/* Reporting line — admins choose who this employee reports to. A
           manager adding their own staff has them assigned automatically. */}
       {isAdmin && (

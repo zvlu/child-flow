@@ -16,7 +16,13 @@ import Foundation
 // date encoding) locally instead of editing APIClient.swift.
 
 struct CreateStaffResponse: Decodable {
-    let id: String
+    /// True when a manager-tier caller's hire was parked as a pending approval
+    /// rather than created outright. Absent/false on the admin (direct) path.
+    let pendingApproval: Bool?
+    /// Present when the staff row was created directly (admin path).
+    let id: String?
+    /// Present when the hire was parked for approval (manager path).
+    let approvalId: Int?
 }
 
 struct LogTrainingResponse: Decodable {
@@ -25,8 +31,9 @@ struct LogTrainingResponse: Decodable {
 }
 
 extension APIClient {
-    /// Admin-only server-side — throws `APIError.httpError(403)` if the
-    /// signed-in user isn't an admin.
+    /// Admins create the staff row directly; manager-tier staff (director,
+    /// coordinators) may add people too, but the hire is parked as a pending
+    /// approval for a higher-up (response has `pendingApproval == true`).
     @discardableResult
     func createStaffMember(
         firstName: String,
