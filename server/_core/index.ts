@@ -3,6 +3,8 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { sql } from "drizzle-orm";
+import { getDb } from "../db";
 import { registerAuthRoutes } from "./auth";
 import { registerOAuthRoutes } from "./oauth";
 import { registerDashboardRoutes } from "../dashboard";
@@ -75,6 +77,28 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // Coarse per-IP rate limit across the API (auth routes keep stricter limits).
+  // Ops liveness/readiness probe (load balancers, uptime monitors). Not under
+  // /api, so it's unauthenticated and not rate-limited. 200 = app up + DB
+  // reachable; 503 = DB unreachable (so a monitor can page / drain traffic).
+  app.get("/healthz", async (_req, res) => {
+    let db = false;
+    try {
+      const d = await getDb();
+      if (d) {
+        await d.execute(sql`select 1`);
+        db = true;
+      }
+    } catch {
+      /* DB unreachable */
+    }
+    res.status(db ? 200 : 503).json({
+      ok: db,
+      db,
+      uptimeSeconds: Math.round(process.uptime()),
+      time: new Date().toISOString(),
+    });
+  });
+
   app.use("/api", apiRateLimiter);
   // Locally-stored document uploads (server/fileStorage.ts) — see that file
   // for why this is disk-based instead of S3/GCS.
