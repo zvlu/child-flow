@@ -8,7 +8,8 @@ import { ArrowLeft, Mail, Phone, Briefcase, Users, School, Award, Loader2, UserC
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
-import { roleLabels, roleColors } from "./Staff";
+import { ROLE_LABELS as roleLabels } from "@shared/roles";
+import { roleColors } from "./Staff";
 
 /** Turn an audit-log row into a one-line, human-readable activity entry. */
 function activityLabel(a: { action: string; resourceType: string; resourceId?: string | null; detail?: string | null }): string {

@@ -17,40 +17,11 @@ import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/date";
 import { objectsToCsv, downloadCsv } from "@/lib/csv";
+import { type StaffRoleValue, ROLE_LABELS as roleLabels, STAFF_MANAGER_ROLES } from "@shared/roles";
 
-/** §1302.91 staffing taxonomy — grouped roughly by service area. */
-export const roleLabels: Record<string, string> = {
-  director: "Head Start Director",
-  admin: "Administrator",
-  fiscal_officer: "Fiscal Officer",
-  education_coordinator: "Education Coordinator",
-  coach: "Coach",
-  teacher: "Teacher",
-  assistant: "Assistant Teacher",
-  health_coordinator: "Health Coordinator",
-  nurse: "Nurse",
-  nutritionist: "Nutritionist / RD",
-  mental_health_consultant: "Mental Health Consultant",
-  disabilities_coordinator: "Disabilities Coordinator",
-  family_services_manager: "Family Services Manager",
-  family_advocate: "Family Advocate",
-  home_visitor: "Home Visitor",
-  ersea_coordinator: "ERSEA Coordinator",
-  cook: "Cook / Food Service",
-  bus_driver: "Bus Driver",
-  coordinator: "Coordinator (legacy)",
-  assistant_director: "Assistant Director",
-  center_director: "Center Director",
-  data_manager: "Data Manager",
-  lead_teacher: "Lead Teacher",
-  office_manager: "Office Manager",
-  enrollment_specialist: "Enrollment Specialist",
-  custodian: "Custodian / Maintenance",
-  bus_monitor: "Bus Monitor",
-  kitchen_assistant: "Kitchen Assistant",
-  substitute: "Substitute / Floater",
-};
-
+// roleLabels, the role value list, and the manager set all come from
+// @shared/roles (single source of truth). roleColors stays here — it's
+// web-only Tailwind styling, not shared taxonomy.
 export const roleColors: Record<string, string> = {
   admin: "bg-amber-100 text-amber-700 border-amber-200",
   teacher: "bg-blue-100 text-blue-700 border-blue-200",
@@ -78,21 +49,7 @@ const trainingEvents = [
   { title: "CPR/First Aid Renewal", date: "Jan 15, 2027", hours: 4, required: true },
 ];
 
-const STAFF_ROLES = [
-  "admin", "director", "fiscal_officer",
-  "education_coordinator", "coach",
-  "health_coordinator", "nurse", "nutritionist", "mental_health_consultant",
-  "disabilities_coordinator",
-  "family_services_manager", "family_advocate", "home_visitor",
-  "ersea_coordinator",
-  "teacher", "assistant",
-  "cook", "bus_driver",
-  "coordinator",
-  "assistant_director", "center_director", "data_manager", "lead_teacher",
-  "office_manager", "enrollment_specialist", "custodian", "bus_monitor",
-  "kitchen_assistant", "substitute",
-] as const;
-type StaffRole = (typeof STAFF_ROLES)[number];
+type StaffRole = StaffRoleValue;
 
 type StaffFormState = {
   firstName: string;
@@ -117,18 +74,9 @@ const emptyForm: StaffFormState = {
   supervisorId: null,
 };
 
-// Functional roles that may manage the employees who report to them (mirrors
-// STAFF_MANAGER_ROLES on the server). Admin access tier can manage everyone.
-const MANAGER_ROLES = new Set<string>([
-  "director",
-  "assistant_director",
-  "center_director",
-  "education_coordinator",
-  "health_coordinator",
-  "disabilities_coordinator",
-  "ersea_coordinator",
-  "family_services_manager",
-]);
+// Functional roles that may manage the employees who report to them. Admin
+// access tier can manage everyone. Sourced from @shared/roles.
+const MANAGER_ROLES = new Set<string>(STAFF_MANAGER_ROLES);
 
 function initials(first: string, last: string) {
   return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";

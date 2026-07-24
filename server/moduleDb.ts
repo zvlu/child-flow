@@ -32,6 +32,7 @@ import {
 } from "../drizzle/schema";
 import { getDb } from "./db";
 import { isEmptyPatch } from "./_core/patch";
+import { STAFF_MANAGER_ROLES as SHARED_MANAGER_ROLES } from "@shared/roles";
 
 async function requireDb() {
   const db = await getDb();
@@ -268,16 +269,7 @@ export async function getAttendanceRange(organizationId: number, start: Date, en
  * users.role ACCESS tier ("admin") always can, org-wide; these functional
  * (staff.role) titles can manage only their direct reports.
  */
-export const STAFF_MANAGER_ROLES = new Set<string>([
-  "director",
-  "assistant_director",
-  "center_director",
-  "education_coordinator",
-  "health_coordinator",
-  "disabilities_coordinator",
-  "ersea_coordinator",
-  "family_services_manager",
-]);
+export const STAFF_MANAGER_ROLES = new Set<string>(SHARED_MANAGER_ROLES);
 
 /** A staff member's own functional role + id, for permission checks. */
 export async function getStaffSelf(organizationId: number, userId: number) {

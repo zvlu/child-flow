@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Settings as SettingsIcon, Bell, Lock, Users, Building2, Save, UserCircle, Loader2, Plus, Trash2, ShieldCheck, LayoutGrid, ChevronUp, ChevronDown, RotateCcw, Eye, EyeOff, Camera } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { ORGANIZATION_ID } from "@/const";
+import { STAFF_MANAGER_ROLES } from "@shared/roles";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useIsAdmin } from "@/_core/hooks/useIsAdmin";
 import { toast } from "sonner";
@@ -54,14 +55,10 @@ const roleColorClasses: Record<RoleColor, string> = {
   blue: "bg-blue-100 text-blue-700 border-blue-200",
 };
 
-// Functional roles that may define custom roles (mirrors STAFF_MANAGER_ROLES on
-// the server). Admin access tier can too. Managers create staff-access roles
-// directly; admin-access roles they create go to approval.
-const SETTINGS_MANAGER_ROLES = new Set<string>([
-  "director", "assistant_director", "center_director",
-  "education_coordinator", "health_coordinator", "disabilities_coordinator",
-  "ersea_coordinator", "family_services_manager",
-]);
+// Functional roles that may define custom roles — the shared manager set.
+// Admin access tier can too. Managers create staff-access roles directly;
+// admin-access roles they create go to approval.
+const SETTINGS_MANAGER_ROLES = new Set<string>(STAFF_MANAGER_ROLES);
 
 export default function Settings() {
   const { user, loading, refresh } = useAuth();

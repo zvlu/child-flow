@@ -1,5 +1,6 @@
 import { COOKIE_NAME, NOT_ADMIN_ERR_MSG } from "@shared/const";
 import { MODULE_IDS } from "@shared/modules";
+import { STAFF_ROLE_VALUES } from "@shared/roles";
 import { TRPCError } from "@trpc/server";
 import { randomUUID } from "crypto";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -110,26 +111,6 @@ async function assertStaffCapacity(organizationId: number, adding: number) {
     });
   }
 }
-
-/**
- * The §1302.91 functional-role taxonomy, as a Zod-enum tuple. Mirrors the
- * `staff.role` mysqlEnum in drizzle/schema.ts and the ROLE_LABELS map in
- * server/staffDirectory.ts (and the client/iOS label maps). Keep in sync.
- */
-const STAFF_ROLE_VALUES = [
-  "admin", "director", "fiscal_officer",
-  "education_coordinator", "coach",
-  "health_coordinator", "nurse", "nutritionist", "mental_health_consultant",
-  "disabilities_coordinator",
-  "family_services_manager", "family_advocate", "home_visitor",
-  "ersea_coordinator",
-  "teacher", "assistant",
-  "cook", "bus_driver",
-  "coordinator",
-  "assistant_director", "center_director", "data_manager", "lead_teacher",
-  "office_manager", "enrollment_specialist", "custodian", "bus_monitor",
-  "kitchen_assistant", "substitute",
-] as const;
 
 export const appRouter = router({
   system: systemRouter,

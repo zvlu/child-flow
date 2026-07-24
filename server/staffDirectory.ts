@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { and, eq } from "drizzle-orm";
+import { ROLE_LABELS } from "@shared/roles";
 import { classrooms, staff, staffTrainingLogs, type User } from "../drizzle/schema";
 import { sdk } from "./_core/sdk";
 import { clientIpFromReq } from "./_core/audit";
@@ -50,39 +51,7 @@ async function requireAdmin(req: Request): Promise<User | null> {
   }
 }
 
-// §1302.91 role enum -> the display title the web Staff page already uses
-// (client/src/pages/Staff.tsx's `roleLabels`) so both surfaces agree.
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Administrator",
-  director: "Head Start Director",
-  fiscal_officer: "Fiscal Officer",
-  education_coordinator: "Education Coordinator",
-  coach: "Coach",
-  health_coordinator: "Health Coordinator",
-  nurse: "Nurse",
-  nutritionist: "Nutritionist / RD",
-  mental_health_consultant: "Mental Health Consultant",
-  disabilities_coordinator: "Disabilities Coordinator",
-  family_services_manager: "Family Services Manager",
-  family_advocate: "Family Advocate",
-  home_visitor: "Home Visitor",
-  ersea_coordinator: "ERSEA Coordinator",
-  teacher: "Teacher",
-  assistant: "Assistant Teacher",
-  cook: "Cook",
-  bus_driver: "Bus Driver",
-  coordinator: "Coordinator",
-  assistant_director: "Assistant Director",
-  center_director: "Center Director",
-  data_manager: "Data Manager",
-  lead_teacher: "Lead Teacher",
-  office_manager: "Office Manager",
-  enrollment_specialist: "Enrollment Specialist",
-  custodian: "Custodian / Maintenance",
-  bus_monitor: "Bus Monitor",
-  kitchen_assistant: "Kitchen Assistant",
-  substitute: "Substitute / Floater",
-};
+// ROLE_LABELS is imported from @shared/roles (single source of truth).
 
 export function registerStaffDirectoryRoutes(app: Express) {
   app.get("/api/staff", async (req: Request, res: Response) => {
